@@ -1,0 +1,1261 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Painel da Igreja · Sistema Prover</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  /* ═══════════════════════════════════════
+     TOKENS & RESET
+  ═══════════════════════════════════════ */
+  :root {
+    --primary:    #1a3a5c;
+    --primary-light: #2563a8;
+    --accent:     #e8a020;
+    --accent-light: #ffd166;
+    --success:    #22c55e;
+    --danger:     #ef4444;
+    --warning:    #f59e0b;
+    --bg:         #f0f4f8;
+    --surface:    #ffffff;
+    --text:       #1e293b;
+    --text-muted: #64748b;
+    --border:     #e2e8f0;
+    --sidebar-w:  260px;
+    --radius:     12px;
+    --shadow:     0 2px 12px rgba(0,0,0,.08);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); }
+  a { text-decoration: none; color: inherit; }
+
+  /* ═══════════════════════════════════════
+     LOGIN
+  ═══════════════════════════════════════ */
+  #login-screen {
+    min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+  }
+  .login-card {
+    background: var(--surface);
+    border-radius: 20px;
+    padding: 48px 40px;
+    width: 400px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.25);
+    text-align: center;
+  }
+  .login-logo {
+    width: 80px; height: 80px;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    border-radius: 20px;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 24px;
+    font-size: 36px;
+  }
+  .login-card h1 { font-size: 24px; color: var(--primary); margin-bottom: 4px; }
+  .login-card p  { color: var(--text-muted); margin-bottom: 32px; font-size: 14px; }
+  .form-group { margin-bottom: 16px; text-align: left; }
+  .form-group label { display: block; font-size: 13px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; }
+  .form-group input, .form-group select {
+    width: 100%; padding: 12px 16px;
+    border: 2px solid var(--border); border-radius: 10px;
+    font-size: 15px; background: #f8fafc;
+    transition: border-color .2s;
+    outline: none;
+  }
+  .form-group input:focus, .form-group select:focus { border-color: var(--primary-light); background: #fff; }
+  .btn-login {
+    width: 100%; padding: 14px;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    color: #fff; border: none; border-radius: 10px;
+    font-size: 16px; font-weight: 700; cursor: pointer;
+    transition: transform .15s, box-shadow .15s;
+    margin-top: 8px;
+  }
+  .btn-login:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(26,58,92,.35); }
+  .login-error {
+    background: #fef2f2; border: 1px solid #fecaca;
+    color: #dc2626; padding: 10px 14px; border-radius: 8px;
+    font-size: 13px; margin-bottom: 16px; display: none;
+  }
+
+  /* ═══════════════════════════════════════
+     APP LAYOUT
+  ═══════════════════════════════════════ */
+  #app { display: none; min-height: 100vh; }
+
+  /* Sidebar */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0;
+    width: var(--sidebar-w);
+    background: linear-gradient(180deg, var(--primary) 0%, #0f2540 100%);
+    color: #fff; display: flex; flex-direction: column;
+    z-index: 100; overflow-y: auto;
+  }
+  .sidebar-brand {
+    padding: 28px 20px 20px;
+    border-bottom: 1px solid rgba(255,255,255,.1);
+  }
+  .sidebar-brand .logo { font-size: 28px; margin-bottom: 6px; }
+  .sidebar-brand h2 { font-size: 16px; font-weight: 700; }
+  .sidebar-brand p  { font-size: 11px; opacity: .6; margin-top: 2px; }
+  .sidebar-user {
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(255,255,255,.1);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .user-avatar {
+    width: 38px; height: 38px; border-radius: 50%;
+    background: var(--accent); display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 15px; color: var(--primary); flex-shrink: 0;
+  }
+  .user-name  { font-size: 13px; font-weight: 600; }
+  .user-role  { font-size: 11px; opacity: .65; }
+  .role-badge {
+    display: inline-block; padding: 2px 8px;
+    border-radius: 20px; font-size: 10px; font-weight: 700;
+    margin-top: 2px;
+  }
+  .role-pastor    { background: #ffd166; color: #7a4f00; }
+  .role-lider     { background: #a7f3d0; color: #065f46; }
+  .role-financeiro{ background: #bfdbfe; color: #1e3a8a; }
+  .role-secretaria{ background: #e9d5ff; color: #4c1d95; }
+
+  .sidebar-nav { flex: 1; padding: 16px 0; }
+  .nav-section { padding: 0 12px 8px; }
+  .nav-section-title {
+    font-size: 10px; font-weight: 700; letter-spacing: .08em;
+    opacity: .4; text-transform: uppercase; padding: 8px 8px 4px;
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 12px; border-radius: 10px; cursor: pointer;
+    font-size: 14px; font-weight: 500; opacity: .75;
+    transition: all .2s;
+  }
+  .nav-item:hover { background: rgba(255,255,255,.1); opacity: 1; }
+  .nav-item.active { background: rgba(255,255,255,.15); opacity: 1; }
+  .nav-item .icon { font-size: 18px; width: 22px; text-align: center; }
+  .nav-item .badge {
+    margin-left: auto; background: var(--accent); color: var(--primary);
+    font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 20px;
+  }
+
+  .sidebar-footer {
+    padding: 16px 20px;
+    border-top: 1px solid rgba(255,255,255,.1);
+  }
+  .btn-logout {
+    width: 100%; padding: 10px; background: rgba(255,255,255,.08);
+    border: 1px solid rgba(255,255,255,.15); border-radius: 8px;
+    color: #fff; cursor: pointer; font-size: 13px;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    transition: background .2s;
+  }
+  .btn-logout:hover { background: rgba(255,255,255,.15); }
+
+  /* Main content */
+  .main {
+    margin-left: var(--sidebar-w);
+    min-height: 100vh;
+    display: flex; flex-direction: column;
+  }
+  .topbar {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 16px 32px;
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 50;
+  }
+  .topbar-left h1 { font-size: 22px; font-weight: 700; color: var(--primary); }
+  .topbar-left p  { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+  .topbar-right { display: flex; align-items: center; gap: 12px; }
+  .btn-refresh {
+    padding: 8px 18px; border-radius: 8px; border: 2px solid var(--border);
+    background: var(--surface); cursor: pointer; font-size: 13px; font-weight: 600;
+    display: flex; align-items: center; gap: 6px; transition: all .2s;
+  }
+  .btn-refresh:hover { border-color: var(--primary-light); color: var(--primary-light); }
+  .last-update { font-size: 12px; color: var(--text-muted); }
+
+  .content { padding: 32px; flex: 1; }
+
+  /* ═══════════════════════════════════════
+     KPI CARDS
+  ═══════════════════════════════════════ */
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 28px; }
+  .kpi-card {
+    background: var(--surface); border-radius: var(--radius);
+    padding: 24px; box-shadow: var(--shadow);
+    border-left: 4px solid var(--primary-light);
+    transition: transform .2s;
+  }
+  .kpi-card:hover { transform: translateY(-2px); }
+  .kpi-card.accent   { border-left-color: var(--accent); }
+  .kpi-card.success  { border-left-color: var(--success); }
+  .kpi-card.warning  { border-left-color: var(--warning); }
+  .kpi-card.danger   { border-left-color: var(--danger); }
+  .kpi-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); }
+  .kpi-value { font-size: 32px; font-weight: 800; color: var(--primary); margin: 8px 0 4px; }
+  .kpi-sub   { font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 4px; }
+  .kpi-sub .up   { color: var(--success); }
+  .kpi-sub .down { color: var(--danger); }
+
+  /* ═══════════════════════════════════════
+     CARDS / PANELS
+  ═══════════════════════════════════════ */
+  .panel {
+    background: var(--surface); border-radius: var(--radius);
+    box-shadow: var(--shadow); margin-bottom: 24px; overflow: hidden;
+  }
+  .panel-header {
+    padding: 20px 24px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .panel-title { font-size: 16px; font-weight: 700; color: var(--primary); }
+  .panel-subtitle { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .panel-body { padding: 24px; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+
+  /* ═══════════════════════════════════════
+     TABLE
+  ═══════════════════════════════════════ */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  thead th {
+    background: #f8fafc; padding: 12px 16px;
+    text-align: left; font-size: 12px; font-weight: 700;
+    color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em;
+    border-bottom: 2px solid var(--border);
+  }
+  tbody td { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  tbody tr:hover { background: #f8fafc; }
+  tbody tr:last-child td { border-bottom: none; }
+  .tag {
+    display: inline-block; padding: 3px 10px; border-radius: 20px;
+    font-size: 11px; font-weight: 700;
+  }
+  .tag-green  { background: #dcfce7; color: #15803d; }
+  .tag-blue   { background: #dbeafe; color: #1d4ed8; }
+  .tag-yellow { background: #fef9c3; color: #a16207; }
+  .tag-red    { background: #fee2e2; color: #b91c1c; }
+
+  /* ═══════════════════════════════════════
+     SEARCH / FILTERS
+  ═══════════════════════════════════════ */
+  .filters { display: flex; gap: 12px; margin-bottom: 16px; align-items: center; }
+  .search-input {
+    flex: 1; padding: 10px 16px; border: 2px solid var(--border);
+    border-radius: 8px; font-size: 14px; outline: none;
+    transition: border-color .2s;
+  }
+  .search-input:focus { border-color: var(--primary-light); }
+  .filter-select {
+    padding: 10px 14px; border: 2px solid var(--border);
+    border-radius: 8px; font-size: 14px; outline: none; cursor: pointer;
+    background: var(--surface);
+  }
+  .filter-select:focus { border-color: var(--primary-light); }
+
+  /* ═══════════════════════════════════════
+     TABS (inside panels)
+  ═══════════════════════════════════════ */
+  .tabs { display: flex; gap: 0; border-bottom: 2px solid var(--border); margin-bottom: 20px; }
+  .tab-btn {
+    padding: 10px 20px; background: none; border: none;
+    font-size: 14px; font-weight: 600; color: var(--text-muted);
+    cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px;
+    transition: all .2s;
+  }
+  .tab-btn:hover { color: var(--primary); }
+  .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+  /* ═══════════════════════════════════════
+     LOADING / EMPTY
+  ═══════════════════════════════════════ */
+  .loading { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+  .loading .spinner {
+    width: 40px; height: 40px; border: 4px solid var(--border);
+    border-top-color: var(--primary-light); border-radius: 50%;
+    animation: spin 1s linear infinite; margin: 0 auto 16px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .empty { text-align: center; padding: 48px 20px; color: var(--text-muted); }
+  .empty .icon { font-size: 48px; margin-bottom: 12px; }
+
+  /* ═══════════════════════════════════════
+     SECTIONS (páginas)
+  ═══════════════════════════════════════ */
+  .section { display: none; }
+  .section.active { display: block; }
+
+  /* ═══════════════════════════════════════
+     PROGRESS BAR
+  ═══════════════════════════════════════ */
+  .progress-wrap { background: var(--border); border-radius: 4px; height: 8px; overflow: hidden; }
+  .progress-bar  { height: 100%; border-radius: 4px; transition: width .4s; }
+
+  /* ═══════════════════════════════════════
+     CELL LEADER CARD
+  ═══════════════════════════════════════ */
+  .cell-card {
+    background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow);
+    padding: 20px; border-top: 4px solid var(--primary-light);
+  }
+  .cell-card h3 { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .cell-card p  { font-size: 12px; color: var(--text-muted); margin-bottom: 16px; }
+  .cell-stat { display: flex; justify-content: space-between; align-items: center; margin: 8px 0; }
+  .cell-stat span:first-child { font-size: 13px; color: var(--text-muted); }
+  .cell-stat span:last-child  { font-size: 15px; font-weight: 700; color: var(--primary); }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    .sidebar { transform: translateX(-100%); transition: transform .3s; }
+    .sidebar.open { transform: translateX(0); }
+    .main { margin-left: 0; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════
+     LOGIN
+═══════════════════════════════════════ -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">⛪</div>
+    <h1>Painel da Igreja</h1>
+    <p>Acesso ao sistema de gestão integrado</p>
+
+    <div id="login-error" class="login-error">Usuário ou senha incorretos.</div>
+
+    <div class="form-group">
+      <label>Perfil de Acesso</label>
+      <select id="login-role">
+        <option value="">Selecione seu perfil...</option>
+        <option value="pastor">🕊 Pastor(a) — Visão Global</option>
+        <option value="lider">👥 Líder de Célula</option>
+        <option value="financeiro">💰 Financeiro</option>
+        <option value="secretaria">📋 Secretaria</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Usuário / Identificador</label>
+      <input type="text" id="login-user" placeholder="Ex: pastor.joao ou lider.maria">
+    </div>
+
+    <div class="form-group">
+      <label>Senha</label>
+      <input type="password" id="login-pass" placeholder="••••••••">
+    </div>
+
+    <button class="btn-login" onclick="doLogin()">Entrar →</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     APP
+═══════════════════════════════════════ -->
+<div id="app">
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="logo">⛪</div>
+      <h2>Painel da Igreja</h2>
+      <p>Sistema de Gestão</p>
+    </div>
+
+    <div class="sidebar-user">
+      <div class="user-avatar" id="user-avatar">P</div>
+      <div>
+        <div class="user-name" id="user-name">Carregando...</div>
+        <span class="role-badge" id="role-badge">—</span>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav" id="sidebar-nav"></nav>
+
+    <div class="sidebar-footer">
+      <button class="btn-logout" onclick="doLogout()">⬅ Sair</button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <header class="topbar">
+      <div class="topbar-left">
+        <h1 id="page-title">Dashboard</h1>
+        <p id="page-sub">Visão geral do sistema</p>
+      </div>
+      <div class="topbar-right">
+        <span class="last-update" id="last-update"></span>
+        <button class="btn-refresh" onclick="refreshData()">🔄 Atualizar</button>
+      </div>
+    </header>
+
+    <div class="content" id="content">
+      <!-- Seções são injetadas aqui via JS -->
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  CONFIGURAÇÃO DE USUÁRIOS E ACESSOS
+//  Edite esta seção para configurar os usuários reais
+// ═══════════════════════════════════════════════════════════════
+const USERS = {
+  // PASTORES — visão global de tudo
+  "pastor.diego":    { senha: "prover2024", role: "pastor",     nome: "Pr. Diego",       celula: null },
+  "pastor.jose":     { senha: "prover2024", role: "pastor",     nome: "Pr. José",         celula: null },
+
+  // FINANCEIRO — só aba financeira
+  "fin.ana":         { senha: "fin2024",    role: "financeiro",  nome: "Ana (Financeiro)", celula: null },
+
+  // SECRETARIA — membros + eventos + células
+  "sec.maria":       { senha: "sec2024",    role: "secretaria",  nome: "Maria (Secretaria)", celula: null },
+
+  // LÍDERES — só veem a própria célula
+  // O campo "celula" deve bater com o nome/ID da célula no dataset
+  "lider.joao":      { senha: "lid2024",    role: "lider",       nome: "João (Líder)",     celula: "Célula Esperança" },
+  "lider.claudia":   { senha: "lid2024",    role: "lider",       nome: "Cláudia (Líder)",  celula: "Célula Família" },
+  "lider.pedro":     { senha: "lid2024",    role: "lider",       nome: "Pedro (Líder)",    celula: "Célula Jovens" },
+};
+
+// ═══════════════════════════════════════════════════════════════
+//  MENUS POR PERFIL
+// ═══════════════════════════════════════════════════════════════
+const MENUS = {
+  pastor: [
+    { section: "overview",    icon: "🏠", label: "Visão Geral" },
+    { section: "membros",     icon: "👥", label: "Membros" },
+    { section: "celulas",     icon: "🔵", label: "Células" },
+    { section: "financeiro",  icon: "💰", label: "Financeiro" },
+    { section: "eventos",     icon: "📅", label: "Eventos / Cultos" },
+    { section: "relatorios",  icon: "📊", label: "Relatórios" },
+  ],
+  secretaria: [
+    { section: "overview",    icon: "🏠", label: "Visão Geral" },
+    { section: "membros",     icon: "👥", label: "Membros" },
+    { section: "celulas",     icon: "🔵", label: "Células" },
+    { section: "eventos",     icon: "📅", label: "Eventos / Cultos" },
+  ],
+  financeiro: [
+    { section: "financeiro",  icon: "💰", label: "Financeiro" },
+    { section: "relatorios",  icon: "📊", label: "Relatórios" },
+  ],
+  lider: [
+    { section: "minha-celula", icon: "🏠", label: "Minha Célula" },
+    { section: "membros",      icon: "👥", label: "Meus Membros" },
+    { section: "presenca",     icon: "✅", label: "Presença" },
+  ],
+};
+
+const ROLE_LABELS = {
+  pastor:     "Pastor(a)",
+  secretaria: "Secretaria",
+  financeiro: "Financeiro",
+  lider:      "Líder de Célula",
+};
+const ROLE_CLASSES = {
+  pastor:     "role-pastor",
+  secretaria: "role-secretaria",
+  financeiro: "role-financeiro",
+  lider:      "role-lider",
+};
+
+// ═══════════════════════════════════════════════════════════════
+//  ESTADO GLOBAL
+// ═══════════════════════════════════════════════════════════════
+let currentUser = null;
+let currentSection = null;
+let allData = {}; // será preenchido ao conectar com Google Sheets ou CSV
+
+// ═══════════════════════════════════════════════════════════════
+//  DADOS DE DEMONSTRAÇÃO (substitua pela conexão real)
+//  Para conectar com Google Sheets, use loadFromGoogleSheets()
+// ═══════════════════════════════════════════════════════════════
+function generateDemoData() {
+  const celulas = ["Célula Esperança","Célula Família","Célula Jovens","Célula Vida","Célula Fé","Célula Graça"];
+  const lideres = ["João Silva","Cláudia Santos","Pedro Lima","Ana Rodrigues","Carlos Souza","Beatriz Costa"];
+  const statusMembro = ["Ativo","Ativo","Ativo","Visitante","Inativo","Transferido"];
+  const bairros = ["Centro","Jardim América","Vila Nova","Bom Retiro","Ipanema","São Paulo"];
+
+  const membros = Array.from({length: 148}, (_, i) => ({
+    id: i+1,
+    nome: `Membro ${i+1}`,
+    celula: celulas[i % celulas.length],
+    status: statusMembro[Math.floor(Math.random()*3)],
+    bairro: bairros[i % bairros.length],
+    data_ingresso: `${2018 + (i%6)}-${String(1+(i%12)).padStart(2,'0')}-${String(1+(i%28)).padStart(2,'0')}`,
+    telefone: `(41) 9${String(Math.floor(Math.random()*99999999)).padStart(8,'0')}`,
+  }));
+
+  const financeiro = Array.from({length: 24}, (_, i) => {
+    const mes = i % 12;
+    const ano = 2024 + Math.floor(i/12);
+    const dizimos  = 8000 + Math.random()*6000;
+    const ofertas  = 2000 + Math.random()*3000;
+    const despesas = 4000 + Math.random()*4000;
+    return {
+      mes: mes+1, ano, periodo: `${['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][mes]}/${ano}`,
+      dizimos: Math.round(dizimos), ofertas: Math.round(ofertas),
+      total_entradas: Math.round(dizimos+ofertas),
+      total_saidas: Math.round(despesas),
+      saldo: Math.round(dizimos+ofertas-despesas),
+    };
+  });
+
+  const celulasData = celulas.map((nome, i) => ({
+    nome, lider: lideres[i],
+    membros_ativos: 10 + Math.floor(Math.random()*20),
+    reunioes_mes: 3 + Math.floor(Math.random()*2),
+    media_presenca: 65 + Math.floor(Math.random()*30),
+    novos_mes: Math.floor(Math.random()*3),
+    bairro: bairros[i],
+    dia_semana: ["Segunda","Terça","Quarta","Quinta","Sexta","Sábado"][i],
+  }));
+
+  const eventos = Array.from({length: 12}, (_, i) => ({
+    data: `2025-${String(i+1).padStart(2,'0')}-07`,
+    evento: i % 3 === 0 ? "Culto de Celebração" : i % 3 === 1 ? "Culto de Ensino" : "Reunião Geral",
+    presentes: 80 + Math.floor(Math.random()*120),
+    membros: 60 + Math.floor(Math.random()*80),
+    visitantes: 20 + Math.floor(Math.random()*40),
+    oferta: Math.round(1200 + Math.random()*2000),
+  }));
+
+  return { membros, financeiro, celulas: celulasData, eventos };
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  CONECTAR COM GOOGLE SHEETS (coloque seu ID e API Key aqui)
+// ═══════════════════════════════════════════════════════════════
+const GOOGLE_SHEET_ID  = "";   // ex: "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms"
+const GOOGLE_API_KEY   = "";   // ex: "AIzaSyB..."
+
+async function loadFromGoogleSheets() {
+  if (!GOOGLE_SHEET_ID || !GOOGLE_API_KEY) return false;
+
+  const tabs = ["Membros","Financeiro","Celulas","Eventos"];
+  const data = {};
+  for (const tab of tabs) {
+    try {
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEET_ID}/values/${tab}?key=${GOOGLE_API_KEY}`;
+      const r = await fetch(url);
+      const json = await r.json();
+      if (json.values && json.values.length > 1) {
+        const [headers, ...rows] = json.values;
+        data[tab.toLowerCase()] = rows.map(row =>
+          Object.fromEntries(headers.map((h,i) => [h, row[i] || ""]))
+        );
+      }
+    } catch(e) { console.warn(`Erro ao carregar ${tab}:`, e); }
+  }
+  return Object.keys(data).length > 0 ? data : false;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  AUTENTICAÇÃO
+// ═══════════════════════════════════════════════════════════════
+function doLogin() {
+  const role = document.getElementById("login-role").value;
+  const user = document.getElementById("login-user").value.trim();
+  const pass = document.getElementById("login-pass").value;
+  const err  = document.getElementById("login-error");
+
+  if (!role || !user || !pass) {
+    err.textContent = "Preencha todos os campos."; err.style.display = "block"; return;
+  }
+
+  const u = USERS[user];
+  if (!u || u.senha !== pass || u.role !== role) {
+    err.textContent = "Usuário, senha ou perfil incorretos."; err.style.display = "block"; return;
+  }
+
+  err.style.display = "none";
+  currentUser = { ...u, username: user };
+  startApp();
+}
+
+document.addEventListener("keydown", e => {
+  if (e.key === "Enter" && document.getElementById("login-screen").style.display !== "none") doLogin();
+});
+
+function doLogout() {
+  currentUser = null;
+  document.getElementById("app").style.display = "none";
+  document.getElementById("login-screen").style.display = "flex";
+  document.getElementById("login-pass").value = "";
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  INICIAR APP
+// ═══════════════════════════════════════════════════════════════
+async function startApp() {
+  document.getElementById("login-screen").style.display = "none";
+  document.getElementById("app").style.display = "block";
+
+  // Avatar e nome
+  document.getElementById("user-avatar").textContent = currentUser.nome.charAt(0);
+  document.getElementById("user-name").textContent = currentUser.nome;
+  const badge = document.getElementById("role-badge");
+  badge.textContent = ROLE_LABELS[currentUser.role];
+  badge.className = `role-badge ${ROLE_CLASSES[currentUser.role]}`;
+
+  // Carregar dados
+  const sheets = await loadFromGoogleSheets();
+  allData = sheets || generateDemoData();
+
+  // Filtrar dados para líderes (só célula própria)
+  if (currentUser.role === "lider" && currentUser.celula) {
+    allData._minha_celula = allData.celulas?.find(c =>
+      c.nome?.toLowerCase() === currentUser.celula?.toLowerCase()
+    );
+    allData._meus_membros = allData.membros?.filter(m =>
+      m.celula?.toLowerCase() === currentUser.celula?.toLowerCase()
+    );
+  }
+
+  buildNav();
+  const firstSection = MENUS[currentUser.role][0].section;
+  showSection(firstSection);
+  updateLastUpdate();
+}
+
+function buildNav() {
+  const nav = document.getElementById("sidebar-nav");
+  const menu = MENUS[currentUser.role];
+  nav.innerHTML = menu.map(item => `
+    <div class="nav-section">
+      <div class="nav-item" id="nav-${item.section}" onclick="showSection('${item.section}')">
+        <span class="icon">${item.icon}</span>
+        <span>${item.label}</span>
+      </div>
+    </div>
+  `).join("");
+}
+
+function showSection(section) {
+  currentSection = section;
+  document.querySelectorAll(".nav-item").forEach(el => el.classList.remove("active"));
+  const active = document.getElementById(`nav-${section}`);
+  if (active) active.classList.add("active");
+
+  const content = document.getElementById("content");
+  content.innerHTML = `<div class="loading"><div class="spinner"></div>Carregando...</div>`;
+
+  setTimeout(() => {
+    const renders = {
+      "overview":     renderOverview,
+      "membros":      renderMembros,
+      "celulas":      renderCelulas,
+      "financeiro":   renderFinanceiro,
+      "eventos":      renderEventos,
+      "relatorios":   renderRelatorios,
+      "minha-celula": renderMinhaCelula,
+      "presenca":     renderPresenca,
+    };
+    const fn = renders[section] || (() => { content.innerHTML = `<div class="empty"><div class="icon">🚧</div><p>Seção em construção</p></div>`; });
+    fn();
+    document.getElementById("page-title").textContent = MENUS[currentUser.role].find(m=>m.section===section)?.label || section;
+  }, 300);
+}
+
+function updateLastUpdate() {
+  document.getElementById("last-update").textContent = `Atualizado: ${new Date().toLocaleString("pt-BR")}`;
+}
+
+function refreshData() {
+  updateLastUpdate();
+  showSection(currentSection);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════════════════════
+function fmt(n) { return Number(n).toLocaleString("pt-BR"); }
+function fmtBRL(n) { return Number(n).toLocaleString("pt-BR",{style:"currency",currency:"BRL"}); }
+
+function kpiCard(label, value, sub, variant="") {
+  return `<div class="kpi-card ${variant}">
+    <div class="kpi-label">${label}</div>
+    <div class="kpi-value">${value}</div>
+    <div class="kpi-sub">${sub}</div>
+  </div>`;
+}
+
+function createChart(id, type, labels, datasets, opts={}) {
+  const canvas = document.getElementById(id);
+  if (!canvas) return;
+  if (canvas._chart) canvas._chart.destroy();
+  canvas._chart = new Chart(canvas, {
+    type, data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: "bottom", labels: { font: { size: 12 } } } },
+      ...opts,
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SEÇÃO: OVERVIEW (Pastor / Secretaria)
+// ═══════════════════════════════════════════════════════════════
+function renderOverview() {
+  const m = allData.membros || [];
+  const c = allData.celulas || [];
+  const f = allData.financeiro || [];
+  const e = allData.eventos || [];
+
+  const ativos    = m.filter(x => x.status === "Ativo").length;
+  const visitantes = m.filter(x => x.status === "Visitante").length;
+  const finRecente = f.slice(-1)[0] || {};
+  const mediaPresenca = e.length ? Math.round(e.reduce((a,b) => a+(+b.presentes||0),0)/e.length) : 0;
+
+  document.getElementById("content").innerHTML = `
+    <div class="kpi-grid">
+      ${kpiCard("Total de Membros", fmt(m.length), `<span class="up">▲</span> ${ativos} ativos`, "")}
+      ${kpiCard("Células Ativas", fmt(c.length), `${c.reduce((a,b)=>a+(+b.membros_ativos||0),0)} membros nas células`, "accent")}
+      ${kpiCard("Entradas (mês)", fmtBRL(finRecente.total_entradas||0), `Dízimos + Ofertas`, "success")}
+      ${kpiCard("Presença Média", fmt(mediaPresenca), `Média por culto`, "warning")}
+      ${kpiCard("Visitantes", fmt(visitantes), `Aguardando integração`, "")}
+      ${kpiCard("Saldo do Mês", fmtBRL(finRecente.saldo||0), `${finRecente.periodo||"—"}`, finRecente.saldo>=0?"success":"danger")}
+    </div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-header">
+          <div><div class="panel-title">Crescimento de Membros</div><div class="panel-subtitle">Últimos 12 meses</div></div>
+        </div>
+        <div class="panel-body" style="height:260px">
+          <canvas id="chart-crescimento"></canvas>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-header">
+          <div><div class="panel-title">Entradas vs Saídas</div><div class="panel-subtitle">Últimos 6 meses</div></div>
+        </div>
+        <div class="panel-body" style="height:260px">
+          <canvas id="chart-financeiro"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-header">
+          <div><div class="panel-title">Distribuição por Célula</div></div>
+        </div>
+        <div class="panel-body" style="height:240px">
+          <canvas id="chart-celulas"></canvas>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-header">
+          <div><div class="panel-title">Status dos Membros</div></div>
+        </div>
+        <div class="panel-body" style="height:240px">
+          <canvas id="chart-status"></canvas>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Gráficos
+  setTimeout(() => {
+    const meses = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+    createChart("chart-crescimento","line",
+      meses, [{
+        label:"Membros Ativos",
+        data: meses.map((_,i)=>100+i*4+Math.floor(Math.random()*8)),
+        borderColor:"#2563a8", backgroundColor:"rgba(37,99,168,.1)", fill:true, tension:.4
+      }]);
+
+    const f6 = f.slice(-6);
+    createChart("chart-financeiro","bar",
+      f6.map(x=>x.periodo),
+      [
+        { label:"Entradas", data: f6.map(x=>+x.total_entradas||0), backgroundColor:"#22c55e" },
+        { label:"Saídas",   data: f6.map(x=>+x.total_saidas||0),   backgroundColor:"#ef4444" },
+      ]);
+
+    createChart("chart-celulas","doughnut",
+      c.map(x=>x.nome), [{
+        data: c.map(x=>+x.membros_ativos||0),
+        backgroundColor:["#2563a8","#e8a020","#22c55e","#8b5cf6","#ef4444","#06b6d4"]
+      }]);
+
+    const statusCount = {};
+    m.forEach(x => { statusCount[x.status] = (statusCount[x.status]||0)+1; });
+    createChart("chart-status","pie",
+      Object.keys(statusCount),
+      [{
+        data: Object.values(statusCount),
+        backgroundColor:["#22c55e","#e8a020","#ef4444","#8b5cf6","#64748b"]
+      }]);
+  }, 50);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SEÇÃO: MEMBROS
+// ═══════════════════════════════════════════════════════════════
+function renderMembros() {
+  const m = (currentUser.role === "lider" ? allData._meus_membros : allData.membros) || [];
+
+  document.getElementById("content").innerHTML = `
+    <div class="kpi-grid">
+      ${kpiCard("Total", fmt(m.length), "cadastrados", "")}
+      ${kpiCard("Ativos", fmt(m.filter(x=>x.status==="Ativo").length), "membros", "success")}
+      ${kpiCard("Visitantes", fmt(m.filter(x=>x.status==="Visitante").length), "em acompanhamento", "accent")}
+      ${kpiCard("Inativos", fmt(m.filter(x=>x.status==="Inativo").length), "sem participação", "danger")}
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <div><div class="panel-title">Lista de Membros</div></div>
+      </div>
+      <div class="panel-body">
+        <div class="filters">
+          <input class="search-input" id="search-membro" placeholder="🔍 Buscar por nome, célula, bairro..." oninput="filterMembros()">
+          <select class="filter-select" id="filter-status" onchange="filterMembros()">
+            <option value="">Todos os status</option>
+            <option>Ativo</option><option>Visitante</option><option>Inativo</option><option>Transferido</option>
+          </select>
+          ${currentUser.role !== "lider" ? `
+          <select class="filter-select" id="filter-celula" onchange="filterMembros()">
+            <option value="">Todas as células</option>
+            ${[...new Set(m.map(x=>x.celula))].map(c=>`<option>${c}</option>`).join("")}
+          </select>` : ""}
+        </div>
+        <div class="table-wrap">
+          <table id="membros-table">
+            <thead>
+              <tr>
+                <th>#</th><th>Nome</th><th>Célula</th><th>Status</th><th>Bairro</th><th>Ingresso</th><th>Telefone</th>
+              </tr>
+            </thead>
+            <tbody id="membros-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+  renderMembrosTable(m);
+}
+
+function filterMembros() {
+  const q  = (document.getElementById("search-membro")?.value||"").toLowerCase();
+  const st = document.getElementById("filter-status")?.value||"";
+  const cl = document.getElementById("filter-celula")?.value||"";
+  const base = (currentUser.role==="lider" ? allData._meus_membros : allData.membros)||[];
+  const filtered = base.filter(x =>
+    (!q  || (x.nome+x.celula+x.bairro).toLowerCase().includes(q)) &&
+    (!st || x.status===st) &&
+    (!cl || x.celula===cl)
+  );
+  renderMembrosTable(filtered);
+}
+
+function renderMembrosTable(list) {
+  const tbody = document.getElementById("membros-tbody");
+  if (!tbody) return;
+  const tagClass = {Ativo:"tag-green",Visitante:"tag-blue",Inativo:"tag-red",Transferido:"tag-yellow"};
+  tbody.innerHTML = list.length
+    ? list.slice(0,200).map(m=>`
+      <tr>
+        <td>${m.id||"—"}</td>
+        <td><strong>${m.nome||"—"}</strong></td>
+        <td>${m.celula||"—"}</td>
+        <td><span class="tag ${tagClass[m.status]||"tag-yellow"}">${m.status||"—"}</span></td>
+        <td>${m.bairro||"—"}</td>
+        <td>${m.data_ingresso||"—"}</td>
+        <td>${m.telefone||"—"}</td>
+      </tr>`).join("")
+    : `<tr><td colspan="7" style="text-align:center;padding:32px;color:#94a3b8">Nenhum membro encontrado.</td></tr>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SEÇÃO: CÉLULAS
+// ═══════════════════════════════════════════════════════════════
+function renderCelulas() {
+  const c = allData.celulas || [];
+
+  document.getElementById("content").innerHTML = `
+    <div class="kpi-grid">
+      ${kpiCard("Total de Células", fmt(c.length), "ativas", "accent")}
+      ${kpiCard("Total Nas Células", fmt(c.reduce((a,b)=>a+(+b.membros_ativos||0),0)), "membros ativos", "")}
+      ${kpiCard("Média de Presença", fmt(Math.round(c.reduce((a,b)=>a+(+b.media_presenca||0),0)/c.length||0))+"%", "por célula", "success")}
+      ${kpiCard("Novos Este Mês", fmt(c.reduce((a,b)=>a+(+b.novos_mes||0),0)), "novos membros", "warning")}
+    </div>
+
+    <div class="grid-2" style="margin-bottom:24px">
+      <div class="panel">
+        <div class="panel-header"><div class="panel-title">Membros por Célula</div></div>
+        <div class="panel-body" style="height:260px"><canvas id="chart-cel-membros"></canvas></div>
+      </div>
+      <div class="panel">
+        <div class="panel-header"><div class="panel-title">Presença Média (%)</div></div>
+        <div class="panel-body" style="height:260px"><canvas id="chart-cel-presenca"></canvas></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header"><div class="panel-title">Detalhes das Células</div></div>
+      <div class="panel-body">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Célula</th><th>Líder</th><th>Bairro</th><th>Dia</th><th>Membros</th><th>Presença</th><th>Novos</th><th>Reuniões/Mês</th></tr></thead>
+            <tbody>
+              ${c.map(x=>`
+                <tr>
+                  <td><strong>${x.nome}</strong></td>
+                  <td>${x.lider}</td>
+                  <td>${x.bairro}</td>
+                  <td>${x.dia_semana}</td>
+                  <td>${x.membros_ativos}</td>
+                  <td>
+                    <div style="display:flex;align-items:center;gap:8px">
+                      <div class="progress-wrap" style="width:80px">
+                        <div class="progress-bar" style="width:${x.media_presenca}%;background:${+x.media_presenca>=80?"#22c55e":+x.media_presenca>=60?"#f59e0b":"#ef4444"}"></div>
+                      </div>
+                      ${x.media_presenca}%
+                    </div>
+                  </td>
+                  <td><span class="tag tag-green">+${x.novos_mes}</span></td>
+                  <td>${x.reunioes_mes}x</td>
+                </tr>`).join("")}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+
+  setTimeout(() => {
+    createChart("chart-cel-membros","bar",
+      c.map(x=>x.nome.replace("Célula ","")),
+      [{ label:"Membros Ativos", data:c.map(x=>+x.membros_ativos||0),
+         backgroundColor:["#2563a8","#e8a020","#22c55e","#8b5cf6","#ef4444","#06b6d4"] }],
+      {plugins:{legend:{display:false}}});
+
+    createChart("chart-cel-presenca","bar",
+      c.map(x=>x.nome.replace("Célula ","")),
+      [{ label:"Presença %", data:c.map(x=>+x.media_presenca||0),
+         backgroundColor: c.map(x=>+x.media_presenca>=80?"#22c55e":+x.media_presenca>=60?"#f59e0b":"#ef4444") }],
+      {plugins:{legend:{display:false}}, scales:{y:{max:100}}});
+  }, 50);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SEÇÃO: FINANCEIRO
+// ═══════════════════════════════════════════════════════════════
+function renderFinanceiro() {
+  const f = allData.financeiro || [];
+  const total_dizimos  = f.reduce((a,b)=>a+(+b.dizimos||0),0);
+  const total_ofertas  = f.reduce((a,b)=>a+(+b.ofertas||0),0);
+  const total_entradas = f.reduce((a,b)=>a+(+b.total_entradas||0),0);
+  const total_saidas   = f.reduce((a,b)=>a+(+b.total_saidas||0),0);
+  const saldo_geral    = total_entradas - total_saidas;
+  const recente = f.slice(-1)[0] || {};
+
+  document.getElementById("content").innerHTML = `
+    <div class="kpi-grid">
+      ${kpiCard("Dízimos (total)", fmtBRL(total_dizimos), "acumulado", "")}
+      ${kpiCard("Ofertas (total)", fmtBRL(total_ofertas), "acumulado", "accent")}
+      ${kpiCard("Total Entradas", fmtBRL(total_entradas), "acumulado", "success")}
+      ${kpiCard("Total Saídas", fmtBRL(total_saidas), "acumulado", "danger")}
+      ${kpiCard("Saldo Geral", fmtBRL(saldo_geral), "acumulado", saldo_geral>=0?"success":"danger")}
+      ${kpiCard("Saldo Mês Atual", fmtBRL(recente.saldo||0), recente.periodo||"—", recente.saldo>=0?"success":"danger")}
+    </div>
+
+    <div class="grid-2" style="margin-bottom:24px">
+      <div class="panel">
+        <div class="panel-header"><div class="panel-title">Entradas Mensais</div></div>
+        <div class="panel-body" style="height:260px"><canvas id="chart-fin-entradas"></canvas></div>
+      </div>
+      <div class="panel">
+        <div class="panel-header"><div class="panel-title">Resultado Mensal (Saldo)</div></div>
+        <div class="panel-body" style="height:260px"><canvas id="chart-fin-saldo"></canvas></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header"><div class="panel-title">Extrato Mensal Detalhado</div></div>
+      <div class="panel-body">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Período</th><th>Dízimos</th><th>Ofertas</th><th>Total Entradas</th><th>Total Saídas</th><th>Saldo</th></tr></thead>
+            <tbody>
+              ${f.map(x=>`
+                <tr>
+                  <td><strong>${x.periodo}</strong></td>
+                  <td>${fmtBRL(x.dizimos)}</td>
+                  <td>${fmtBRL(x.ofertas)}</td>
+                  <td style="color:#15803d;font-weight:700">${fmtBRL(x.total_entradas)}</td>
+                  <td style="color:#b91c1c;font-weight:700">${fmtBRL(x.total_saidas)}</td>
+                  <td><span class="tag ${+x.saldo>=0?'tag-green':'tag-red'}">${fmtBRL(x.saldo)}</span></td>
+                </tr>`).join("")}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+
+  setTimeout(() => {
+    const f12 = f.slice(-12);
+    createChart("chart-fin-entradas","bar",
+      f12.map(x=>x.periodo),
+      [
+        { label:"Dízimos", data:f12.map(x=>+x.dizimos||0), backgroundColor:"#2563a8" },
+        { label:"Ofertas", data:f12.map(x=>+x.ofertas||0), backgroundColor:"#e8a020" },
+      ]);
+
+    createChart("chart-fin-saldo","line",
+      f12.map(x=>x.periodo),
+      [{
+        label:"Saldo", data:f12.map(x=>+x.saldo||0),
+        borderColor:"#22c55e", backgroundColor:"rgba(34,197,94,.1)", fill:true, tension:.4,
+        segment: { borderColor: ctx => ctx.p1.parsed.y < 0 ? "#ef4444" : "#22c55e",
+                   backgroundColor: ctx => ctx.p1.parsed.y < 0 ? "rgba(239,68,68,.1)" : "rgba(34,197,94,.1)" }
+      }]);
+  }, 50);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SEÇÃO: EVENTOS / CULTOS
+// ═══════════════════════════════════════════════════════════════
+function renderEventos() {
+  const e = allData.eventos || [];
+  const mediaPresentes = e.length ? Math.round(e.reduce((a,b)=>a+(+b.presentes||0),0)/e.length) : 0;
+  const mediaMembros   = e.length ? Math.round(e.reduce((a,b)=>a+(+b.membros||0),0)/e.length)   : 0;
+  const mediaVisitantes= e.length ? Math.round(e.reduce((a,b)=>a+(+b.visitantes||0),0)/e.length): 0;
+
+  document.getElementById("content").innerHTML = `
+    <div class="kpi-grid">
+      ${kpiCard("Eventos Registrados", fmt(e.length), "no período", "")}
+      ${kpiCard("Média de Presença", fmt(mediaPresentes), "por culto", "accent")}
+      ${kpiCard("Média Membros", fmt(mediaMembros), "por culto", "success")}
+      ${kpiCard("Média Visitantes", fmt(mediaVisitantes), "por culto", "warning")}
+    </div>
+
+    <div class="panel" style="margin-bottom:24px">
+      <div class="panel-header"><div class="panel-title">Presença nos Cultos</div></div>
+      <div class="panel-body" style="height:280px"><canvas id="chart-eventos"></canvas></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header"><div class="panel-title">Histórico de Eventos</div></div>
+      <div class="panel-body">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Data</th><th>Evento</th><th>Total Presentes</th><th>Membros</th><th>Visitantes</th><th>Oferta</th></tr></thead>
+            <tbody>
+              ${e.map(x=>`
+                <tr>
+                  <td>${new Date(x.data+"T12:00:00").toLocaleDateString("pt-BR")}</td>
+                  <td><strong>${x.evento}</strong></td>
+                  <td><span class="tag tag-blue">${x.presentes}</span></td>
+                  <td>${x.membros}</td>
+                  <td><span class="tag tag-green">+${x.visitantes}</span></td>
+                  <td>${fmtBRL(x.oferta)}</td>
+                </tr>`).join("")}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+
+  setTimeout(() => {
+    createChart("chart-eventos","line",
+      e.map(x=>new Date(x.data+"T12:00:00").toLocaleDateString("pt-BR",{month:"short",day:"numeric"})),
+      [
+        { label:"Total Presentes", data:e.map(x=>+x.presentes||0), borderColor:"#2563a8", backgroundColor:"rgba(37,99,168,.1)", fill:true, tension:.4 },
+        { label:"Membros",         data:e.map(x=>+x.membros||0),   borderColor:"#22c55e", tension:.4 },
+        { label:"Visitantes",      data:e.map(x=>+x.visitantes||0),borderColor:"#e8a020", tension:.4 },
+      ]);
+  }, 50);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SEÇÃO: MINHA CÉLULA (Líder)
+// ═══════════════════════════════════════════════════════════════
+function renderMinhaCelula() {
+  const cel = allData._minha_celula || {};
+  const mem = allData._meus_membros || [];
+
+  document.getElementById("content").innerHTML = `
+    <div class="kpi-grid">
+      ${kpiCard("Meus Membros", fmt(mem.length), "cadastrados", "")}
+      ${kpiCard("Ativos", fmt(mem.filter(x=>x.status==="Ativo").length), "membros ativos", "success")}
+      ${kpiCard("Presença Média", (cel.media_presenca||"—")+"%", "nas reuniões", "accent")}
+      ${kpiCard("Novos Este Mês", fmt(cel.novos_mes||0), "novos integrantes", "warning")}
+    </div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-header"><div class="panel-title">Informações da Célula</div></div>
+        <div class="panel-body">
+          <div class="cell-stat"><span>Nome</span><span>${cel.nome||"—"}</span></div>
+          <div class="cell-stat"><span>Líder</span><span>${cel.lider||"—"}</span></div>
+          <div class="cell-stat"><span>Bairro</span><span>${cel.bairro||"—"}</span></div>
+          <div class="cell-stat"><span>Reuniões/mês</span><span>${cel.reunioes_mes||"—"}x</span></div>
+          <div class="cell-stat"><span>Dia</span><span>${cel.dia_semana||"—"}</span></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-header"><div class="panel-title">Status dos Membros</div></div>
+        <div class="panel-body" style="height:200px"><canvas id="chart-lider-status"></canvas></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header"><div class="panel-title">Meus Membros</div></div>
+      <div class="panel-body">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Nome</th><th>Status</th><th>Bairro</th><th>Ingresso</th><th>Telefone</th></tr></thead>
+            <tbody>
+              ${mem.map(m=>`
+                <tr>
+                  <td><strong>${m.nome}</strong></td>
+                  <td><span class="tag ${{Ativo:"tag-green",Visitante:"tag-blue",Inativo:"tag-red"}[m.status]||"tag-yellow"}">${m.status}</span></td>
+                  <td>${m.bairro}</td>
+                  <td>${m.data_ingresso}</td>
+                  <td>${m.telefone}</td>
+                </tr>`).join("")}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+
+  setTimeout(() => {
+    const statusCount = {};
+    mem.forEach(x => { statusCount[x.status] = (statusCount[x.status]||0)+1; });
+    createChart("chart-lider-status","doughnut",
+      Object.keys(statusCount),
+      [{ data:Object.values(statusCount), backgroundColor:["#22c55e","#e8a020","#ef4444","#8b5cf6"] }]);
+  }, 50);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SEÇÃO: PRESENÇA (Líder)
+// ═══════════════════════════════════════════════════════════════
+function renderPresenca() {
+  const mem = allData._meus_membros || [];
+  const cel = allData._minha_celula || {};
+  const reunioes = Array.from({length:+(cel.reunioes_mes||4)}, (_,i) => `Reunião ${i+1}`);
+
+  document.getElementById("content").innerHTML = `
+    <div class="panel">
+      <div class="panel-header">
+        <div><div class="panel-title">Registro de Presença</div><div class="panel-subtitle">Marque a presença dos membros</div></div>
+        <button class="btn-refresh" onclick="salvarPresenca()">💾 Salvar Presença</button>
+      </div>
+      <div class="panel-body">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Membro</th>
+                ${reunioes.map(r=>`<th>${r}</th>`).join("")}
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${mem.map((m,i)=>`
+                <tr>
+                  <td><strong>${m.nome}</strong></td>
+                  ${reunioes.map((_,j)=>`
+                    <td style="text-align:center">
+                      <input type="checkbox" id="pres_${i}_${j}" ${Math.random()>.4?"checked":""} onchange="calcPresenca(${i},${reunioes.length})">
+                    </td>`).join("")}
+                  <td id="pres-total-${i}" style="font-weight:700;color:var(--primary)">—</td>
+                </tr>`).join("")}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Calcula totais iniciais
+  mem.forEach((_,i) => calcPresenca(i, reunioes.length));
+}
+
+function calcPresenca(i, total) {
+  let count = 0;
+  for (let j=0;j<total;j++) {
+    if (document.getElementById(`pres_${i}_${j}`)?.checked) count++;
+  }
+  const el = document.getElementById(`pres-total-${i}`);
+  if (el) { el.textContent = `${count}/${total}`; el.style.color = count===total?"#15803d":count>0?"#d97706":"#b91c1c"; }
+}
+
+function salvarPresenca() {
+  alert("✅ Presença salva com sucesso!\n\nEm produção, isso enviará os dados para o Google Sheets automaticamente.");
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SEÇÃO: RELATÓRIOS (Pastor / Financeiro)
+// ═══════════════════════════════════════════════════════════════
+function renderRelatorios() {
+  document.getElementById("content").innerHTML = `
+    <div class="panel">
+      <div class="panel-header"><div class="panel-title">Relatórios Disponíveis</div></div>
+      <div class="panel-body">
+        <div class="grid-3">
+          ${[
+            ["📊","Crescimento Anual","Análise do crescimento de membros por ano","relatorio-crescimento"],
+            ["💰","Financeiro Completo","DRE simplificado com todos os meses","relatorio-financeiro"],
+            ["🔵","Relatório de Células","Performance de todas as células","relatorio-celulas"],
+            ["👥","Novos Membros","Membros integrados no período","relatorio-novos"],
+            ["📅","Frequência de Cultos","Presença histórica nos cultos","relatorio-presenca"],
+            ["⬇","Exportar CSV","Baixar dados completos em CSV","exportar-csv"],
+          ].map(([icon,title,desc,id])=>`
+            <div class="cell-card" style="cursor:pointer" onclick="gerarRelatorio('${id}')">
+              <div style="font-size:32px;margin-bottom:8px">${icon}</div>
+              <h3>${title}</h3>
+              <p>${desc}</p>
+              <div style="color:var(--primary-light);font-size:13px;font-weight:600">Gerar →</div>
+            </div>`).join("")}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function gerarRelatorio(tipo) {
+  if (tipo === "exportar-csv") {
+    const m = allData.membros || [];
+    const csv = [Object.keys(m[0]||{}).join(","), ...m.map(r=>Object.values(r).join(","))].join("\n");
+    const blob = new Blob(["\uFEFF"+csv], {type:"text/csv;charset=utf-8;"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `membros_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+  } else {
+    alert(`Relatório "${tipo}" gerado!\n\nEm produção, isso gerará um PDF ou Excel completo.`);
+  }
+}
+
+// ─────────────────────────────────────────────
+// Enter key no login
+document.getElementById("login-pass").addEventListener("keydown", e => {
+  if (e.key === "Enter") doLogin();
+});
+</script>
+</body>
+</html>
