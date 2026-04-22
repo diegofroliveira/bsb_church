@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { BookOpen, Search, Loader2 } from 'lucide-react';
+import { Search, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 export const Discipleship: React.FC = () => {
