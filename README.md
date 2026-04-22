@@ -1,73 +1,103 @@
-# React + TypeScript + Vite
+# ⛪ IgrejaPro Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Sistema inteligente de BI e Gestão para Igrejas, integrado ao Sistema Prover e Supabase.
 
-Currently, two official plugins are available:
+## 🚀 Como começar no novo ambiente
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Se você acabou de clonar este repositório para uma nova pasta ou drive (ex: Google Drive), siga estes passos:
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### 1. Configurar Backend (Python)
+Os scripts de extração e importação precisam de um ambiente virtual:
+```powershell
+python -m venv venv
+.\venv\Scripts\activate
+pip install playwright pandas openpyxl supabase httpx beautifulsoup4
+playwright install chromium
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### 2. Configurar Frontend (React)
+Instale as dependências do Node.js:
+```powershell
+npm install
 ```
+
+### 3. Variáveis de Ambiente
+Crie um arquivo `.env.local` na raiz do projeto com as suas chaves do Supabase:
+```text
+VITE_SUPABASE_URL=https://vadufkgbluisdamgkbln.supabase.co
+VITE_SUPABASE_ANON_KEY=SUA_ANON_KEY_AQUI
+```
+
+---
+
+## 🔄 Sincronização de Dados
+
+Para atualizar os dados do dashboard com as informações mais recentes do Sistema Prover, basta rodar o comando:
+```powershell
+.\venv\Scripts\python.exe run_sync.py
+```
+Este comando executa automaticamente:
+1.  **Extração:** Faz login via Playwright no Prover e baixa os CSVs.
+2.  **Importação:** Lê os CSVs, remove duplicatas e faz o UPSERT no Supabase.
+
+---
+
+## 🛠 Estrutura do Banco (Supabase)
+
+Para o sistema funcionar, as tabelas abaixo devem existir no seu Supabase. Rode estes scripts no **SQL Editor**:
+
+<details>
+<summary>Clique para ver os Scripts SQL</summary>
+
+```sql
+-- Tabelas Principais (Membros, Celulas, Financeiro, Eventos, Discipulado)
+-- Nota: O importador ajusta as colunas automaticamente.
+
+CREATE TABLE membros (id BIGINT PRIMARY KEY, nome TEXT, status TEXT, tipo_cadastro TEXT);
+CREATE TABLE celulas (id BIGINT PRIMARY KEY, grupo_caseiro TEXT, lider TEXT);
+CREATE TABLE financeiro (id BIGINT PRIMARY KEY, valor TEXT, tipo TEXT, data DATE);
+CREATE TABLE eventos (id_serial BIGSERIAL PRIMARY KEY, pessoa TEXT, localidade TEXT);
+CREATE TABLE discipulado (id_serial BIGSERIAL PRIMARY KEY, mestre TEXT, discipulo TEXT, status TEXT);
+
+-- Tabela de Perfis de Usuário (Auth)
+CREATE TABLE profiles (
+  id UUID REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
+  name TEXT,
+  role TEXT DEFAULT 'pastor',
+  group_id TEXT,
+  avatar TEXT
+);
+
+-- Trigger para criar perfil automático
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO public.profiles (id, name, role)
+  VALUES (new.id, new.raw_user_meta_data->>'name', new.raw_user_meta_data->>'role');
+  RETURN new;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
+```
+</details>
+
+---
+
+## ☁️ Deploy (Vercel)
+
+Para colocar o sistema online e acessível de qualquer lugar:
+1.  Instale a Vercel CLI: `npm install -g vercel`
+2.  Execute `vercel` para configurar o projeto.
+3.  Adicione as chaves: `vercel env add VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`.
+4.  Execute o deploy final: `vercel --prod`
+
+---
+
+## 📦 Tecnologias Utilizadas
+*   **Frontend:** React, TypeScript, Vite, TailwindCSS, Recharts, Lucide Icons.
+*   **Banco de Dados & Auth:** Supabase.
+*   **Automação:** Python, Playwright, Pandas.
+*   **Hospedagem:** Vercel.
