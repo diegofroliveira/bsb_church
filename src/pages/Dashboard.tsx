@@ -5,7 +5,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, Legend, PieChart, Pie, Cell
 } from 'recharts';
-import { Users, UserPlus, Home, TrendingUp, Loader2 } from 'lucide-react';
+import { Users, UserPlus, Home, TrendingUp, Loader2, X, Search } from 'lucide-react';
 import clsx from 'clsx';
 
 export const Dashboard: React.FC = () => {
@@ -25,6 +25,11 @@ export const Dashboard: React.FC = () => {
     finance: [] as any[],
     groups: [] as any[],
   });
+  
+  // Modal state for Group Details
+  const [selectedGrupo, setSelectedGrupo] = useState<string | null>(null);
+  const [grupoMembers, setGrupoMembers] = useState<any[]>([]);
+  const [isLoadingGroup, setIsLoadingGroup] = useState(false);
   
   const formatCurrency = (value: number) => 
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
@@ -135,6 +140,24 @@ export const Dashboard: React.FC = () => {
 
     fetchDashboardData();
   }, []);
+
+  const handleOpenGroupDetails = async (grupoNome: string) => {
+    setSelectedGrupo(grupoNome);
+    setIsLoadingGroup(true);
+    try {
+      const { data, error } = await supabase
+        .from('membros')
+        .select('nome, tipo_cadastro, status, telefone, celular')
+        .eq('grupo_caseiro', grupoNome);
+        
+      if (error) throw error;
+      setGrupoMembers(data || []);
+    } catch (error) {
+      console.error('Error fetching group members:', error);
+    } finally {
+      setIsLoadingGroup(false);
+    }
+  };
 
   const isPastorOrAdmin = ['pastor', 'admin'].includes(user?.role || '');
 
@@ -307,7 +330,9 @@ export const Dashboard: React.FC = () => {
                            <td className="whitespace-nowrap py-3 pl-4 pr-3 text-sm font-medium text-gray-900 truncate max-w-[150px]">{group.nome}</td>
                            <td className="whitespace-nowrap px-3 py-3 text-sm text-gray-500 truncate max-w-[150px]">{group.lider}</td>
                            <td className="whitespace-nowrap px-3 py-3 text-sm text-right">
-                              <span className="text-primary-600 font-medium cursor-pointer hover:underline text-xs">Ver Detalhes</span>
+                              <button onClick={() => handleOpenGroupDetails(group.nome)} className="text-primary-600 font-medium hover:underline text-xs outline-none">
+                                Ver Detalhes
+                              </button>
                            </td>
                         </tr>
                       ))}
@@ -315,6 +340,62 @@ export const Dashboard: React.FC = () => {
                  </table>
               </div>
            </div>
+        </div>
+      )}
+
+      {/* Group Details Modal Overlay */}
+      {selectedGrupo && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center">
+          <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm transition-opacity" onClick={() => setSelectedGrupo(null)} />
+          <div className="relative flex w-full max-w-2xl flex-col bg-white rounded-2xl shadow-2xl overflow-hidden m-4 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">{selectedGrupo}</h3>
+                <p className="text-xs text-gray-500 mt-1">{grupoMembers.length} participantes encontrados</p>
+              </div>
+              <button onClick={() => setSelectedGrupo(null)} className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors cursor-pointer">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="p-0 overflow-y-auto max-h-[60vh]">
+              {isLoadingGroup ? (
+                <div className="flex flex-col items-center justify-center p-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
+                </div>
+              ) : grupoMembers.length === 0 ? (
+                <div className="flex flex-col items-center justify-center p-12 text-center">
+                  <Search className="h-10 w-10 text-gray-300 mb-3" />
+                  <p className="text-gray-500 text-sm">Nenhum membro vinculado a este Grupo Caseiro.</p>
+                </div>
+              ) : (
+                <table className="min-w-full divide-y divide-gray-100">
+                  <thead className="bg-white sticky top-0">
+                    <tr>
+                      <th className="py-3 pl-6 pr-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Nome</th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Tipo/Status</th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Contato</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {grupoMembers.map((m, idx) => (
+                      <tr key={idx} className="hover:bg-gray-50/50">
+                        <td className="whitespace-nowrap py-3 pl-6 pr-3 text-sm font-medium text-gray-900">{m.nome}</td>
+                        <td className="whitespace-nowrap px-3 py-3 text-sm">
+                          <span className={clsx("inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium", 
+                             m.tipo_cadastro === 'Visitante' ? 'bg-orange-50 text-orange-700' : 'bg-blue-50 text-blue-700'
+                          )}>
+                             {m.tipo_cadastro || 'Membro'}
+                          </span>
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-3 text-sm text-gray-500 font-mono text-xs">{m.telefone || m.celular || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

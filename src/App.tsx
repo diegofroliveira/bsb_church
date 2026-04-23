@@ -9,6 +9,7 @@ import { MyGroup } from './pages/MyGroup';
 import { Discipleship } from './pages/Discipleship';
 import { Finance } from './pages/Finance';
 import { Settings } from './pages/Settings';
+import { Reports } from './pages/Reports';
 
 function App() {
   return (
@@ -22,6 +23,10 @@ function App() {
               <Route path="/" element={<Dashboard />} />
               
               <Route path="/members" element={<Members />} />
+              
+              <Route element={<ProtectedRoute allowedRoles={['admin', 'pastor', 'secretary']} />}>
+                 <Route path="/reports" element={<Reports />} />
+              </Route>
               
               {/* Only leader role can access their group */}
               <Route element={<ProtectedRoute allowedRoles={['leader', 'admin']} />}>

@@ -9,7 +9,8 @@ import {
   LogOut,
   Menu,
   Church,
-  BookOpen
+  BookOpen,
+  FileText
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import clsx from 'clsx';
@@ -28,6 +29,7 @@ export const MainLayout: React.FC = () => {
   const navItems = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard, roles: ['admin', 'pastor', 'leader', 'secretary'] },
     { name: 'Membros', path: '/members', icon: Users, roles: ['admin', 'pastor', 'secretary'] },
+    { name: 'Relatórios', path: '/reports', icon: FileText, roles: ['admin', 'pastor', 'secretary'] },
     { name: 'Meu Grupo', path: '/my-group', icon: Heart, roles: ['leader'] },
     { name: 'Discipulado', path: '/discipleship', icon: BookOpen, roles: ['admin', 'pastor', 'leader'] },
     { name: 'Financeiro', path: '/finance', icon: DollarSign, roles: ['admin', 'pastor', 'finance'] },
