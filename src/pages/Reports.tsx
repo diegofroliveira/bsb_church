@@ -223,6 +223,14 @@ export const Reports: React.FC = () => {
           </div>
 
           <div className="xl:col-span-1">
+             <label className="block text-xs font-medium text-gray-500 mb-1">UF / Estado</label>
+             <select value={filterState} onChange={e => setFilterState(e.target.value)} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none">
+                 <option value="Todos">Todos</option>
+                 {uniqueStates.map(t => <option key={t as string} value={t as string}>{t as string}</option>)}
+             </select>
+          </div>
+
+          <div className="xl:col-span-1">
              <label className="block text-xs font-medium text-gray-500 mb-1">Discipulador</label>
              <select value={filterMestre} onChange={e => setFilterMestre(e.target.value)} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none">
                  <option value="Todos">Todos</option>

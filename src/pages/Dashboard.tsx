@@ -24,7 +24,7 @@ export const Dashboard: React.FC = () => {
   const [modalTitle, setModalTitle] = useState('');
   const [modalItems, setModalItems] = useState<any[]>([]);
   const [isModalLoading, setIsModalLoading] = useState(false);
-  
+
   const formatCurrency = (value: number) => 
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
@@ -349,6 +349,28 @@ export const Dashboard: React.FC = () => {
                   </div>
                </div>
            </div>
+        </div>
+      )}
+
+      {isPastorOrAdmin && (
+        <div className="rounded-2xl bg-white p-8 shadow-sm border border-gray-100 mt-6">
+            <div className="mb-6">
+                <h3 className="text-xl font-bold text-gray-900">Histórico Financeiro Real</h3>
+                <p className="text-sm text-gray-500">Consolidado mensal de Entradas e Saídas</p>
+            </div>
+            <div className="h-80 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={charts.finance} barGap={8}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} />
+                    <YAxis axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} tickFormatter={(v) => `R$${v/1000}k`} />
+                    <Tooltip cursor={{fill: '#f8fafc'}} formatter={(v) => formatCurrency(v as number)} contentStyle={{borderRadius:'16px', border:'none', boxShadow:'0 10px 15px -3px rgba(0,0,0,0.1)'}} />
+                    <Legend iconType="circle" wrapperStyle={{paddingTop: '20px'}} />
+                    <Bar dataKey="entradas" fill="#10b981" radius={[4, 4, 0, 0]} name="Entradas" barSize={30} />
+                    <Bar dataKey="saidas" fill="#ef4444" radius={[4, 4, 0, 0]} name="Saídas" barSize={30} />
+                </BarChart>
+                </ResponsiveContainer>
+            </div>
         </div>
       )}
 
