@@ -44,6 +44,7 @@ interface LocationData {
 const Georeferencing: React.FC = () => {
   const [locations, setLocations] = useState<LocationData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<LocationData | null>(null);
   const [stats, setStats] = useState({ membros: 0, celulas: 0 });
 
@@ -54,22 +55,25 @@ const Georeferencing: React.FC = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
+      setError(null);
       
       const { data: membros, error: mError } = await supabase
         .from('membros')
         .select('id, nome, latitude, longitude, grupos_caseiros, estado_civil')
-        .eq('status', 'Ativo')
-        .not('latitude', 'is', null);
+        .eq('status', 'Ativo');
 
       const { data: celulas, error: cError } = await supabase
         .from('celulas')
-        .select('id, grupo_caseiro, latitude, longitude, lider, setor')
-        .not('latitude', 'is', null);
+        .select('id, grupo_caseiro, latitude, longitude, lider, setor');
 
-      if (mError || cError) throw mError || cError;
+      if (mError) throw new Error(`Erro Membros: ${mError.message}`);
+      if (cError) throw new Error(`Erro Células: ${cError.message}`);
+
+      const geoMembros = (membros || []).filter(m => m.latitude && m.longitude);
+      const geoCelulas = (celulas || []).filter(c => c.latitude && c.longitude);
 
       const formattedLocations: LocationData[] = [
-        ...(membros || []).map(m => ({
+        ...geoMembros.map(m => ({
           id: m.id,
           nome: m.nome,
           latitude: m.latitude,
@@ -77,7 +81,7 @@ const Georeferencing: React.FC = () => {
           tipo: 'membro' as const,
           metadata: { grupo: m.grupos_caseiros, status: m.estado_civil }
         })),
-        ...(celulas || []).map(c => ({
+        ...geoCelulas.map(c => ({
           id: c.id,
           nome: c.grupo_caseiro,
           latitude: c.latitude,
@@ -89,11 +93,12 @@ const Georeferencing: React.FC = () => {
 
       setLocations(formattedLocations);
       setStats({
-        membros: membros?.length || 0,
-        celulas: celulas?.length || 0
+        membros: geoMembros.length,
+        celulas: geoCelulas.length
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erro ao carregar dados geográficos:', err);
+      setError(err.message || 'Erro desconhecido ao carregar o mapa.');
     } finally {
       setLoading(false);
     }
@@ -101,6 +106,20 @@ const Georeferencing: React.FC = () => {
 
   return (
     <div className="space-y-6 h-[calc(100vh-180px)] flex flex-col">
+      {error && (
+        <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded-md">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-red-700 font-medium">{error}</p>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Georreferenciamento</h1>

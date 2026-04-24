@@ -1,5 +1,4 @@
 import os
-import pandas as pd
 import httpx
 import time
 import random
@@ -8,33 +7,31 @@ import random
 SUPABASE_URL = "https://vadufkgbluisdamgkbln.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZhZHVma2dibHVpc2RhbWdrYmxuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4NjE2NDksImV4cCI6MjA5MjQzNzY0OX0.40XwaADEKukkhuLqcQQnNpx-6a1ipKnz_4Fy8DJdrao"
 
-def geocode_address(client, address):
-    url = "https://nominatim.openstreetmap.org/search"
+def geocode_address_arcgis(client, address):
+    # Usando a API gratuita do ArcGIS (mais permissiva que o Nominatim)
+    url = "https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates"
     params = {
-        "q": address,
-        "format": "json",
-        "limit": 1
-    }
-    headers = {
-        "User-Agent": f"ChurchPro_Mapping_Bot_{random.randint(1000, 9999)}"
+        "f": "json",
+        "singleLine": address,
+        "maxLocations": 1
     }
     
     try:
-        response = client.get(url, params=params, headers=headers)
+        response = client.get(url, params=params)
         if response.status_code == 200:
             data = response.json()
-            if data:
-                return float(data[0]["lat"]), float(data[0]["lon"])
+            if data.get("candidates"):
+                loc = data["candidates"][0]["location"]
+                return loc["y"], loc["x"]
         elif response.status_code == 429:
-            print("   AVISO: Limite de taxa atingido. Dormindo por 30 segundos...")
+            print("   AVISO: Limite atingido no ArcGIS. Dormindo 30s...", flush=True)
             time.sleep(30)
-            return geocode_address(client, address) # Tenta novamente após o descanso
     except Exception as e:
-        print(f"   ERRO na API: {e}")
+        print(f"   ERRO na API: {e}", flush=True)
     return None, None
 
 def main():
-    print("INFO: INICIANDO GEOCODIFICADOR VERSAO 3 (RESILIENTE)", flush=True)
+    print("INFO: INICIANDO GEOCODIFICADOR VERSAO 5 (ARCGIS ENGINE)", flush=True)
     
     headers_sb = {
         "apikey": SUPABASE_KEY,
@@ -42,9 +39,7 @@ def main():
         "Content-Type": "application/json"
     }
 
-    print("INFO: Buscando membros ativos sem coordenadas...", flush=True)
-    with httpx.Client(verify=False) as client_sb, httpx.Client(timeout=20.0) as client_geo:
-        print("DEBUG: Clientes HTTP inicializados", flush=True)
+    with httpx.Client(verify=False) as client_sb, httpx.Client(verify=False, timeout=30.0) as client_geo:
         res = client_sb.get(
             f"{SUPABASE_URL}/rest/v1/membros",
             params={
@@ -54,46 +49,39 @@ def main():
             },
             headers=headers_sb
         )
-        print(f"DEBUG: Status da query Supabase: {res.status_code}", flush=True)
         
-        try:
-            membros = res.json()
-        except Exception as e:
-            print(f"ERRO: Falha ao decodificar JSON: {e}", flush=True)
-            print(f"DEBUG: Body: {res.text[:200]}", flush=True)
-            return
-
+        membros = res.json()
         print(f"INFO: Encontrados {len(membros)} membros para processar.", flush=True)
 
         for m in membros:
-            # Endereço simplificado para melhor busca
             logradouro = (m.get('logradouro') or '').strip()
             bairro = (m.get('bairro') or '').strip()
             cidade = (m.get('cidade') or '').strip()
             
-            if not logradouro: continue
+            if not logradouro or len(logradouro) < 3:
+                continue
             
-            endereco = f"{logradouro}, {bairro}, {cidade}, Brazil"
-            print(f"INFO: Localizando: {m['nome']} -> {endereco}")
+            # Endereço completo para o ArcGIS
+            endereco = f"{logradouro}, {bairro}, {cidade}, DF, Brazil"
+            print(f"INFO: Localizando: {m['nome']} -> {endereco}", flush=True)
             
-            lat, lon = geocode_address(client_geo, endereco)
+            lat, lon = geocode_address_arcgis(client_geo, endereco)
             
             if lat and lon:
-                print(f"   OK: {lat}, {lon}")
-                # Salvar no Supabase
+                print(f"   OK: {lat}, {lon}", flush=True)
                 client_sb.patch(
                     f"{SUPABASE_URL}/rest/v1/membros",
                     params={"nome": f"eq.{m['nome']}"},
                     json={"latitude": lat, "longitude": lon},
                     headers=headers_sb
                 )
+                # Espera curta entre sucessos
+                time.sleep(1)
             else:
-                print("   ERRO: Nao encontrado.")
-            
-            # Espera entre 5 e 8 segundos para ser bem conservador
-            time.sleep(random.uniform(5, 8))
+                print("   AVISO: Nao encontrado.", flush=True)
+                time.sleep(2)
 
-    print("\n✅ PROCESSO FINALIZADO")
+    print("\nOK: PROCESSO FINALIZADO", flush=True)
 
 if __name__ == "__main__":
     main()
