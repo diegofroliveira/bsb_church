@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { type User as SupabaseUser } from '@supabase/supabase-js';
 
-export type Role = 'admin' | 'pastor' | 'leader' | 'finance' | 'secretary';
+export type Role = 'admin' | 'pastor' | 'secretaria' | 'financeiro';
 
 export interface User {
   id: string;
@@ -33,7 +33,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       id: sbUser.id,
       email: sbUser.email || '',
       name: sbUser.user_metadata?.name || sbUser.email?.split('@')[0] || 'Usuário',
-      role: (sbUser.user_metadata?.role as Role) || 'pastor', // Default role if not set
+      role: (sbUser.user_metadata?.role as Role) || 'secretaria',
       avatar: sbUser.user_metadata?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${sbUser.id}`,
       groupId: sbUser.user_metadata?.groupId,
     };

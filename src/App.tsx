@@ -14,6 +14,7 @@ import { Reports } from './pages/Reports';
 import { QA } from './pages/QA';
 import { Cells } from './pages/Cells';
 import { MemberProfile } from './pages/MemberProfile';
+import { AdminUsers } from './pages/AdminUsers';
 
 function App() {
   return (
@@ -21,43 +22,45 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
-          
+
           <Route element={<ProtectedRoute />}>
             <Route element={<MainLayout />}>
+              {/* All authenticated users */}
               <Route path="/" element={<Dashboard />} />
-              
-              <Route path="/members" element={<Members />} />
-              <Route path="/crm/:name" element={<MemberProfile />} />
-              <Route path="/cells" element={<Cells />} />
-              
-              <Route element={<ProtectedRoute allowedRoles={['admin', 'pastor', 'secretary']} />}>
-                 <Route path="/reports" element={<Reports />} />
-                 <Route path="/qa" element={<QA />} />
-              </Route>
-              
-              {/* Only leader role can access their group */}
-              <Route element={<ProtectedRoute allowedRoles={['leader', 'admin']} />}>
-                 <Route path="/my-group" element={<MyGroup />} />
+
+              {/* Secretaria + Pastor + Admin */}
+              <Route element={<ProtectedRoute allowedRoles={['admin', 'pastor', 'secretaria']} />}>
+                <Route path="/members" element={<Members />} />
+                <Route path="/cells" element={<Cells />} />
+                <Route path="/reports" element={<Reports />} />
+                <Route path="/qa" element={<QA />} />
+                <Route path="/discipleship" element={<Discipleship />} />
+                <Route path="/network" element={<Network />} />
               </Route>
 
-              {/* Discipleship / MDA */}
-              <Route element={<ProtectedRoute allowedRoles={['admin', 'pastor', 'leader']} />}>
-                 <Route path="/discipleship" element={<Discipleship />} />
-                 <Route path="/network" element={<Network />} />
+              {/* CRM — pastor + admin + secretaria */}
+              <Route element={<ProtectedRoute allowedRoles={['admin', 'pastor', 'secretaria']} />}>
+                <Route path="/crm/:name" element={<MemberProfile />} />
               </Route>
 
-              {/* Finance Role access */}
-              <Route element={<ProtectedRoute allowedRoles={['admin', 'pastor', 'finance']} />}>
-                  <Route path="/finance" element={<Finance />} />
+              {/* Finance — financeiro + pastor + admin */}
+              <Route element={<ProtectedRoute allowedRoles={['admin', 'pastor', 'financeiro']} />}>
+                <Route path="/finance" element={<Finance />} />
               </Route>
 
-              {/* Admin only Settings */}
+              {/* Admin only */}
               <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
-                  <Route path="/settings" element={<Settings />} />
+                <Route path="/admin/users" element={<AdminUsers />} />
+                <Route path="/settings" element={<Settings />} />
+              </Route>
+
+              {/* Legacy */}
+              <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
+                <Route path="/my-group" element={<MyGroup />} />
               </Route>
             </Route>
           </Route>
-          
+
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
