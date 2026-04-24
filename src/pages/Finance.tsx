@@ -146,9 +146,6 @@ export const Finance: React.FC = () => {
 
     return {
       totals: {
-        saldo: sumEntradas - sumSaidas, // Wait, if DB has negatives for exits, `val` is already negative. Let's ensure logic. 
-        // In the original code, we added `val` directly. If saida is negative, adding it reduces the sum.
-        // Let's rely on isEntrada to determine sign. Actually, let's just use the absolute values for displays.
         entradas: sumEntradas,
         saidas: Math.abs(sumSaidas)
       },
@@ -156,6 +153,28 @@ export const Finance: React.FC = () => {
       pieChartData: pieArr
     };
   }, [filteredData]);
+
+  // Gráfico de histórico sempre com todos os dados (sem filtros)
+  const allBarChartData = useMemo(() => {
+    const monthlyMap: Record<string, { name: string, entradas: number, saidas: number }> = {};
+    transactions.forEach(item => {
+      const val = item.valor;
+      const isEntrada = item.tipo.toLowerCase().includes('entrada') || item.tipo.toLowerCase().includes('receita');
+      const date = new Date(item.data);
+      if (isNaN(date.getTime())) return;
+      const monthYear = `${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
+      if (!monthlyMap[monthYear]) monthlyMap[monthYear] = { name: monthYear, entradas: 0, saidas: 0 };
+      if (isEntrada) monthlyMap[monthYear].entradas += val;
+      else monthlyMap[monthYear].saidas += Math.abs(val);
+    });
+    return Object.values(monthlyMap)
+      .sort((a, b) => {
+        const [mA, yA] = a.name.split('/');
+        const [mB, yB] = b.name.split('/');
+        return new Date(Number(yA), Number(mA)-1).getTime() - new Date(Number(yB), Number(mB)-1).getTime();
+      })
+      .slice(-12);
+  }, [transactions]);
 
   if (isLoading) {
     return (
@@ -188,7 +207,7 @@ export const Finance: React.FC = () => {
         </div>
         <div className="h-80 w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={barChartData} barGap={8}>
+            <BarChart data={allBarChartData} barGap={8}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
               <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} />
               <YAxis axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} tickFormatter={(v) => `R$${v/1000}k`} />
