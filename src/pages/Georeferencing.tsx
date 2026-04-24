@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { supabase } from '../lib/supabase';
-import { Home, Users, Navigation, Info, Search, Filter, X, ArrowRight } from 'lucide-react';
+import { Home, Users, Navigation, Search, Filter, X } from 'lucide-react';
 import { differenceInYears, parseISO } from 'date-fns';
 
 // Fix para ícones do Leaflet
@@ -68,7 +68,6 @@ const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
 const Georeferencing: React.FC = () => {
   const [allLocations, setAllLocations] = useState<LocationData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<LocationData | null>(null);
   
   const [filters, setFilters] = useState({
@@ -95,7 +94,6 @@ const Georeferencing: React.FC = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      setError(null);
       
       const { data: membros, error: mError } = await supabase
         .from('membros')
@@ -177,7 +175,7 @@ const Georeferencing: React.FC = () => {
       });
 
     } catch (err: any) {
-      setError(err.message || 'Erro ao carregar dados.');
+      console.error('Erro ao carregar dados.', err);
     } finally {
       setLoading(false);
     }
