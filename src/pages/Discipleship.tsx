@@ -14,10 +14,10 @@ export const Discipleship: React.FC = () => {
         let query = supabase.from('discipulado').select('*');
         
         if (searchTerm) {
-          query = query.or(`mestre.ilike.%${searchTerm}%,discipulo.ilike.%${searchTerm}%`);
+          query = query.or(`discipulador.ilike.%${searchTerm}%,discipulo.ilike.%${searchTerm}%`);
         }
 
-        const { data: results, error } = await query.order('mestre', { ascending: true });
+        const { data: results, error } = await query.order('discipulador', { ascending: true });
         if (error) throw error;
         setData(results || []);
       } catch (error) {
@@ -75,7 +75,7 @@ export const Discipleship: React.FC = () => {
                 <tbody className="divide-y divide-gray-100 bg-white">
                    {data.map((item, i) => (
                       <tr key={i} className="hover:bg-gray-50 transition-colors">
-                         <td className="whitespace-nowrap py-4 pl-6 pr-3 text-sm font-medium text-gray-900">{item.mestre}</td>
+                         <td className="whitespace-nowrap py-4 pl-6 pr-3 text-sm font-medium text-gray-900">{item.discipulador}</td>
                          <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-700">{item.discipulo}</td>
                          <td className="whitespace-nowrap px-3 py-4 text-sm">
                             <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
