@@ -63,7 +63,7 @@ const Georeferencing: React.FC = () => {
 
       const { data: celulas, error: cError } = await supabase
         .from('celulas')
-        .select('id, "Grupo Caseiro", latitude, longitude, lider, setor')
+        .select('id, grupo_caseiro, latitude, longitude, lider, setor')
         .not('latitude', 'is', null);
 
       if (mError || cError) throw mError || cError;
@@ -79,7 +79,7 @@ const Georeferencing: React.FC = () => {
         })),
         ...(celulas || []).map(c => ({
           id: c.id,
-          nome: c['Grupo Caseiro'],
+          nome: c.grupo_caseiro,
           latitude: c.latitude,
           longitude: c.longitude,
           tipo: 'celula' as const,

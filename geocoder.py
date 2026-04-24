@@ -34,7 +34,7 @@ def geocode_address(client, address):
     return None, None
 
 def main():
-    print("INFO: INICIANDO GEOCODIFICADOR VERSAO 3 (RESILIENTE)")
+    print("INFO: INICIANDO GEOCODIFICADOR VERSAO 3 (RESILIENTE)", flush=True)
     
     headers_sb = {
         "apikey": SUPABASE_KEY,
@@ -42,8 +42,9 @@ def main():
         "Content-Type": "application/json"
     }
 
-    print("INFO: Buscando membros ativos sem coordenadas...")
+    print("INFO: Buscando membros ativos sem coordenadas...", flush=True)
     with httpx.Client(verify=False) as client_sb, httpx.Client(timeout=20.0) as client_geo:
+        print("DEBUG: Clientes HTTP inicializados", flush=True)
         res = client_sb.get(
             f"{SUPABASE_URL}/rest/v1/membros",
             params={
@@ -53,9 +54,16 @@ def main():
             },
             headers=headers_sb
         )
+        print(f"DEBUG: Status da query Supabase: {res.status_code}", flush=True)
         
-        membros = res.json()
-        print(f"INFO: Encontrados {len(membros)} membros para processar.")
+        try:
+            membros = res.json()
+        except Exception as e:
+            print(f"ERRO: Falha ao decodificar JSON: {e}", flush=True)
+            print(f"DEBUG: Body: {res.text[:200]}", flush=True)
+            return
+
+        print(f"INFO: Encontrados {len(membros)} membros para processar.", flush=True)
 
         for m in membros:
             # Endereço simplificado para melhor busca
