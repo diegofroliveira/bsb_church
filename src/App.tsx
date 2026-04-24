@@ -7,6 +7,7 @@ import { Dashboard } from './pages/Dashboard';
 import { Members } from './pages/Members';
 import { MyGroup } from './pages/MyGroup';
 import { Discipleship } from './pages/Discipleship';
+import { Network } from './pages/Network';
 import { Finance } from './pages/Finance';
 import { Settings } from './pages/Settings';
 import { Reports } from './pages/Reports';
@@ -36,6 +37,7 @@ function App() {
               {/* Discipleship / MDA */}
               <Route element={<ProtectedRoute allowedRoles={['admin', 'pastor', 'leader']} />}>
                  <Route path="/discipleship" element={<Discipleship />} />
+                 <Route path="/network" element={<Network />} />
               </Route>
 
               {/* Finance Role access */}

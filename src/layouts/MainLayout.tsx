@@ -10,7 +10,8 @@ import {
   Menu,
   Church,
   BookOpen,
-  FileText
+  FileText,
+  Network
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import clsx from 'clsx';
@@ -32,6 +33,7 @@ export const MainLayout: React.FC = () => {
     { name: 'Relatórios', path: '/reports', icon: FileText, roles: ['admin', 'pastor', 'secretary'] },
     { name: 'Meu Grupo', path: '/my-group', icon: Heart, roles: ['leader'] },
     { name: 'Discipulado', path: '/discipleship', icon: BookOpen, roles: ['admin', 'pastor', 'leader'] },
+    { name: 'Rede', path: '/network', icon: Network, roles: ['admin', 'pastor', 'leader'] },
     { name: 'Financeiro', path: '/finance', icon: DollarSign, roles: ['admin', 'pastor', 'finance'] },
     { name: 'Configurações', path: '/settings', icon: Settings, roles: ['admin'] },
   ];
