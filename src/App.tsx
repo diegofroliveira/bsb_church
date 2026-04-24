@@ -11,6 +11,7 @@ import { Network } from './pages/Network';
 import { Finance } from './pages/Finance';
 import { Settings } from './pages/Settings';
 import { Reports } from './pages/Reports';
+import { QA } from './pages/QA';
 
 function App() {
   return (
@@ -27,6 +28,7 @@ function App() {
               
               <Route element={<ProtectedRoute allowedRoles={['admin', 'pastor', 'secretary']} />}>
                  <Route path="/reports" element={<Reports />} />
+                 <Route path="/qa" element={<QA />} />
               </Route>
               
               {/* Only leader role can access their group */}
