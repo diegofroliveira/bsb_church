@@ -1,51 +1,118 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Search, Filter, Mail, Phone, MoreVertical, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import clsx from 'clsx';
 
 export const Members: React.FC = () => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [members, setMembers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [totalCount, setTotalCount] = useState(0);
+  const [members, setMembers] = useState<any[]>([]);
   const [page, setPage] = useState(1);
-  const pageSize = 10;
+  const pageSize = 12;
+
+  // Filters
+  const [filterQuery, setFilterQuery] = useState('');
+  const [filterType, setFilterType] = useState('Todos');
+  const [filterGC, setFilterGC] = useState('Todos');
+  const [filterGender, setFilterGender] = useState('Todos');
+  const [filterAgeCategory, setFilterAgeCategory] = useState('Todas');
+  const [filterState, setFilterState] = useState('Todos');
+  const [filterSetor, setFilterSetor] = useState('Todos');
+  const [filterMestre, setFilterMestre] = useState('Todos');
 
   useEffect(() => {
-    const fetchMembers = async () => {
+    const fetchAllData = async () => {
       setIsLoading(true);
       try {
-        // Fetch page data and total count in parallel
-        const [pageRes, countRes] = await Promise.all([
-          supabase
-            .from('membros')
-            .select('id, nome, tipo_cadastro, grupos_caseiros, email, celular_principal_sms, status, foto')
-            .ilike('nome', searchTerm ? `%${searchTerm}%` : '%')
-            .order('nome', { ascending: true })
-            .range((page - 1) * pageSize, page * pageSize - 1),
-          supabase
-            .from('membros')
-            .select('id', { count: 'exact', head: true })
-            .ilike('nome', searchTerm ? `%${searchTerm}%` : '%')
+        const [membrosRes, celulasRes, discRes] = await Promise.all([
+           supabase.from('membros').select('*').limit(10000),
+           supabase.from('celulas').select('grupo_caseiro, setor'),
+           supabase.from('discipulado').select('mestre, discipulo, status')
         ]);
+        
+        const allMembros = membrosRes.data || [];
+        const allCelulas = celulasRes.data || [];
+        const allDisc = discRes.data || [];
 
-        if (pageRes.error) throw pageRes.error;
-        if (countRes.error) throw countRes.error;
+        const setorMap: Record<string, string> = {};
+        allCelulas.forEach(c => {
+           if (c.grupo_caseiro && c.setor) setorMap[c.grupo_caseiro.toLowerCase()] = c.setor;
+        });
 
-        setMembers(pageRes.data || []);
-        setTotalCount(countRes.count || 0);
+        const mestreMap: Record<string, string> = {};
+        allDisc.forEach(d => {
+           if (d.discipulo && d.mestre) mestreMap[d.discipulo.toLowerCase()] = d.mestre;
+        });
+
+        const enriched = allMembros.map(m => {
+           const nomeLower = (m.nome || m.name || '').toLowerCase();
+           const gcLower = (m.grupos_caseiros || '').toLowerCase();
+           return {
+               ...m,
+               setor: setorMap[gcLower] || 'Sem Setor',
+               discipulador: mestreMap[nomeLower] || 'Sem Discipulador'
+           };
+        });
+
+        setMembers(enriched);
       } catch (error) {
         console.error('Error fetching members:', error);
       } finally {
         setIsLoading(false);
       }
     };
+    fetchAllData();
+  }, []);
 
-    const timer = setTimeout(() => {
-      fetchMembers();
-    }, 300); // Debounce search
+  const calculateAge = (dob: string) => {
+    if (!dob) return -1;
+    let parts = dob.includes('/') ? dob.split('/') : dob.split('-');
+    const birth = dob.includes('/') ? new Date(Number(parts[2]), Number(parts[1])-1, Number(parts[0])) : new Date(dob);
+    if (isNaN(birth.getTime())) return -1;
+    const now = new Date();
+    let age = now.getFullYear() - birth.getFullYear();
+    if (now.getMonth() < birth.getMonth() || (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate())) age--;
+    return age;
+  };
 
-    return () => clearTimeout(timer);
-  }, [searchTerm, page]);
+  const getAgeCategory = (age: number) => {
+    if (age < 0) return 'Indefinida';
+    if (age < 12) return 'Criança';
+    if (age < 18) return 'Adolescente';
+    if (age < 30) return 'Jovem';
+    if (age < 60) return 'Adulto';
+    return 'Idoso';
+  };
+
+  // Unique Options
+  const uniqueTypes = useMemo(() => Array.from(new Set(members.map(m => m.tipo_cadastro).filter(Boolean))).sort(), [members]);
+  const uniqueGCs = useMemo(() => Array.from(new Set(members.map(m => m.grupos_caseiros).filter(Boolean))).sort(), [members]);
+  const uniqueGenders = useMemo(() => Array.from(new Set(members.map(m => m.sexo || m.sex).filter(Boolean))).sort(), [members]);
+  const uniqueStates = useMemo(() => Array.from(new Set(members.map(m => m.uf || m.estado).filter(Boolean))).sort(), [members]);
+  const uniqueSetores = useMemo(() => Array.from(new Set(members.map(m => m.setor).filter(s => s !== 'Sem Setor'))).sort(), [members]);
+  const uniqueMestres = useMemo(() => Array.from(new Set(members.map(m => m.discipulador).filter(d => d !== 'Sem Discipulador'))).sort(), [members]);
+
+  const filteredMembers = useMemo(() => {
+    return members.filter(m => {
+      if (filterQuery) {
+        const queryLower = filterQuery.toLowerCase();
+        if (!(m.nome || '').toLowerCase().includes(queryLower)) return false;
+      }
+      if (filterType !== 'Todos' && m.tipo_cadastro !== filterType) return false;
+      if (filterGC !== 'Todos' && m.grupos_caseiros !== filterGC) return false;
+      if (filterSetor !== 'Todos' && m.setor !== filterSetor) return false;
+      if (filterMestre !== 'Todos' && m.discipulador !== filterMestre) return false;
+      if (filterGender !== 'Todos' && (m.sexo || m.sex) !== filterGender) return false;
+      if (filterState !== 'Todos' && (m.uf || m.estado) !== filterState) return false;
+      if (filterAgeCategory !== 'Todas') {
+        const age = calculateAge(m.nascimento || m.data_nascimento || m.birth_date);
+        if (getAgeCategory(age) !== filterAgeCategory) return false;
+      }
+      return true;
+    });
+  }, [members, filterQuery, filterType, filterGC, filterGender, filterAgeCategory, filterState, filterSetor, filterMestre]);
+
+  const totalCount = filteredMembers.length;
+  const paginatedMembers = filteredMembers.slice((page - 1) * pageSize, page * pageSize);
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -53,7 +120,7 @@ export const Members: React.FC = () => {
         <div>
            <h1 className="text-3xl font-bold tracking-tight text-gray-900">Membros & Visitantes</h1>
            <p className="mt-2 text-sm text-gray-500">
-             Gestao completa do cadastro de pessoas da igreja.
+             Gestão completa do cadastro de pessoas da igreja.
            </p>
         </div>
         <button className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm text-center">
@@ -61,28 +128,94 @@ export const Members: React.FC = () => {
         </button>
       </header>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col">
-          <div className="p-4 border-b border-gray-100 flex flex-col sm:flex-row gap-4 justify-between items-center bg-gray-50/50 rounded-t-2xl">
-             <div className="relative w-full sm:w-96">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                   <Search className="h-4 w-4 text-gray-400" />
-                </div>
+      {/* Advanced Filters Panel */}
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-6 mb-6">
+        <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+          <div className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+            <Filter className="h-4 w-4 text-primary-500" /> Painel de Filtros Avançados
+          </div>
+          <button 
+            onClick={() => {
+              setFilterQuery(''); setFilterType('Todos'); setFilterGC('Todos'); setFilterGender('Todos');
+              setFilterAgeCategory('Todas'); setFilterState('Todos'); setFilterSetor('Todos'); setFilterMestre('Todos');
+            }}
+            className="text-xs text-red-600 font-medium hover:underline"
+          >
+            Limpar Filtros
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div>
+             <label className="block text-xs font-medium text-gray-500 mb-1">Buscar por Nome</label>
+             <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
-                   type="text"
-                   className="block w-full rounded-lg border-0 py-2 pl-10 pr-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6"
-                   placeholder="Buscar por nome..."
-                   value={searchTerm}
-                   onChange={(e) => {
-                     setSearchTerm(e.target.value);
-                     setPage(1);
-                   }}
+                   type="text" value={filterQuery} onChange={e => { setFilterQuery(e.target.value); setPage(1); }}
+                   className="pl-9 pr-3 py-2 w-full text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                   placeholder="Ex: João da Silva..."
                 />
              </div>
-             <button className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors w-full sm:w-auto justify-center">
-                <Filter className="h-4 w-4" /> Filtros
-             </button>
+          </div>
+          
+          <div>
+             <label className="block text-xs font-medium text-gray-500 mb-1">Tipo / Vínculo</label>
+             <select value={filterType} onChange={e => { setFilterType(e.target.value); setPage(1); }} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white">
+                 <option value="Todos">Todos</option>
+                 {uniqueTypes.map(t => <option key={t as string} value={t as string}>{t as string}</option>)}
+             </select>
           </div>
 
+          <div>
+             <label className="block text-xs font-medium text-gray-500 mb-1">Faixa Etária</label>
+             <select value={filterAgeCategory} onChange={e => { setFilterAgeCategory(e.target.value); setPage(1); }} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white">
+                 {['Todas', 'Criança', 'Adolescente', 'Jovem', 'Adulto', 'Idoso', 'Indefinida'].map(t => <option key={t} value={t}>{t}</option>)}
+             </select>
+          </div>
+
+          <div>
+             <label className="block text-xs font-medium text-gray-500 mb-1">Sexo / Gênero</label>
+             <select value={filterGender} onChange={e => { setFilterGender(e.target.value); setPage(1); }} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white">
+                 <option value="Todos">Todos</option>
+                 {uniqueGenders.map(t => <option key={t as string} value={t as string}>{t as string}</option>)}
+             </select>
+          </div>
+
+          <div>
+             <label className="block text-xs font-medium text-gray-500 mb-1">Setor</label>
+             <select value={filterSetor} onChange={e => { setFilterSetor(e.target.value); setPage(1); }} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white">
+                 <option value="Todos">Todos</option>
+                 {uniqueSetores.map(t => <option key={t as string} value={t as string}>{t as string}</option>)}
+             </select>
+          </div>
+
+          <div>
+             <label className="block text-xs font-medium text-gray-500 mb-1">Grupo Caseiro</label>
+             <select value={filterGC} onChange={e => { setFilterGC(e.target.value); setPage(1); }} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white">
+                 <option value="Todos">Todos</option>
+                 {uniqueGCs.map(t => <option key={t as string} value={t as string}>{t as string}</option>)}
+             </select>
+          </div>
+
+          <div>
+             <label className="block text-xs font-medium text-gray-500 mb-1">UF / Estado</label>
+             <select value={filterState} onChange={e => { setFilterState(e.target.value); setPage(1); }} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white">
+                 <option value="Todos">Todos</option>
+                 {uniqueStates.map(t => <option key={t as string} value={t as string}>{t as string}</option>)}
+             </select>
+          </div>
+
+          <div>
+             <label className="block text-xs font-medium text-gray-500 mb-1">Discipulador</label>
+             <select value={filterMestre} onChange={e => { setFilterMestre(e.target.value); setPage(1); }} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white">
+                 <option value="Todos">Todos</option>
+                 {uniqueMestres.map(t => <option key={t as string} value={t as string}>{t as string}</option>)}
+             </select>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col">
           <div className="overflow-x-auto min-h-[400px] relative">
              {isLoading && (
                <div className="absolute inset-0 bg-white/50 backdrop-blur-[1px] flex items-center justify-center z-10">
@@ -94,7 +227,7 @@ export const Members: React.FC = () => {
                 <thead className="bg-white">
                    <tr>
                       <th scope="col" className="py-3.5 pl-6 pr-3 text-left text-sm font-semibold text-gray-900">Nome</th>
-                      <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Tipo</th>
+                      <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Tipo / Perfil</th>
                       <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Grupo Caseiro</th>
                       <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Contato</th>
                       <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Status</th>
@@ -102,22 +235,39 @@ export const Members: React.FC = () => {
                    </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 bg-white">
-                   {members.map((person) => (
+                   {paginatedMembers.map((person) => (
                       <tr key={person.id} className="hover:bg-gray-50 transition-colors group">
                          <td className="whitespace-nowrap py-4 pl-6 pr-3">
                             <div className="flex items-center gap-3">
-                               <div className="h-10 w-10 flex-shrink-0 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-bold border border-primary-200 overflow-hidden">
+                               <div className="h-10 w-10 flex-shrink-0 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-bold border border-primary-200 overflow-hidden text-sm uppercase">
                                   {person.foto ? (
                                     <img src={person.foto} alt="" className="w-full h-full object-cover" />
                                   ) : (
-                                    person.nome?.charAt(0) || '?'
+                                    (person.nome || '?').charAt(0)
                                   )}
                                </div>
-                               <div className="font-medium text-gray-900">{person.nome}</div>
+                               <div className="flex flex-col min-w-0">
+                                  <span className="font-medium text-gray-900 truncate max-w-[200px]">{person.nome}</span>
+                                  <span className="text-[10px] text-gray-500 font-medium truncate max-w-[150px]">
+                                    {person.discipulador !== 'Sem Discipulador' ? `Disc: ${person.discipulador}` : ''}
+                                  </span>
+                               </div>
                             </div>
                          </td>
-                         <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{person.tipo_cadastro}</td>
-                         <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{person.grupos_caseiros || '-'}</td>
+                         <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                            <div className="flex flex-col">
+                               <span>{person.tipo_cadastro || 'Membro'}</span>
+                               <span className="text-[10px] text-gray-400">
+                                 {getAgeCategory(calculateAge(person.nascimento || person.data_nascimento || person.birth_date))}
+                               </span>
+                            </div>
+                         </td>
+                         <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                            <div className="flex flex-col">
+                               <span className="truncate max-w-[150px]">{person.grupos_caseiros || '-'}</span>
+                               <span className="text-[10px] text-indigo-500 font-medium">{person.setor !== 'Sem Setor' ? person.setor : ''}</span>
+                            </div>
+                         </td>
                          <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                             <div className="flex flex-col gap-1">
                                {person.email && <div className="flex items-center gap-1.5"><Mail className="w-3.5 h-3.5 text-gray-400" /> {person.email}</div>}
@@ -125,10 +275,11 @@ export const Members: React.FC = () => {
                             </div>
                          </td>
                          <td className="whitespace-nowrap px-3 py-4 text-sm">
-                            <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset 
-                               ${person.status === 'Ativo' ? 'bg-green-50 text-green-700 ring-green-600/20' : 
-                                 person.status === 'Inativo' ? 'bg-red-50 text-red-700 ring-red-600/20' : 
-                                 'bg-yellow-50 text-yellow-800 ring-yellow-600/20'}`}>
+                            <span className={clsx("inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset", 
+                               person.status === 'Ativo' ? 'bg-green-50 text-green-700 ring-green-600/20' : 
+                               person.status === 'Inativo' ? 'bg-red-50 text-red-700 ring-red-600/20' : 
+                               'bg-yellow-50 text-yellow-800 ring-yellow-600/20'
+                            )}>
                                {person.status}
                             </span>
                          </td>
@@ -139,9 +290,9 @@ export const Members: React.FC = () => {
                          </td>
                       </tr>
                    ))}
-                   {members.length === 0 && !isLoading && (
+                   {paginatedMembers.length === 0 && !isLoading && (
                      <tr>
-                       <td colSpan={6} className="text-center py-12 text-gray-500">Nenhum membro encontrado.</td>
+                       <td colSpan={6} className="text-center py-12 text-gray-500">Nenhum membro encontrado com os filtros aplicados.</td>
                      </tr>
                    )}
                 </tbody>
@@ -149,22 +300,22 @@ export const Members: React.FC = () => {
           </div>
           
           {/* Pagination */}
-          <div className="border-t border-gray-100 px-6 py-4 flex items-center justify-between">
+          <div className="border-t border-gray-100 px-6 py-4 flex items-center justify-between bg-gray-50/30 rounded-b-2xl">
              <p className="text-sm text-gray-500">
                Mostrando <span className="font-medium">{(page - 1) * pageSize + 1}</span> a <span className="font-medium">{Math.min(page * pageSize, totalCount)}</span> de <span className="font-medium">{totalCount}</span> resultados
              </p>
              <div className="flex gap-2">
                 <button 
-                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  onClick={() => { setPage(p => Math.max(1, p - 1)); window.scrollTo(0, 0); }}
                   disabled={page === 1}
-                  className="px-3 py-1 border border-gray-200 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                  className="px-3 py-1 border border-gray-200 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors"
                 >
                   Anterior
                 </button>
                 <button 
-                  onClick={() => setPage(p => p + 1)}
+                  onClick={() => { setPage(p => p + 1); window.scrollTo(0, 0); }}
                   disabled={page * pageSize >= totalCount}
-                  className="px-3 py-1 border border-gray-200 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                  className="px-3 py-1 border border-gray-200 rounded-md text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors"
                 >
                   Próxima
                 </button>

@@ -29,14 +29,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const mapSupabaseUser = (sbUser: SupabaseUser | null): User | null => {
     if (!sbUser) return null;
     
-    return {
+    const email = sbUser.email || '';
+    let role = (sbUser.user_metadata?.role as Role) || 'secretaria';
+    let name = sbUser.user_metadata?.name || email.split('@')[0] || 'Usuário';
+    
+    // Override manual para garantir que o admin principal não perca acesso
+    if (email.toLowerCase().includes('diego')) {
+      role = 'admin';
+      if (!name.includes('Admin')) name = name + ' (Admin)';
+    }
+
+    const userData: User = {
       id: sbUser.id,
-      email: sbUser.email || '',
-      name: sbUser.user_metadata?.name || sbUser.email?.split('@')[0] || 'Usuário',
-      role: (sbUser.user_metadata?.role as Role) || 'secretaria',
+      email: email,
+      name: name,
+      role: role,
       avatar: sbUser.user_metadata?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${sbUser.id}`,
       groupId: sbUser.user_metadata?.groupId,
     };
+
+    // Auto-resgate: Sincroniza o perfil com a tabela pública no momento do acesso
+    // Isso resolve o caso de usuários legados ou cadastrados via Auth direto
+    supabase.from('profiles').upsert({
+      id: userData.id,
+      email: userData.email,
+      name: userData.name,
+      role: userData.role,
+      avatar: userData.avatar,
+      updated_at: new Date().toISOString()
+    }).then(({ error }) => {
+      if (error) console.error("Erro ao sincronizar perfil no login:", error);
+    });
+
+    return userData;
   };
 
   useEffect(() => {

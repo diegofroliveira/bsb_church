@@ -34,7 +34,7 @@ def clean_column_name(col):
     return col
 
 def main():
-    print("🚀 Iniciando importador Inteligente (Auto-discovery de colunas)...")
+    print("INFO: Iniciando importador Inteligente (Auto-discovery de colunas)...")
     
     with httpx.Client(verify=False, headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}) as client:
         
@@ -42,7 +42,7 @@ def main():
             path = os.path.join(INPUT_DIR, file_name)
             if not os.path.exists(path): continue
             
-            print(f"\n📊 Analisando {file_name} -> Tabela '{table_name}'...")
+            print(f"\nINFO: Analisando {file_name} -> Tabela '{table_name}'...")
             
             # 1. Descobrir quais colunas existem de fato no Supabase para esta tabela
             # Fazemos uma chamada OPTIONS para pegar a definição da tabela
@@ -74,7 +74,7 @@ def main():
                     df = df.drop_duplicates(subset=["id"], keep="first")
                     depois = len(df)
                     if antes != depois:
-                        print(f"  ♻ Removidos {antes - depois} IDs duplicados do arquivo.")
+                        print(f"  INFO: Removidos {antes - depois} IDs duplicados do arquivo.")
 
                 # DEDUPLICAÇÃO ESPECIAL PARA DISCIPULADO
                 # Como o Prover gera novos id_serial a cada exportação, usamos
@@ -86,11 +86,11 @@ def main():
                         df = df.drop_duplicates(subset=chave_natural, keep="first")
                         depois = len(df)
                         if antes != depois:
-                            print(f"  ♻ Removidos {antes - depois} vínculos duplicados de discipulado.")
+                            print(f"  INFO: Removidos {antes - depois} vinculos duplicados de discipulado.")
                         # Remove id_serial para evitar conflito de chave no UPSERT
                         if "id_serial" in df.columns:
                             df = df.drop(columns=["id_serial"])
-                            print(f"  ✂ Removendo id_serial do discipulado (será gerado pelo banco).")
+                            print(f"  INFO: Removendo id_serial do discipulado (sera gerado pelo banco).")
 
                 if table_name == "eventos":
                     if "id_serial" in df.columns: df = df.drop(columns=["id_serial"])
@@ -107,7 +107,7 @@ def main():
                 # ESTRATÉGIA ESPECIAL PARA DISCIPULADO: apaga tudo e reinseere
                 # Isso garante que o banco sempre reflita exatamente o que veio do Prover
                 if table_name == "discipulado":
-                    print("  🗑 Limpando tabela discipulado antes de reinserir...")
+                    print("  LIMPANDO: Limpando tabela discipulado antes de reinserir...")
                     client.delete(
                         url,
                         params={"id_serial": "gt.0"},  # PostgREST precisa de um filtro
@@ -130,7 +130,7 @@ def main():
                     )
                     
                     if res.status_code in [200, 201]:
-                        print(f"  ✓ Lote {i//batch_size + 1} enviado.")
+                        print(f"  OK: Lote {i//batch_size + 1} enviado.")
                         i += batch_size
                     elif res.status_code == 400:
                         try:
@@ -139,7 +139,7 @@ def main():
                         except:
                             msg = res.text
                         
-                        print(f"  ⚠ Mensagem de erro: {msg}")
+                        print(f"  AVISO: Mensagem de erro: {msg}")
                         
                         # O PostgREST costuma retornar: Could not find the 'coluna' column...
                         # Tentativa 1: Entre aspas simples
@@ -151,19 +151,19 @@ def main():
                         
                         if match:
                             col_ruim = match.group(1).replace("'", "").replace('"', "").strip()
-                            print(f"  ✂ Removendo coluna inexistente: '{col_ruim}'")
+                            print(f"  INFO: Removendo coluna inexistente: '{col_ruim}'")
                             colunas_invalidas.add(col_ruim)
                         else:
-                            print(f"  ✗ Não consegui identificar a coluna no erro.")
+                            print(f"  ERRO: Nao consegui identificar a coluna no erro.")
                             break
                     else:
-                        print(f"  ✗ Erro inesperado: {res.status_code} - {res.text}")
+                        print(f"  ERRO inesperado: {res.status_code} - {res.text}")
                         break
                         
             except Exception as e:
                 print(f"  ✗ Erro ao processar arquivo: {e}")
 
-    print("\n✅ PROCESSO DE IMPORTAÇÃO FINALIZADO")
+    print("\nOK: PROCESSO DE IMPORTACAO FINALIZADO")
 
 if __name__ == "__main__":
     main()

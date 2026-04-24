@@ -50,7 +50,7 @@ MODULOS_EXPORT = {
 # ─────────────────────────────────────────────
 
 def fazer_login(page):
-    print(f"🔐 Acessando página de login: {BASE_LOGIN}")
+    print(f"LOGIN: Acessando pagina de login: {BASE_LOGIN}")
     page.goto(BASE_LOGIN, wait_until="networkidle")
 
     # Tenta preencher o e-mail/usuário
@@ -67,13 +67,13 @@ def fazer_login(page):
     # Preenche a senha
     page.fill('input[type="password"]', PROVER_SENHA)
 
-    print("🚀 Clicando no botão de entrar...")
+    print("LOGIN: Clicando no botao de entrar...")
     page.click('button[type="submit"]')
 
     # Aguarda a navegação pós-login
     try:
         page.wait_for_url(lambda url: "login" not in url.lower(), timeout=15000)
-        print(f"  ✓ Login realizado com sucesso! URL atual: {page.url}")
+        print(f"  OK: Login realizado com sucesso! URL atual: {page.url}")
         
         # Tenta fechar possíveis modais de aviso que bloqueiam a tela
         page.wait_for_timeout(3000)
@@ -82,24 +82,24 @@ def fazer_login(page):
             try:
                 if modal_close.is_visible():
                     modal_close.click(timeout=2000)
-                    print("  ℹ Modal de aviso fechado.")
+                    print("  INFO: Modal de aviso fechado.")
             except:
                 pass
         
         return True
     except PlaywrightTimeoutError:
-        print("  ✗ Erro: O login demorou muito ou falhou. Verifique as credenciais.")
+        print("  ERRO: O login demorou muito ou falhou. Verifique as credenciais.")
         return False
 
 def baixar_modulo(page, nome_modulo, termos):
-    print(f"\n📂 Tentando baixar módulo: {nome_modulo.upper()}")
+    print(f"\nMODULO: Tentando baixar modulo: {nome_modulo.upper()}")
     
     target_url = None
     
     # 1. Tenta ver se o primeiro termo já é uma URL direta (começa com /)
     if termos[0].startswith("/"):
         target_url = PROVER_BASE_URL + termos[0]
-        print(f"  → Usando URL direta: {target_url}")
+        print(f"  URL: Usando URL direta: {target_url}")
     else:
         # 2. Caso contrário, procura na página de exportação
         page.goto(EXPORT_URL, wait_until="networkidle")
@@ -115,13 +115,13 @@ def baixar_modulo(page, nome_modulo, termos):
                             target_url = PROVER_BASE_URL + href if href.startswith("/") else f"{PROVER_BASE_URL}/consolidado/{href}"
                         else:
                             target_url = href
-                        print(f"  → Encontrado na página: '{text}' -> {target_url}")
+                        print(f"  URL: Encontrado na pagina: '{text}' -> {target_url}")
                         break
             except: continue
 
     if target_url:
         try:
-            print(f"  📥 Baixando arquivo...")
+            print(f"  INFO: Baixando arquivo...")
             response = page.context.request.get(target_url)
             
             if response.status == 200:
@@ -138,7 +138,7 @@ def baixar_modulo(page, nome_modulo, termos):
                 with open(path, "wb") as f:
                     f.write(response.body())
                 
-                print(f"  ✓ {nome_modulo} salvo em: {path}")
+                print(f"  OK: {nome_modulo} salvo em: {path}")
                 
                 # Validação
                 try:
@@ -149,19 +149,19 @@ def baixar_modulo(page, nome_modulo, termos):
                             df = pd.read_csv(path, encoding="latin1", sep=";")
                     else:
                         df = pd.read_excel(path)
-                    print(f"  📊 {len(df)} registros extraídos.")
+                    print(f"  INFO: {len(df)} registros extraidos.")
                     return df
                 except Exception as e_parse:
-                    print(f"  ⚠ Arquivo baixado ({len(response.body())} bytes) mas erro ao ler: {e_parse}")
+                    print(f"  AVISO: Arquivo baixado ({len(response.body())} bytes) mas erro ao ler: {e_parse}")
                     return pd.DataFrame()
             else:
-                print(f"  ✗ Erro no download (Status: {response.status})")
+                print(f"  ERRO no download (Status: {response.status})")
                 # Se falhou a URL direta, tenta procurar na página (caso não tenha tentado ainda)
                 if termos[0].startswith("/") and len(termos) > 1:
-                    print("  🔄 Tentando buscar link alternativo na página...")
+                    print("  RETRY: Tentando buscar link alternativo na página...")
                     return baixar_modulo(page, nome_modulo, termos[1:])
         except Exception as e:
-            print(f"  ✗ Erro ao processar: {e}")
+            print(f"  ERRO ao processar: {e}")
     
     return None
 
@@ -176,7 +176,7 @@ def salvar_estrutura_json(dados: dict):
     path = f"{OUTPUT_DIR}/estrutura_dados.json"
     with open(path, "w", encoding="utf-8") as f:
         json.dump(estrutura, f, ensure_ascii=False, indent=2)
-    print(f"\n📋 Estrutura salva em {path}")
+    print(f"\nINFO: Estrutura salva em {path}")
 
 def main():
     print("=" * 60)
@@ -205,14 +205,14 @@ def main():
 
             if dados_finais:
                 salvar_estrutura_json(dados_finais)
-                print("\n✅ Extração concluída com sucesso!")
+                print("\nOK: Extracao concluida com sucesso!")
             else:
-                print("\n⚠ Nenhum dado foi baixado.")
+                print("\nAVISO: Nenhum dado foi baixado.")
         finally:
             browser.close()
 
     print("\n" + "=" * 60)
-    print("✅ PROCESSO FINALIZADO")
+    print("OK: PROCESSO FINALIZADO")
     print("=" * 60)
 
 if __name__ == "__main__":

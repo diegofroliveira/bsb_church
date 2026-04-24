@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { Download, Wallet, ArrowUpRight, ArrowDownRight, Loader2, Filter, PieChart as PieChartIcon } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
+import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
 import clsx from 'clsx';
 
 interface Transaction {
@@ -309,7 +309,30 @@ export const Finance: React.FC = () => {
                   </BarChart>
                </ResponsiveContainer>
              </div>
-         </div>
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 lg:col-span-3">
+              <div className="pb-4 mb-4 border-b border-gray-100">
+                <h3 className="text-lg font-semibold leading-6 text-gray-900">Histórico de Crescimento (Receitas)</h3>
+              </div>
+              <div className="h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={allBarChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorEntradas" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} dy={10} />
+                    <YAxis axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} />
+                    <RechartsTooltip formatter={(val) => formatCurrency(val as number)} contentStyle={{ borderRadius: '12px', border: 'none' }} />
+                    <Area type="monotone" dataKey="entradas" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorEntradas)" name="Receitas" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+          </div>
 
          {/* Pie Chart */}
          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">

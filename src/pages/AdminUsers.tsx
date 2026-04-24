@@ -18,6 +18,7 @@ interface AppUser {
   email: string;
   name: string;
   role: Role;
+  avatar?: string;
   created_at: string;
 }
 
@@ -27,6 +28,8 @@ export const AdminUsers: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editRole, setEditRole] = useState<Role>('secretaria');
+  const [editName, setEditName] = useState('');
+  const [editAvatar, setEditAvatar] = useState('');
   const [savingId, setSavingId] = useState<string | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
   const [showNewForm, setShowNewForm] = useState(false);
@@ -40,29 +43,49 @@ export const AdminUsers: React.FC = () => {
   const fetchUsers = async () => {
     setIsLoading(true);
     try {
-      // List users from supabase_users table (public profiles)
-      const { data, error } = await supabase.from('supabase_users').select('*');
-      if (!error && data) { setUsers(data); setIsLoading(false); return; }
+      const { data, error } = await supabase.from('profiles').select('*');
+      if (!error && data) { 
+        setUsers(data.map(u => ({ ...u, avatar: u.avatar || u.foto }))); 
+        setIsLoading(false); 
+        return; 
+      }
     } catch (_) {}
-    // Fallback: just show current user
     if (currentUser) {
-      setUsers([{ id: currentUser.id, email: currentUser.email, name: currentUser.name, role: currentUser.role as Role, created_at: new Date().toISOString() }]);
+      setUsers([{ id: currentUser.id, email: currentUser.email, name: currentUser.name, role: currentUser.role as Role, avatar: currentUser.avatar, created_at: new Date().toISOString() }]);
     }
     setIsLoading(false);
   };
 
   useEffect(() => { fetchUsers(); }, []);
 
-  const saveRole = async (userId: string) => {
+  const saveProfile = async (userId: string) => {
     setSavingId(userId);
     try {
-      const { error } = await supabase.auth.admin.updateUserById(userId, { user_metadata: { role: editRole } });
+      // 1. Atualizar Metadados no Auth (se possível)
+      await supabase.auth.admin.updateUserById(userId, { 
+        user_metadata: { name: editName, role: editRole, avatar: editAvatar } 
+      }).catch(() => console.log('Admin API restrita, atualizando apenas tabela pública...'));
+
+      // 2. Atualizar Tabela Pública de Perfis
+      const { error } = await supabase.from('profiles').upsert({
+        id: userId,
+        email: users.find(u => u.id === userId)?.email,
+        name: editName,
+        role: editRole,
+        updated_at: new Date().toISOString()
+      });
+
       if (error) throw error;
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: editRole } : u));
+
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, name: editName, role: editRole, avatar: editAvatar } : u));
       setSavedId(userId); setTimeout(() => setSavedId(null), 2000);
+      
+      if (userId === currentUser?.id) {
+        // Recarregar para atualizar avatar/nome no Sidebar
+        window.location.reload();
+      }
     } catch (err: any) {
-      // admin API requires service key — update via RPC or metadata directly
-      alert('Para atualizar roles, use o painel do Supabase → Authentication → Users → Edit user metadata: { "role": "' + editRole + '" }');
+      alert('Erro ao salvar perfil: ' + err.message);
     } finally {
       setSavingId(null); setEditingId(null);
     }
@@ -72,16 +95,60 @@ export const AdminUsers: React.FC = () => {
     if (!newEmail || !newPassword || !newName) { setCreateError('Preencha todos os campos.'); return; }
     setCreating(true); setCreateError('');
     try {
-      const { error } = await supabase.auth.admin.createUser({
-        email: newEmail, password: newPassword,
-        user_metadata: { name: newName, role: newRole },
-        email_confirm: true
+      const response = await fetch('/api/create-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: newEmail,
+          password: newPassword,
+          name: newName,
+          role: newRole
+        })
       });
-      if (error) throw error;
-      setShowNewForm(false); setNewEmail(''); setNewPassword(''); setNewName(''); setNewRole('secretaria');
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        // Se o erro for falta de chave no servidor, tentamos o Plano B (SignUp público)
+        if (result.error?.includes('SUPABASE_SERVICE_ROLE_KEY')) {
+           console.log('Tentando Plano B: SignUp público...');
+           const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+             email: newEmail,
+             password: newPassword,
+             options: {
+               data: { name: newName, role: newRole },
+               emailRedirectTo: window.location.origin
+             }
+           });
+           
+           if (signUpError) throw signUpError;
+
+           // Criar perfil na tabela pública imediatamente
+           if (signUpData.user) {
+              await supabase.from('profiles').insert({
+                 id: signUpData.user.id,
+                 email: newEmail,
+                 name: newName,
+                 role: newRole,
+                 avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${newName}`
+              });
+           }
+           
+           setShowNewForm(false); setNewEmail(''); setNewPassword(''); setNewName(''); setNewRole('secretaria');
+           fetchUsers();
+           alert('Usuário cadastrado via Plano B. \n\nIMPORTANTE: Ele deve confirmar o e-mail ' + newEmail + '. Ele já aparecerá na lista.');
+           return;
+        }
+        throw new Error(result.error || 'Falha ao criar usuário');
+      }
+
+      // Sucesso na API Normal:
       fetchUsers();
+      setShowNewForm(false); setNewEmail(''); setNewPassword(''); setNewName(''); setNewRole('secretaria');
+      alert('Usuário ' + newName + ' criado com sucesso!');
     } catch (err: any) {
-      setCreateError('Criação requer permissão de admin. Use o painel Supabase → Auth → Add User e defina o metadata: { "name": "' + newName + '", "role": "' + newRole + '" }');
+      console.error('Erro na criação:', err);
+      setCreateError(err.message || 'Falha ao criar usuário. Verifique se o e-mail já existe ou se a chave de serviço está configurada.');
     } finally { setCreating(false); }
   };
 
@@ -176,37 +243,58 @@ export const AdminUsers: React.FC = () => {
                 return (
                   <tr key={u.id} className="hover:bg-gray-50/50">
                     <td className="py-4 pl-6 pr-3">
-                      <div className="font-medium text-gray-900 text-sm">{u.name || u.email.split('@')[0]}</div>
-                      <div className="text-xs text-gray-400">{u.email}</div>
+                      {isEditing ? (
+                        <div className="flex flex-col gap-2">
+                          <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Nome de exibição</div>
+                          <input 
+                            value={editName} 
+                            onChange={e => setEditName(e.target.value)} 
+                            className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white shadow-sm" 
+                            placeholder="Ex: Diego" 
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-3">
+                          <div className="flex flex-col">
+                            <div className="font-medium text-gray-900 text-sm">{u.name || u.email.split('@')[0]}</div>
+                            <div className="text-xs text-gray-400">{u.email}</div>
+                          </div>
+                        </div>
+                      )}
                     </td>
-                    <td className="px-3 py-4">
+                    <td className="px-3 py-4 align-top">
                       <span className={clsx('text-xs font-semibold px-2 py-1 rounded-full border', ri.color)}>{ri.label}</span>
-                      {isCurrent && <span className="ml-2 text-xs text-gray-400">(você)</span>}
+                      {isCurrent && <div className="mt-1 text-[10px] text-primary-500 font-bold uppercase tracking-tighter">(Você)</div>}
                     </td>
-                    <td className="px-3 py-4">
+                    <td className="px-3 py-4 align-top">
                       {isEditing ? (
                         <select value={editRole} onChange={e => setEditRole(e.target.value as Role)}
-                          className="border border-gray-200 rounded-lg px-2 py-1 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white">
+                          className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white shadow-sm">
                           {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                         </select>
                       ) : (
-                        <span className="text-sm text-gray-400">—</span>
+                        <span className="text-sm text-gray-300">—</span>
                       )}
                     </td>
-                    <td className="px-3 py-4 text-right">
+                    <td className="px-3 py-4 text-right align-top">
                       {savedId === u.id ? (
-                        <span className="text-green-600 text-sm flex items-center gap-1 justify-end"><Check className="w-4 h-4" /> Salvo</span>
+                        <span className="text-green-600 text-sm flex items-center gap-1 justify-end font-bold"><Check className="w-4 h-4" /> Atualizado</span>
                       ) : isEditing ? (
-                        <div className="flex gap-2 justify-end">
-                          <button onClick={() => saveRole(u.id)} disabled={!!savingId}
-                            className="text-xs bg-primary-600 text-white px-3 py-1 rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center gap-1">
+                        <div className="flex flex-col gap-2 items-end">
+                          <button onClick={() => saveProfile(u.id)} disabled={!!savingId}
+                            className="w-full flex justify-center items-center gap-2 bg-primary-600 text-white px-4 py-1.5 rounded-lg hover:bg-primary-700 disabled:opacity-50 text-xs font-bold transition-all shadow-md">
                             {savingId === u.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />} Salvar
                           </button>
-                          <button onClick={() => setEditingId(null)} className="text-xs text-gray-500 border border-gray-200 px-3 py-1 rounded-lg hover:bg-gray-50">Cancelar</button>
+                          <button onClick={() => setEditingId(null)} className="w-full text-xs text-gray-500 border border-gray-200 px-4 py-1.5 rounded-lg hover:bg-gray-50 transition-colors bg-white">Cancelar</button>
                         </div>
                       ) : (
-                        <button onClick={() => { setEditingId(u.id); setEditRole(u.role); }}
-                          className="text-xs text-primary-600 hover:text-primary-800 font-medium">
+                        <button onClick={() => { 
+                          setEditingId(u.id); 
+                          setEditRole(u.role); 
+                          setEditName(u.name || ''); 
+                          setEditAvatar(u.avatar || ''); 
+                        }}
+                          className="text-xs text-primary-600 hover:text-primary-800 font-bold border border-primary-100 px-3 py-1.5 rounded-lg bg-primary-50/30 hover:bg-primary-50 transition-all">
                           Editar perfil
                         </button>
                       )}

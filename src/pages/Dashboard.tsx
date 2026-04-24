@@ -1,124 +1,44 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, Legend, PieChart, Pie, Cell
 } from 'recharts';
-import { Users, UserPlus, Home, TrendingUp, Loader2, X, Search, Layers, UserCheck } from 'lucide-react';
+import { Users, UserPlus, Home, TrendingUp, Loader2, X, Search, Layers, UserCheck, MapPin } from 'lucide-react';
 import clsx from 'clsx';
 
 export const Dashboard: React.FC = () => {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
-  const [stats, setStats] = useState<any>({
-    totalMembros: 0, membrosAtivos: 0, totalVisitantes: 0, totalCelulas: 0, arrecadacaoMes: 0
-  });
-
-  const [charts, setCharts] = useState<any>({
-    growth: [], demographics: [], finance: [], groups: [], sectors: [], discipuladores: []
-  });
-  
+  const [isModalLoading, setIsModalLoading] = useState(false);
   const [modalType, setModalType] = useState<any>(null);
   const [modalTitle, setModalTitle] = useState('');
   const [modalItems, setModalItems] = useState<any[]>([]);
-  const [isModalLoading, setIsModalLoading] = useState(false);
+  
+  const [filterGender, setFilterGender] = useState('Todos');
+  const [filterGroup, setFilterGroup] = useState('Todos');
+  const [filterDisc, setFilterDisc] = useState('Todos');
 
-  const formatCurrency = (value: number) => 
-    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+  const [rawMembros, setRawMembros] = useState<any[]>([]);
+  const [rawCelulas, setRawCelulas] = useState<any[]>([]);
+  const [rawDiscipulado, setRawDiscipulado] = useState<any[]>([]);
 
-  const parseProverDate = (dateStr: string) => {
-    if (!dateStr) return new Date();
-    const [day, month, year] = dateStr.split('/').map(Number);
-    return new Date(year, month - 1, day);
-  };
+
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       setIsLoading(true);
       try {
-        const [membrosRes, celulasRes, financeiroRes, discRes] = await Promise.all([
-          supabase.from('membros').select('status, tipo_cadastro, nascimento, grupos_caseiros', { count: 'exact' }),
-          supabase.from('celulas').select('grupo_caseiro, lider, setor'),
-          supabase.from('financeiro').select('tipo, valor, data').order('data', { ascending: false }).limit(5000),
+        const [membrosRes, celulasRes, discRes] = await Promise.all([
+          supabase.from('membros').select('nome, status, tipo_cadastro, nascimento, grupos_caseiros, sexo, cidade, estado, tipo_de_pessoa, data_de_cadastro, data_atualizacao, estado_civil'),
+          supabase.from('celulas').select('grupo_caseiro, lider, auxiliar, setor'),
           supabase.from('discipulado').select('discipulador, discipulo, status')
         ]);
 
-        const allMembros = membrosRes.data || [];
-        const totalMembros = membrosRes.count || 0;
-        const ativos = allMembros.filter(m => m.status === 'Ativo').length;
-        const visitantes = allMembros.filter(m => m.tipo_cadastro === 'Visitante').length;
-        
-        const allCelulas = celulasRes.data || [];
-        const totalCelulas = allCelulas.length;
-
-        let sumEntradas = 0; let sumSaidas = 0;
-        const monthlyFinance: Record<string, any> = {};
-        financeiroRes.data?.forEach(item => {
-          const val = Math.abs(parseFloat(item.valor)) || 0;
-          const isEntrada = item.tipo.toLowerCase().includes('entrada');
-          if (isEntrada) sumEntradas += val; else sumSaidas += val;
-          const date = parseProverDate(item.data);
-          const monthLabel = `${date.getMonth() + 1}/${date.getFullYear()}`;
-          const sortKey = date.getFullYear() * 100 + date.getMonth();
-          if (!monthlyFinance[monthLabel]) monthlyFinance[monthLabel] = { name: monthLabel, entradas: 0, saidas: 0, sortKey };
-          if (isEntrada) monthlyFinance[monthLabel].entradas += val;
-          else monthlyFinance[monthLabel].saidas += val;
-        });
-
-        const sortedFinanceChart = Object.values(monthlyFinance).sort((a: any, b: any) => a.sortKey - b.sortKey).slice(-6);
-
-        const demoCounts: Record<string, number> = { 'Criancas': 0, 'Jovens': 0, 'Adultos': 0, 'Idosos': 0 };
-        const now = new Date();
-        const grupoCounts: any = {};
-        
-        allMembros.forEach(m => {
-          if (m.grupos_caseiros) {
-            grupoCounts[m.grupos_caseiros] = (grupoCounts[m.grupos_caseiros] || 0) + 1;
-          }
-          if (m.nascimento) {
-            const birth = new Date(m.nascimento);
-            let age = now.getFullYear() - birth.getFullYear();
-            if (isNaN(age)) age = 30;
-            if (age < 12) demoCounts['Criancas']++;
-            else if (age < 25) demoCounts['Jovens']++;
-            else if (age < 60) demoCounts['Adultos']++;
-            else demoCounts['Idosos']++;
-          } else {
-            demoCounts['Adultos']++;
-          }
-        });
-
-        const groupsList = allCelulas.map(c => ({
-          nome: c.grupo_caseiro, lider: c.lider || 'Sem Lider', setor: c.setor || 'Sem Setor', membros: grupoCounts[c.grupo_caseiro] || 0
-        })).sort((a, b) => b.membros - a.membros);
-
-        const sectorCounts: any = {};
-        groupsList.forEach(g => {
-          if (!sectorCounts[g.setor]) sectorCounts[g.setor] = { nome: g.setor, grupos: 0, membros: 0 };
-          sectorCounts[g.setor].grupos += 1;
-          sectorCounts[g.setor].membros += g.membros;
-        });
-        const sectorsList = Object.values(sectorCounts).sort((a: any, b: any) => b.grupos - a.grupos);
-
-        const discipuladoList = discRes.data || [];
-        const mestreCounts: any = {};
-        discipuladoList.forEach(d => {
-          if (d.discipulador) mestreCounts[d.discipulador] = (mestreCounts[d.discipulador] || 0) + 1;
-        });
-        const discMestres = Object.keys(mestreCounts).map(k => ({ nome: k, discipulos: mestreCounts[k] })).sort((a, b) => b.discipulos - a.discipulos);
-
-        setStats({ totalMembros, membrosAtivos: ativos, totalVisitantes: visitantes, totalCelulas, arrecadacaoMes: sumEntradas / (sortedFinanceChart.length || 1) });
-
-        setCharts({
-          growth: [{ name: 'Total', membros: totalMembros, visitantes: visitantes }, { name: 'Ativos', membros: ativos, visitantes: 0 }],
-          demographics: Object.entries(demoCounts).map(([name, value], i) => ({ name, value, fill: ['#3b82f6', '#10b981', '#f59e0b', '#6366f1'][i] })),
-          finance: sortedFinanceChart,
-          groups: groupsList,
-          sectors: sectorsList,
-          discipuladores: discMestres
-        });
-
+        setRawMembros(membrosRes.data || []);
+        setRawCelulas(celulasRes.data || []);
+        setRawDiscipulado(discRes.data || []);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
       } finally {
@@ -128,19 +48,216 @@ export const Dashboard: React.FC = () => {
     fetchDashboardData();
   }, []);
 
+  const dashboardData = useMemo(() => {
+    if (isLoading || rawMembros.length === 0) return null;
+
+    const discSet = new Set(rawDiscipulado.map(d => d.discipulador));
+    const discipuladoMap = new Map();
+    rawDiscipulado.forEach(d => {
+      const disc = d.discipulo?.trim().toUpperCase();
+      if (!discipuladoMap.has(disc)) discipuladoMap.set(disc, []);
+      discipuladoMap.get(disc).push(d.discipulador);
+    });
+
+    const now = new Date();
+    const parseSafeDate = (dateVal: any) => {
+        if (!dateVal) return null;
+        try {
+            if (dateVal instanceof Date) return dateVal;
+            const s = String(dateVal);
+            if (s.includes('/')) {
+                const parts = s.split('/');
+                if (parts.length === 3) {
+                    const d = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+                    return isNaN(d.getTime()) ? null : d;
+                }
+            }
+            const d = new Date(s);
+            return isNaN(d.getTime()) ? null : d;
+        } catch (e) {
+            return null;
+        }
+    };
+
+    const getAge = (birth: any) => {
+        const b = parseSafeDate(birth);
+        if (!b) return 35; // Fallback para média
+        let age = now.getFullYear() - b.getFullYear();
+        if (isNaN(age)) return 35;
+        return age;
+    };
+
+    const getDetailedCategory = (m: any) => {
+        const age = getAge(m.nascimento);
+        if (age <= 3) return 'Bebês';
+        if (age <= 12) return 'Crianças';
+        if (age >= 60) return 'Idosos';
+        
+        const estCivil = (m.estado_civil || '').trim().toLowerCase();
+        if (estCivil.includes('solteir')) return 'Solteiros';
+        if (estCivil.includes('casad')) return 'Casados';
+        if (estCivil.includes('viuv')) return 'Viúvos';
+        
+        return 'Outros';
+    };
+
+    // Apply Filters to Membros
+    const filteredMembros = rawMembros.filter(m => {
+        const matchGender = filterGender === 'Todos' || m.sexo === filterGender;
+        const matchGroup = filterGroup === 'Todos' || m.grupos_caseiros === filterGroup;
+        const matchDisc = filterDisc === 'Todos' || (discipuladoMap.get(m.nome?.trim().toUpperCase()) || []).includes(filterDisc);
+        
+        return matchGender && matchGroup && matchDisc;
+    });
+
+    // Ativos Only for specific charts
+    const ativosOnly = filteredMembros.filter(m => m.status === 'Ativo');
+
+    // KPI Calculations
+    const totalMembros = filteredMembros.length;
+    const ativos = filteredMembros.filter(m => m.status === 'Ativo').length;
+    const visitantes = filteredMembros.filter(m => m.tipo_cadastro === 'Visitante').length;
+    const totalCelulas = rawCelulas.length;
+    const totalDiscipuladores = discSet.size;
+    
+    // Membros Localidade: MEMBRO, DIÁCONO, PRESBÍTERO, AGREGADO, LÍDER (Ativos)
+    const tiposMembrosLocalidade = ['MEMBRO', 'DIÁCONO', 'PRESBÍTERO', 'AGREGADO', 'LÍDER'];
+    const membrosLocalidade = filteredMembros.filter(m => 
+        tiposMembrosLocalidade.includes((m.tipo_de_pessoa || '').toUpperCase()) && 
+        m.status === 'Ativo'
+    ).length;
+
+    // Growth Data (Last 12 Months with Year)
+    const growthData: any[] = [];
+    const monthsNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    
+    for (let i = 11; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const mMonth = d.getMonth();
+        const mYear = d.getFullYear();
+        const label = `${monthsNames[mMonth]}/${mYear.toString().slice(-2)}`;
+        
+        const entries = rawMembros.filter(m => {
+            const md = parseSafeDate(m.data_de_cadastro);
+            return md && md.getMonth() === mMonth && md.getFullYear() === mYear;
+        }).length;
+        
+        const exits = rawMembros.filter(m => {
+            const md = parseSafeDate(m.data_atualizacao);
+            return m.status === 'Inativo' && md && md.getMonth() === mMonth && md.getFullYear() === mYear;
+        }).length;
+        
+        growthData.push({ name: label, entradas: entries, saidas: exits });
+    }
+
+    // Charts: Demographics (Ativos Only)
+    const demoCounts: Record<string, number> = {};
+    ativosOnly.forEach(m => {
+      const cat = getDetailedCategory(m);
+      demoCounts[cat] = (demoCounts[cat] || 0) + 1;
+    });
+
+    const demoColors: Record<string, string> = {
+        'Bebês': '#60a5fa', 'Crianças': '#3b82f6', 'Solteiros': '#10b981', 
+        'Casados': '#f59e0b', 'Divorciados': '#ef4444', 'Viúvos': '#6366f1', 
+        'Separados': '#8b5cf6', 'Idosos': '#a855f7', 'Outros': '#9ca3af'
+    };
+
+    // Charts: Pyramid (Ativos Only)
+    const pyramidRanges = ['0-10', '11-20', '21-30', '31-40', '41-50', '51-60', '61-70', '71+'];
+    const pyramidMap: Record<string, { name: string, masc: number, fem: number }> = {};
+    pyramidRanges.forEach(r => pyramidMap[r] = { name: r, masc: 0, fem: 0 });
+    
+    ativosOnly.forEach(m => {
+        const age = getAge(m.nascimento);
+        let range = '71+';
+        if (age <= 10) range = '0-10';
+        else if (age <= 20) range = '11-20';
+        else if (age <= 30) range = '21-30';
+        else if (age <= 40) range = '31-40';
+        else if (age <= 50) range = '41-50';
+        else if (age <= 60) range = '51-60';
+        else if (age <= 70) range = '61-70';
+        
+        const isMasc = m.sexo === 'Masculino' || m.sexo === 'M';
+        if (isMasc) pyramidMap[range].masc++;
+        else pyramidMap[range].fem++;
+    });
+
+    // Tables: Groups
+    const grupoCounts: any = {};
+    filteredMembros.forEach(m => { if (m.grupos_caseiros) grupoCounts[m.grupos_caseiros] = (grupoCounts[m.grupos_caseiros] || 0) + 1; });
+    const groupsList = rawCelulas.map(c => ({
+      nome: c.grupo_caseiro, lider: c.lider || 'Sem Lider', setor: c.setor || 'Sem Setor', membros: grupoCounts[c.grupo_caseiro] || 0
+    })).sort((a, b) => b.membros - a.membros);
+
+    // Tables: Sectors
+    const sectorCounts: any = {};
+    groupsList.forEach(g => {
+      if (!sectorCounts[g.setor]) sectorCounts[g.setor] = { nome: g.setor, grupos: 0, membros: 0 };
+      sectorCounts[g.setor].grupos += 1;
+      sectorCounts[g.setor].membros += g.membros;
+    });
+
+    // Tables: Discipuladores
+    const mestreCounts: any = {};
+    rawDiscipulado.forEach(d => { if (d.discipulador) mestreCounts[d.discipulador] = (mestreCounts[d.discipulador] || 0) + 1; });
+    const discList = Object.keys(mestreCounts).map(k => ({ nome: k, discipulos: mestreCounts[k] })).sort((a, b) => b.discipulos - a.discipulos);
+
+    return {
+        stats: { totalMembros, ativos, visitantes, totalCelulas, totalDiscipuladores, membrosLocalidade },
+        charts: {
+            growth: growthData,
+            demographics: Object.entries(demoCounts).map(([name, value]) => ({ 
+                name, 
+                value, 
+                percent: ((value / (ativos || 1)) * 100).toFixed(1),
+                fill: demoColors[name] || '#9ca3af' 
+            })).sort((a, b) => b.value - a.value),
+            pyramid: Object.values(pyramidMap),
+            groups: groupsList,
+            sectors: Object.values(sectorCounts).sort((a: any, b: any) => b.membros - a.membros),
+            discipuladores: discList
+        }
+    };
+  }, [isLoading, rawMembros, rawCelulas, rawDiscipulado, filterGender, filterGroup, filterDisc]);
+
   const handleOpenModal = async (type: 'grupo' | 'setor' | 'discipulador', title: string) => {
     setModalType(type); setModalTitle(title); setIsModalLoading(true);
     try {
       let dataResp: any[] = [];
+      const discSet = new Set(rawDiscipulado.map(d => d.discipulador?.trim().toUpperCase()));
+      
       if (type === 'grupo') {
-        const { data } = await supabase.from('membros').select('nome, tipo_cadastro, celular_principal_sms').eq('grupos_caseiros', title);
-        dataResp = (data || []).map(d => ({ col1: d.nome, col2: d.tipo_cadastro || 'Membro', col3: d.celular_principal_sms || '-' }));
+        const { data } = await supabase.from('membros').select('nome, sexo, nascimento, tipo_cadastro').eq('grupos_caseiros', title);
+        const cell = rawCelulas.find(c => c.grupo_caseiro === title);
+        
+        dataResp = (data || []).map(d => {
+          const age = d.nascimento ? new Date().getFullYear() - new Date(d.nascimento).getFullYear() : '-';
+          let role = 'Participante';
+          if (cell?.lider === d.nome) role = 'Líder';
+          else if (cell?.auxiliar === d.nome) role = 'Auxiliar';
+          
+          return { 
+            col1: d.nome, 
+            col2: d.sexo || '-', 
+            col3: age,
+            col4: role,
+            col5: discSet.has(d.nome?.trim().toUpperCase()) ? 'Sim' : 'Não'
+          };
+        });
       } else if (type === 'setor') {
-        const { data } = await supabase.from('celulas').select('grupo_caseiro, lider').eq('setor', title);
-        dataResp = (data || []).map(d => ({ col1: d.grupo_caseiro, col2: d.lider || 'Sem Lider', col3: 'Celula' }));
+        const { data } = await supabase.from('celulas').select('grupo_caseiro, lider, auxiliar').eq('setor', title);
+        dataResp = (data || []).map(d => ({ 
+          col1: d.grupo_caseiro, 
+          col2: d.lider || 'Sem Líder', 
+          col3: 'Grupo Caseiro',
+          col4: 'Detalhar',
+          isAction: true
+        }));
       } else if (type === 'discipulador') {
         const { data } = await supabase.from('discipulado').select('discipulo, status, tipo').eq('discipulador', title);
-        dataResp = (data || []).map(d => ({ col1: d.discipulo, col2: d.status || 'Ativo', col3: d.tipo || '-' }));
+        dataResp = (data || []).map(d => ({ col1: d.discipulo, col2: d.status || 'Ativo', col3: d.tipo || '-', col4: '-', col5: '-' }));
       }
       setModalItems(dataResp);
     } catch (e) { console.error(e); } finally { setIsModalLoading(false); }
@@ -152,33 +269,79 @@ export const Dashboard: React.FC = () => {
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <header className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Visão Geral</h1>
-        <p className="mt-2 flex items-baseline text-sm text-gray-500">
-          Bem-vindo de volta, <span className="font-semibold text-primary-600 ml-1">{user?.name}</span>. Dados reais extraídos do Supabase.
-        </p>
+      <header className="mb-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Visão Geral</h1>
+          <p className="mt-2 flex items-baseline text-sm text-gray-500">
+            Bem-vindo de volta, <span className="font-semibold text-primary-600 ml-1">{user?.name}</span>. Dados reais extraídos do Supabase.
+          </p>
+        </div>
       </header>
 
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Filters Bar */}
+      <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-wrap gap-4 items-center mb-6">
+        <div className="flex items-center gap-2 text-gray-400 mr-2">
+          <Search className="w-4 h-4" />
+          <span className="text-xs font-bold uppercase tracking-wider">Filtros Rápidos:</span>
+        </div>
+        
+        <select 
+          value={filterGender} onChange={e => setFilterGender(e.target.value)}
+          className="text-sm border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50"
+        >
+          <option value="Todos">Todos os Sexos</option>
+          <option value="Masculino">Masculino</option>
+          <option value="Feminino">Feminino</option>
+        </select>
+
+        <select 
+          value={filterGroup} onChange={e => setFilterGroup(e.target.value)}
+          className="text-sm border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50 max-w-[200px]"
+        >
+          <option value="Todos">Todos os Grupos</option>
+          {rawCelulas.map(c => <option key={c.grupo_caseiro} value={c.grupo_caseiro}>{c.grupo_caseiro}</option>)}
+        </select>
+
+        <select 
+          value={filterDisc} onChange={e => setFilterDisc(e.target.value)}
+          className="text-sm border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50 max-w-[200px]"
+        >
+          <option value="Todos">Todos os Discipuladores</option>
+          {Array.from(new Set(rawDiscipulado.map(d => d.discipulador))).sort().map(d => <option key={d} value={d}>{d}</option>)}
+        </select>
+
+        {(filterGender !== 'Todos' || filterGroup !== 'Todos' || filterDisc !== 'Todos') && (
+          <button 
+            onClick={() => { setFilterGender('Todos'); setFilterGroup('Todos'); setFilterDisc('Todos'); }}
+            className="text-xs text-red-600 font-medium hover:underline"
+          >
+            Limpar Filtros
+          </button>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {[
-          { label: 'Total de Membros', value: stats.totalMembros, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
-          { label: 'Membros Ativos', value: stats.membrosAtivos, sub: 'Status: Ativo', icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-          { label: 'Visitantes', value: stats.totalVisitantes, icon: UserPlus, color: 'text-orange-600', bg: 'bg-orange-50' },
-          { label: 'Grupos Caseiros', value: stats.totalCelulas, icon: Home, color: 'text-purple-600', bg: 'bg-purple-50' },
+          { label: 'Total de Cadastros', value: dashboardData?.stats.totalMembros, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
+          { label: 'Membros Ativos', value: dashboardData?.stats.ativos, sub: 'Status: Ativo', icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+          { label: 'Membros Localidade', value: dashboardData?.stats.membrosLocalidade, icon: MapPin, color: 'text-pink-600', bg: 'bg-pink-50' },
+          { label: 'Visitantes', value: dashboardData?.stats.visitantes, icon: UserPlus, color: 'text-orange-600', bg: 'bg-orange-50' },
+          { label: 'Grupos Caseiros', value: dashboardData?.stats.totalCelulas, icon: Home, color: 'text-purple-600', bg: 'bg-purple-50' },
+          { label: 'Discipuladores', value: dashboardData?.stats.totalDiscipuladores, icon: UserCheck, color: 'text-indigo-600', bg: 'bg-indigo-50' },
         ].map((kpi, idx) => {
-          const Icon = kpi.icon;
+          const Icon = kpi.icon || Users;
           return (
-            <div key={idx} className="relative overflow-hidden rounded-2xl bg-white p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow group">
-              <div className="flex items-center gap-4">
-                <div className={clsx("flex h-12 w-12 items-center justify-center rounded-xl transition-transform group-hover:scale-110", kpi.bg)}>
-                  <Icon className={clsx("h-6 w-6", kpi.color)} />
+            <div key={idx} className="relative overflow-hidden rounded-2xl bg-white p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow group">
+              <div className="flex flex-col gap-3">
+                <div className={clsx("flex h-10 w-10 items-center justify-center rounded-xl transition-transform group-hover:scale-110", kpi.bg)}>
+                  <Icon className={clsx("h-5 w-5", kpi.color)} />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-500">{kpi.label}</p>
-                  <div className="flex items-baseline gap-2">
+                  <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">{kpi.label}</p>
+                  <div className="flex items-baseline gap-2 mt-1">
                     <p className="text-2xl font-bold text-gray-900">{kpi.value}</p>
-                    {kpi.sub && <span className="text-xs text-gray-400">{kpi.sub}</span>}
                   </div>
+                  {kpi.sub && <p className="text-[10px] text-gray-400 mt-0.5">{kpi.sub}</p>}
                 </div>
               </div>
             </div>
@@ -187,50 +350,74 @@ export const Dashboard: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 rounded-2xl bg-white p-6 shadow-sm border border-gray-100">
-          <div className="pb-4 mb-4 border-b border-gray-100">
+        <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100 flex flex-col">
+          <div className="pb-4 mb-4 border-b border-gray-100 flex justify-between items-center">
             <h3 className="text-lg font-semibold leading-6 text-gray-900">Evolução da Base</h3>
           </div>
-          <div className="h-80 w-full">
+          <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={charts.growth} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <defs><linearGradient id="colorMembros" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/><stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/></linearGradient></defs>
+              <AreaChart data={dashboardData?.charts.growth} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorEntradas" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/><stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/></linearGradient>
+                  <linearGradient id="colorSaidas" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/><stop offset="95%" stopColor="#ef4444" stopOpacity={0}/></linearGradient>
+                </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} dy={10} />
                 <YAxis axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} />
                 <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                <Area type="monotone" dataKey="membros" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorMembros)" name="Membros" />
-                <Area type="monotone" dataKey="visitantes" stroke="#f59e0b" strokeWidth={3} fillOpacity={0.1} name="Visitantes" />
+                <Legend verticalAlign="top" height={36} iconType="circle" />
+                <Area type="monotone" dataKey="entradas" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorEntradas)" name="Entradas" />
+                <Area type="monotone" dataKey="saidas" stroke="#ef4444" strokeWidth={3} fillOpacity={1} fill="url(#colorSaidas)" name="Saídas" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
+
         <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100 flex flex-col">
           <div className="pb-4 mb-4 border-b border-gray-100">
-            <h3 className="text-lg font-semibold leading-6 text-gray-900">Demografia</h3>
+            <h3 className="text-lg font-semibold leading-6 text-gray-900">Demografia (Perfil)</h3>
           </div>
           <div className="flex-1 flex flex-col justify-center items-center relative">
             <div className="h-64 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={charts.demographics} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value" stroke="none">
-                    {charts.demographics.map((entry: any, index: number) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
+                  <Pie data={dashboardData?.charts.demographics} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value" stroke="none">
+                    {dashboardData?.charts.demographics.map((entry: any, index: number) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
                   </Pie>
                   <Tooltip />
                 </PieChart>
               </ResponsiveContainer>
             </div>
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-12">
-              <span className="text-3xl font-bold text-gray-900">{stats.totalMembros}</span>
+              <span className="text-2xl font-bold text-gray-900">{dashboardData?.stats.ativos}</span>
             </div>
             <div className="grid grid-cols-2 gap-2 w-full mt-4">
-              {charts.demographics.map((item: any, i: number) => (
+              {dashboardData?.charts.demographics.map((item: any, i: number) => (
                 <div key={i} className="flex items-center gap-1.5">
                   <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.fill }}></div>
-                  <span className="text-[10px] font-medium text-gray-600 truncate">{item.name}</span>
+                  <span className="text-[10px] font-medium text-gray-600 truncate">{item.name} ({item.percent}%)</span>
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+
+        <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100 flex flex-col">
+          <div className="pb-4 mb-4 border-b border-gray-100">
+            <h3 className="text-lg font-semibold leading-6 text-gray-900">Pirâmide Etária por Sexo</h3>
+          </div>
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={dashboardData?.charts.pyramid} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                <XAxis type="number" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} />
+                <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} />
+                <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{borderRadius:'12px', border:'none'}} />
+                <Legend />
+                <Bar dataKey="masc" fill="#3b82f6" name="Masc" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="fem" fill="#ec4899" name="Fem" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
       </div>
@@ -246,14 +433,14 @@ export const Dashboard: React.FC = () => {
               <table className="min-w-full divide-y divide-gray-200 mt-4">
                 <thead className="bg-gray-50/50">
                   <tr>
-                    <th className="py-3 pl-4 pr-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Grupo</th>
+                    <th className="py-3 pl-4 pr-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Grupo Caseiro</th>
                     <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Líder</th>
                     <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Membros</th>
                     <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ação</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 bg-white">
-                  {charts.groups.slice(0, 10).map((group: any, idx: number) => (
+                  {dashboardData?.charts.groups.slice(0, 10).map((group: any, idx: number) => (
                     <tr key={idx} className="hover:bg-gray-50/50 transition-colors">
                       <td className="whitespace-nowrap py-3 pl-4 pr-3 text-sm font-medium text-gray-900">{group.nome}</td>
                       <td className="whitespace-nowrap px-3 py-3 text-sm text-gray-500">{group.lider}</td>
@@ -282,15 +469,19 @@ export const Dashboard: React.FC = () => {
                     <tr>
                       <th className="py-3 pl-4 pr-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Setor</th>
                       <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">GCs</th>
+                      <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Membros</th>
                       <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ação</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 bg-white">
-                    {charts.sectors.map((setor: any, idx: number) => (
+                    {dashboardData?.charts.sectors.map((setor: any, idx: number) => (
                       <tr key={idx} className="hover:bg-gray-50/50">
                         <td className="whitespace-nowrap py-3 pl-4 pr-3 text-sm font-medium text-gray-900">{setor.nome}</td>
                         <td className="whitespace-nowrap px-3 py-3 text-sm text-center">
                           <span className="bg-gray-100 text-gray-600 py-1 px-2 rounded-md font-bold">{setor.grupos}</span>
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-3 text-sm text-center">
+                          <span className="bg-indigo-50 text-indigo-600 py-1 px-2 rounded-md font-bold">{setor.membros}</span>
                         </td>
                         <td className="whitespace-nowrap px-3 py-3 text-sm text-right">
                           <button onClick={() => handleOpenModal('setor', setor.nome)} className="text-indigo-600 font-medium hover:underline text-xs">Acessar</button>
@@ -304,20 +495,20 @@ export const Dashboard: React.FC = () => {
 
             <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100 flex flex-col">
               <div className="pb-4 border-b border-gray-100">
-                <h3 className="text-lg font-semibold leading-6 text-gray-900 flex items-center gap-2"><UserCheck className="h-5 w-5 text-emerald-500" /> Discipuladores</h3>
-                <p className="mt-1 text-sm text-gray-500">Mestres cadastrados (MDA)</p>
+                <h3 className="text-lg font-semibold leading-6 text-gray-900 flex items-center gap-2"><UserCheck className="h-5 w-5 text-emerald-500" /> Discipuladores Cadastrados</h3>
+                <p className="mt-1 text-sm text-gray-500">Rede de Discipulado Ativa</p>
               </div>
               <div className="overflow-x-auto max-h-[300px]">
                 <table className="min-w-full divide-y divide-gray-200 mt-4">
                   <thead className="bg-gray-50/50 sticky top-0">
                     <tr>
-                      <th className="py-3 pl-4 pr-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mestre</th>
+                      <th className="py-3 pl-4 pr-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Discipulador</th>
                       <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Discípulos</th>
                       <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ação</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 bg-white">
-                    {charts.discipuladores.slice(0, 15).map((disc: any, idx: number) => (
+                    {dashboardData?.charts.discipuladores.slice(0, 15).map((disc: any, idx: number) => (
                       <tr key={idx} className="hover:bg-gray-50/50">
                         <td className="whitespace-nowrap py-3 pl-4 pr-3 text-sm font-medium text-gray-900">{disc.nome}</td>
                         <td className="whitespace-nowrap px-3 py-3 text-sm text-center">
@@ -336,27 +527,7 @@ export const Dashboard: React.FC = () => {
         </div>
       )}
 
-      {isPastorOrAdmin && (
-        <div className="rounded-2xl bg-white p-8 shadow-sm border border-gray-100 mt-6">
-          <div className="mb-6">
-            <h3 className="text-xl font-bold text-gray-900">Histórico Financeiro Real</h3>
-            <p className="text-sm text-gray-500">Consolidado mensal de Entradas e Saídas</p>
-          </div>
-          <div className="h-80 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={charts.finance} barGap={8}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} tickFormatter={(v) => `R$${v/1000}k`} />
-                <Tooltip cursor={{fill: '#f8fafc'}} formatter={(v) => formatCurrency(v as number)} contentStyle={{borderRadius:'16px', border:'none', boxShadow:'0 10px 15px -3px rgba(0,0,0,0.1)'}} />
-                <Legend iconType="circle" wrapperStyle={{paddingTop: '20px'}} />
-                <Bar dataKey="entradas" fill="#10b981" radius={[4, 4, 0, 0]} name="Entradas" barSize={30} />
-                <Bar dataKey="saidas" fill="#ef4444" radius={[4, 4, 0, 0]} name="Saídas" barSize={30} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
+
 
       {modalType && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center">
@@ -383,11 +554,22 @@ export const Dashboard: React.FC = () => {
                 <table className="min-w-full divide-y divide-gray-100">
                   <thead className="bg-white sticky top-0">
                     <tr>
-                      <th className="py-3 pl-6 pr-3 text-left text-xs font-medium text-gray-400 uppercase">
-                        {modalType === 'setor' ? 'Célula' : 'Nome'}
+                      <th className="py-3 pl-6 pr-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                        {modalType === 'setor' ? 'Grupo Caseiro' : 'Nome'}
                       </th>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-400 uppercase">Atributo</th>
-                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-400 uppercase">Complemento</th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                        {modalType === 'grupo' ? 'Sexo' : modalType === 'setor' ? 'Líder' : 'Status'}
+                      </th>
+                      <th className="px-3 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                         {modalType === 'grupo' ? 'Idade' : 'Info'}
+                      </th>
+                      {modalType === 'grupo' && (
+                        <>
+                          <th className="px-3 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Função</th>
+                          <th className="px-3 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Disc.</th>
+                        </>
+                      )}
+                      {modalType === 'setor' && <th className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Ação</th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
@@ -396,6 +578,27 @@ export const Dashboard: React.FC = () => {
                         <td className="whitespace-nowrap py-3 pl-6 pr-3 text-sm font-medium text-gray-900">{m.col1}</td>
                         <td className="whitespace-nowrap px-3 py-3 text-sm text-gray-600">{m.col2}</td>
                         <td className="whitespace-nowrap px-3 py-3 text-sm text-gray-500 font-mono text-xs">{m.col3}</td>
+                        {modalType === 'grupo' && (
+                          <>
+                            <td className="whitespace-nowrap px-3 py-3 text-sm text-gray-600">
+                              <span className={clsx("px-2 py-0.5 rounded text-[10px] font-bold uppercase", 
+                                m.col4 === 'Líder' ? 'bg-primary-50 text-primary-700' : m.col4 === 'Auxiliar' ? 'bg-orange-50 text-orange-700' : 'bg-gray-50 text-gray-500')}>
+                                {m.col4}
+                              </span>
+                            </td>
+                            <td className="whitespace-nowrap px-3 py-3 text-sm text-gray-600">
+                              <span className={clsx("px-2 py-0.5 rounded text-[10px] font-bold uppercase", 
+                                m.col5 === 'Sim' ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-50 text-gray-500')}>
+                                {m.col5}
+                              </span>
+                            </td>
+                          </>
+                        )}
+                        {modalType === 'setor' && (
+                          <td className="whitespace-nowrap px-3 py-3 text-sm text-right">
+                             <button onClick={() => handleOpenModal('grupo', m.col1)} className="text-primary-600 hover:underline text-xs font-bold uppercase tracking-tighter">Detalhar</button>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>

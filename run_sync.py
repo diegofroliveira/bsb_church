@@ -4,7 +4,7 @@ import time
 
 def run_step(name, command):
     print(f"\n{'='*60}")
-    print(f"🚀 INICIANDO: {name}")
+    print(f"INICIANDO: {name}")
     print(f"{'='*60}")
     
     # Usa o executável do venv
@@ -19,30 +19,30 @@ def run_step(name, command):
         process.wait()
         
         if process.returncode == 0:
-            print(f"\n✅ {name} CONCLUÍDO COM SUCESSO!")
+            print(f"\nOK: {name} CONCLUIDO COM SUCESSO!")
             return True
         else:
-            print(f"\n❌ {name} FALHOU (Código {process.returncode})")
+            print(f"\nERRO: {name} FALHOU (Codigo {process.returncode})")
             return False
             
     except Exception as e:
-        print(f"\n❌ Erro ao executar {name}: {e}")
+        print(f"\nERRO ao executar {name}: {e}")
         return False
 
 def main():
     start_time = time.time()
     
     # Passo 1: Extrair do Prover
-    if not run_step("Extração Prover (Playwright)", ["extrator_prover.py"]):
+    if not run_step("Extracao Prover (Playwright)", ["extrator_prover.py"]):
         sys.exit(1)
         
     # Passo 2: Importar para o Supabase
-    if not run_step("Importação Supabase (UPSERT)", ["importador_supabase.py"]):
+    if not run_step("Importacao Supabase (UPSERT)", ["importador_supabase.py"]):
         sys.exit(1)
     
     duration = time.time() - start_time
     print(f"\n{'='*60}")
-    print(f"✨ PIPELINE FINALIZADO EM {duration:.1f}s")
+    print(f"PIPELINE FINALIZADO EM {duration:.1f}s")
     print(f"{'='*60}")
 
 if __name__ == "__main__":

@@ -15,6 +15,7 @@ import { QA } from './pages/QA';
 import { Cells } from './pages/Cells';
 import { MemberProfile } from './pages/MemberProfile';
 import { AdminUsers } from './pages/AdminUsers';
+import Georeferencing from './pages/Georeferencing';
 
 function App() {
   return (
@@ -27,6 +28,11 @@ function App() {
             <Route element={<MainLayout />}>
               {/* All authenticated users */}
               <Route path="/" element={<Dashboard />} />
+
+              {/* Geo — Pastor + Admin */}
+              <Route element={<ProtectedRoute allowedRoles={['admin', 'pastor']} />}>
+                <Route path="/georeferencing" element={<Georeferencing />} />
+              </Route>
 
               {/* Secretaria + Pastor + Admin */}
               <Route element={<ProtectedRoute allowedRoles={['admin', 'pastor', 'secretaria']} />}>
