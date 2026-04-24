@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell
+  BarChart, Bar, Legend, PieChart, Pie, Cell
 } from 'recharts';
 import { Users, UserPlus, Home, TrendingUp, Loader2, X, Search, Layers, UserCheck } from 'lucide-react';
 import clsx from 'clsx';
@@ -25,6 +25,8 @@ export const Dashboard: React.FC = () => {
   const [modalItems, setModalItems] = useState<any[]>([]);
   const [isModalLoading, setIsModalLoading] = useState(false);
 
+  const formatCurrency = (value: number) => 
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
   const parseProverDate = (dateStr: string) => {
     if (!dateStr) return new Date();
@@ -67,7 +69,7 @@ export const Dashboard: React.FC = () => {
 
         const sortedFinanceChart = Object.values(monthlyFinance).sort((a: any, b: any) => a.sortKey - b.sortKey).slice(-6);
 
-        const demoCounts = { 'Crianças': 0, 'Jovens': 0, 'Adultos': 0, 'Idosos': 0 };
+        const demoCounts = { 'CrianÃ§as': 0, 'Jovens': 0, 'Adultos': 0, 'Idosos': 0 };
         const now = new Date();
         const grupoCounts: any = {};
         
@@ -79,7 +81,7 @@ export const Dashboard: React.FC = () => {
             const birth = new Date(m.nascimento);
             let age = now.getFullYear() - birth.getFullYear();
             if (isNaN(age)) age = 30;
-            if (age < 12) demoCounts['Crianças']++;
+            if (age < 12) demoCounts['CrianÃ§as']++;
             else if (age < 25) demoCounts['Jovens']++;
             else if (age < 60) demoCounts['Adultos']++;
             else demoCounts['Idosos']++;
@@ -89,7 +91,7 @@ export const Dashboard: React.FC = () => {
         });
 
         const groupsList = allCelulas.map(c => ({
-          nome: c.grupo_caseiro, lider: c.lider || 'Sem Líder', setor: c.setor || 'Sem Setor', membros: grupoCounts[c.grupo_caseiro] || 0
+          nome: c.grupo_caseiro, lider: c.lider || 'Sem LÃ­der', setor: c.setor || 'Sem Setor', membros: grupoCounts[c.grupo_caseiro] || 0
         })).sort((a,b) => b.membros - a.membros);
 
         const sectorCounts: any = {};
@@ -140,7 +142,7 @@ export const Dashboard: React.FC = () => {
         dataResp = (data||[]).map(d => ({ col1: d.nome, col2: d.tipo_cadastro||'Membro', col3: d.celular_principal_sms||'-' }));
       } else if (type === 'setor') {
         const { data } = await supabase.from('celulas').select('grupo_caseiro, lider').eq('setor', title);
-        dataResp = (data||[]).map(d => ({ col1: d.grupo_caseiro, col2: d.lider||'Sem Líder', col3: 'Célula' }));
+        dataResp = (data||[]).map(d => ({ col1: d.grupo_caseiro, col2: d.lider||'Sem LÃ­der', col3: 'CÃ©lula' }));
       } else if (type === 'discipulador') {
         const { data } = await supabase.from('discipulado').select('discipulo, status, tipo').eq('discipulador', title);
         dataResp = (data||[]).map(d => ({ col1: d.discipulo, col2: d.status||'Ativo', col3: d.tipo||'-' }));
@@ -160,9 +162,9 @@ export const Dashboard: React.FC = () => {
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <header className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Visão Geral</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-gray-900">VisÃ£o Geral</h1>
         <p className="mt-2 flex items-baseline text-sm text-gray-500">
-          Bem-vindo de volta, <span className="font-semibold text-primary-600 ml-1">{user?.name}</span>. Dados reais extraídos do Supabase.
+          Bem-vindo de volta, <span className="font-semibold text-primary-600 ml-1">{user?.name}</span>. Dados reais extraÃ­dos do Supabase.
         </p>
       </header>
 
@@ -196,7 +198,7 @@ export const Dashboard: React.FC = () => {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 rounded-2xl bg-white p-6 shadow-sm border border-gray-100">
           <div className="pb-4 mb-4 border-b border-gray-100">
-            <h3 className="text-lg font-semibold leading-6 text-gray-900">Evolução da Base</h3>
+            <h3 className="text-lg font-semibold leading-6 text-gray-900">EvoluÃ§Ã£o da Base</h3>
           </div>
           <div className="h-80 w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -257,9 +259,9 @@ export const Dashboard: React.FC = () => {
                     <thead className="bg-gray-50/50">
                       <tr>
                         <th className="py-3 pl-4 pr-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Grupo</th>
-                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Líder</th>
+                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">LÃ­der</th>
                         <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Membros</th>
-                        <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ação</th>
+                        <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">AÃ§Ã£o</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 bg-white">
@@ -287,7 +289,7 @@ export const Dashboard: React.FC = () => {
                <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100 flex flex-col">
                   <div className="pb-4 border-b border-gray-100">
                     <h3 className="text-lg font-semibold leading-6 text-gray-900 flex items-center gap-2"><Layers className="h-5 w-5 text-indigo-500" /> Setores</h3>
-                    <p className="mt-1 text-sm text-gray-500">Agrupamento de células</p>
+                    <p className="mt-1 text-sm text-gray-500">Agrupamento de cÃ©lulas</p>
                   </div>
                   <div className="overflow-x-auto">
                      <table className="min-w-full divide-y divide-gray-200 mt-4">
@@ -295,7 +297,7 @@ export const Dashboard: React.FC = () => {
                           <tr>
                             <th className="py-3 pl-4 pr-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Setor</th>
                             <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">GCs</th>
-                            <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ação</th>
+                            <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">AÃ§Ã£o</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100 bg-white">
@@ -326,8 +328,8 @@ export const Dashboard: React.FC = () => {
                         <thead className="bg-gray-50/50 sticky top-0">
                           <tr>
                             <th className="py-3 pl-4 pr-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mestre</th>
-                            <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Discípulos</th>
-                            <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ação</th>
+                            <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">DiscÃ­pulos</th>
+                            <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">AÃ§Ã£o</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100 bg-white">
@@ -350,6 +352,27 @@ export const Dashboard: React.FC = () => {
         </div>
       )}
 
+      {isPastorOrAdmin && (
+        <div className="rounded-2xl bg-white p-8 shadow-sm border border-gray-100 mt-6">
+            <div className="mb-6">
+                <h3 className="text-xl font-bold text-gray-900">HistÃ³rico Financeiro Real</h3>
+                <p className="text-sm text-gray-500">Consolidado mensal de Entradas e SaÃ­das</p>
+            </div>
+            <div className="h-80 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={charts.finance} barGap={8}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} />
+                    <YAxis axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} tickFormatter={(v) => `R$${v/1000}k`} />
+                    <Tooltip cursor={{fill: '#f8fafc'}} formatter={(v) => formatCurrency(v as number)} contentStyle={{borderRadius:'16px', border:'none', boxShadow:'0 10px 15px -3px rgba(0,0,0,0.1)'}} />
+                    <Legend iconType="circle" wrapperStyle={{paddingTop: '20px'}} />
+                    <Bar dataKey="entradas" fill="#10b981" radius={[4, 4, 0, 0]} name="Entradas" barSize={30} />
+                    <Bar dataKey="saidas" fill="#ef4444" radius={[4, 4, 0, 0]} name="SaÃ­das" barSize={30} />
+                </BarChart>
+                </ResponsiveContainer>
+            </div>
+        </div>
+      )}
 
       {modalType && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center">
@@ -378,7 +401,7 @@ export const Dashboard: React.FC = () => {
                   <thead className="bg-white sticky top-0">
                     <tr>
                       <th className="py-3 pl-6 pr-3 text-left text-xs font-medium text-gray-400 uppercase">
-                        {modalType === 'setor' ? 'Célula' : 'Nome'}
+                        {modalType === 'setor' ? 'CÃ©lula' : 'Nome'}
                       </th>
                       <th className="px-3 py-3 text-left text-xs font-medium text-gray-400 uppercase">Atributo</th>
                       <th className="px-3 py-3 text-left text-xs font-medium text-gray-400 uppercase">Complemento</th>
@@ -402,3 +425,4 @@ export const Dashboard: React.FC = () => {
     </div>
   );
 };
+
