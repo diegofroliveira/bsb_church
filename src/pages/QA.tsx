@@ -25,6 +25,11 @@ const calculateAge = (birthDateString: string | null): number => {
   return age;
 };
 
+const normalizeStr = (s: string | null | undefined): string => {
+  if (!s) return '';
+  return s.trim().replace(/\s+/g, ' ').toUpperCase();
+};
+
 // DFS cycle detection
 const findCycles = (edges: { from: string; to: string }[]): string[][] => {
   const adj = new Map<string, string[]>();
@@ -92,12 +97,19 @@ export const QA: React.FC = () => {
         const celulas = celulasRes.data || [];
         const discipulado = discRes.data || [];
 
-        const membrosNomes = new Set(membros.map(m => m.nome));
-        const membrosMap = new Map(membros.map(m => [m.nome, m]));
-        const gruposNomes = new Set(celulas.map(c => c.grupo_caseiro));
-        const discipuladores = new Set(discipulado.map(d => d.discipulador));
-        const discipulos = new Set(discipulado.map(d => d.discipulo));
+        const membrosNomes = new Set(membros.map(m => normalizeStr(m.nome)));
+        const membrosMap = new Map(membros.map(m => [normalizeStr(m.nome), m]));
+        const gruposNomes = new Set(celulas.map(c => normalizeStr(c.grupo_caseiro)));
+        const discipuladores = new Set(discipulado.map(d => normalizeStr(d.discipulador)));
+        const discipulos = new Set(discipulado.map(d => normalizeStr(d.discipulo)));
         const allDiscipuladoNames = new Set([...discipuladores, ...discipulos]);
+        
+        // Mapeamento inverso para exibir o nome original escrito no discipulado em caso de erro
+        const discOriginalNames = new Map();
+        discipulado.forEach(d => {
+           if (d.discipulador) discOriginalNames.set(normalizeStr(d.discipulador), d.discipulador);
+           if (d.discipulo) discOriginalNames.set(normalizeStr(d.discipulo), d.discipulo);
+        });
 
         const newReports: QAReport[] = [];
 
@@ -107,7 +119,7 @@ export const QA: React.FC = () => {
            const tipo = (m.tipo_cadastro || '').toLowerCase();
            if (tipo.includes('pastor') || tipo.includes('ext') || tipo.includes('agregado') || tipo.includes('externo')) return false;
            if (!['membro', 'líder', 'lider', 'diácono', 'diacono'].some(t => tipo.includes(t))) return false;
-           return !discipulos.has(m.nome);
+           return !discipulos.has(normalizeStr(m.nome));
         });
         newReports.push({
           id: 'orfaos',
@@ -169,7 +181,7 @@ export const QA: React.FC = () => {
         });
 
         // 5. Grupos Fantasmas
-        const grupoFantasma = membros.filter(m => m.grupos_caseiros && m.grupos_caseiros !== 'Sem Grupo' && !gruposNomes.has(m.grupos_caseiros));
+        const grupoFantasma = membros.filter(m => m.grupos_caseiros && m.grupos_caseiros !== 'Sem Grupo' && !gruposNomes.has(normalizeStr(m.grupos_caseiros)));
         newReports.push({
           id: 'grupo_fantasma',
           title: 'Membros em Grupos Inexistentes',
@@ -181,7 +193,7 @@ export const QA: React.FC = () => {
         });
 
         // 6. Loop no Discipulado
-        const edges = discipulado.map(d => ({ from: d.discipulador, to: d.discipulo }));
+        const edges = discipulado.map(d => ({ from: normalizeStr(d.discipulador), to: normalizeStr(d.discipulo) })).filter(e => e.from && e.to);
         const cycles = findCycles(edges);
         newReports.push({
           id: 'loop_rede',
@@ -201,7 +213,7 @@ export const QA: React.FC = () => {
           description: 'Nomes escritos na tabela de Discipulado que não possuem cadastro correspondente na tabela de Membros.',
           count: typos.length,
           severity: 'medium',
-          data: typos.map(nome => ({ nome })),
+          data: typos.map(nome => ({ nome: discOriginalNames.get(nome) || nome })),
           columns: [{ key: 'nome', label: 'Nome Escrito na Rede' }]
         });
 
@@ -220,7 +232,7 @@ export const QA: React.FC = () => {
         // 9. Células sem Líder Ativo
         const celulasSemLider = celulas.filter(c => {
            if (!c.lider) return true;
-           const m = membrosMap.get(c.lider);
+           const m = membrosMap.get(normalizeStr(c.lider));
            return !m || m.status !== 'Ativo';
         });
         newReports.push({
