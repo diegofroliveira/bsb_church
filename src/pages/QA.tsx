@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
-import { AlertTriangle, Loader2, ChevronDown, ChevronRight, ShieldCheck, Activity, Users, FileWarning } from 'lucide-react';
+import { AlertTriangle, Loader2, ChevronDown, ChevronRight, ShieldCheck, Activity, FileWarning } from 'lucide-react';
 import clsx from 'clsx';
 
 interface QAReport {
