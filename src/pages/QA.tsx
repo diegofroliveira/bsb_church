@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
+import { Link } from 'react-router-dom';
 import { AlertTriangle, Loader2, ChevronDown, ChevronRight, ShieldCheck, Activity, FileWarning } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -355,7 +356,13 @@ export const QA: React.FC = () => {
                             <tr key={i} className="hover:bg-gray-50/50">
                               {report.columns.map((col, idx) => (
                                 <td key={col.key} className={clsx("whitespace-nowrap py-2 text-sm text-gray-700", idx === 0 ? "pl-6 pr-3 font-medium text-gray-900" : "px-3")}>
-                                  {row[col.key] || '-'}
+                                  {col.key === 'nome' && row[col.key] ? (
+                                    <Link to={`/crm/${encodeURIComponent(row[col.key])}`} className="text-primary-600 hover:text-primary-800 hover:underline">
+                                      {row[col.key]}
+                                    </Link>
+                                  ) : (
+                                    row[col.key] || '-'
+                                  )}
                                 </td>
                               ))}
                             </tr>

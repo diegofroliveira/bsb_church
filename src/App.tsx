@@ -12,6 +12,8 @@ import { Finance } from './pages/Finance';
 import { Settings } from './pages/Settings';
 import { Reports } from './pages/Reports';
 import { QA } from './pages/QA';
+import { Cells } from './pages/Cells';
+import { MemberProfile } from './pages/MemberProfile';
 
 function App() {
   return (
@@ -25,6 +27,8 @@ function App() {
               <Route path="/" element={<Dashboard />} />
               
               <Route path="/members" element={<Members />} />
+              <Route path="/crm/:name" element={<MemberProfile />} />
+              <Route path="/cells" element={<Cells />} />
               
               <Route element={<ProtectedRoute allowedRoles={['admin', 'pastor', 'secretary']} />}>
                  <Route path="/reports" element={<Reports />} />
