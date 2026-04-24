@@ -381,7 +381,7 @@ export const Finance: React.FC = () => {
                          {new Date(t.data).toLocaleDateString('pt-BR')}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900">
-                         <div className="font-medium">{t.pessoa_lancamento || 'Não Informado'}</div>
+                         <div className="font-medium">{t.pessoa_lancamento || 'Nao Informado'}</div>
                          <div className="text-xs text-gray-500 line-clamp-1">{t.historico}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

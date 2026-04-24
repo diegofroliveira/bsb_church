@@ -43,12 +43,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Get initial session
     const initAuth = async () => {
       try {
-        console.log("Iniciando verificação de sessão...");
+        console.log("Iniciando verificacao de sessao...");
         const { data: { session } } = await supabase.auth.getSession();
         setUser(mapSupabaseUser(session?.user || null));
-        console.log("Sessão carregada com sucesso.");
+        console.log("Sessao carregada com sucesso.");
       } catch (err) {
-        console.error("Erro crítico na inicialização do Auth:", err);
+        console.error("Erro critico na inicializacao do Auth:", err);
       } finally {
         setIsLoading(false);
       }

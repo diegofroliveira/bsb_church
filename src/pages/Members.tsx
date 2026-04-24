@@ -53,7 +53,7 @@ export const Members: React.FC = () => {
         <div>
            <h1 className="text-3xl font-bold tracking-tight text-gray-900">Membros & Visitantes</h1>
            <p className="mt-2 text-sm text-gray-500">
-             Gestão completa do cadastro de pessoas da igreja.
+             Gestao completa do cadastro de pessoas da igreja.
            </p>
         </div>
         <button className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm text-center">
