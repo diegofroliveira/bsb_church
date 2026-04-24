@@ -10,6 +10,11 @@ interface DiscipleshipData {
   data_inicio: string;
 }
 
+interface MemberData {
+  nome: string;
+  tipo_cadastro: string;
+}
+
 interface TreeNodeData {
   name: string;
   status: string;
@@ -26,7 +31,7 @@ const calculateDescendants = (node: TreeNodeData): number => {
   return count;
 };
 
-const buildTree = (data: DiscipleshipData[]): TreeNodeData[] => {
+const buildTree = (data: DiscipleshipData[], pastores: Set<string>): TreeNodeData[] => {
   const nodeMap = new Map<string, TreeNodeData>();
   const childrenSet = new Set<string>();
 
@@ -52,7 +57,10 @@ const buildTree = (data: DiscipleshipData[]): TreeNodeData[] => {
 
   const roots: TreeNodeData[] = [];
   nodeMap.forEach(node => {
-    if (!childrenSet.has(node.name) && node.children.length > 0) {
+    const isRoot = !childrenSet.has(node.name) && node.children.length > 0;
+    // Only show as root if they are a pastor/pastora OR if no pastors list available
+    const isPastor = pastores.size === 0 || pastores.has(node.name.trim().toUpperCase());
+    if (isRoot && isPastor) {
       roots.push(node);
     }
   });
@@ -147,6 +155,7 @@ const TreeNode: React.FC<{ node: TreeNodeData; level?: number; searchTerm: strin
 
 export const Network: React.FC = () => {
   const [data, setData] = useState<DiscipleshipData[]>([]);
+  const [pastores, setPastores] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -154,9 +163,18 @@ export const Network: React.FC = () => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        const { data: results, error } = await supabase.from('discipulado').select('*');
-        if (error) throw error;
-        setData(results || []);
+        const [discRes, membRes] = await Promise.all([
+          supabase.from('discipulado').select('*'),
+          supabase.from('membros').select('nome, tipo_cadastro').ilike('tipo_cadastro', '%pastor%')
+        ]);
+        if (discRes.error) throw discRes.error;
+        setData(discRes.data || []);
+
+        // Build set of pastor names (normalized)
+        const pastorSet = new Set<string>(
+          (membRes.data || []).map((m: MemberData) => m.nome.trim().toUpperCase())
+        );
+        setPastores(pastorSet);
       } catch (error) {
         console.error('Error fetching discipleship data:', error);
       } finally {
@@ -166,7 +184,7 @@ export const Network: React.FC = () => {
     fetchData();
   }, []);
 
-  const tree = useMemo(() => buildTree(data), [data]);
+  const tree = useMemo(() => buildTree(data, pastores), [data, pastores]);
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-5xl mx-auto">

@@ -76,6 +76,22 @@ def main():
                     if antes != depois:
                         print(f"  ♻ Removidos {antes - depois} IDs duplicados do arquivo.")
 
+                # DEDUPLICAÇÃO ESPECIAL PARA DISCIPULADO
+                # Como o Prover gera novos id_serial a cada exportação, usamos
+                # a chave natural (discipulador, discipulo) para evitar duplicatas
+                if table_name == "discipulado":
+                    chave_natural = [c for c in ["discipulador", "discipulo"] if c in df.columns]
+                    if chave_natural:
+                        antes = len(df)
+                        df = df.drop_duplicates(subset=chave_natural, keep="first")
+                        depois = len(df)
+                        if antes != depois:
+                            print(f"  ♻ Removidos {antes - depois} vínculos duplicados de discipulado.")
+                        # Remove id_serial para evitar conflito de chave no UPSERT
+                        if "id_serial" in df.columns:
+                            df = df.drop(columns=["id_serial"])
+                            print(f"  ✂ Removendo id_serial do discipulado (será gerado pelo banco).")
+
                 if table_name == "eventos":
                     if "id_serial" in df.columns: df = df.drop(columns=["id_serial"])
 
@@ -88,6 +104,16 @@ def main():
                 
                 colunas_invalidas = set()
                 
+                # ESTRATÉGIA ESPECIAL PARA DISCIPULADO: apaga tudo e reinseere
+                # Isso garante que o banco sempre reflita exatamente o que veio do Prover
+                if table_name == "discipulado":
+                    print("  🗑 Limpando tabela discipulado antes de reinserir...")
+                    client.delete(
+                        url,
+                        params={"id_serial": "gt.0"},  # PostgREST precisa de um filtro
+                        headers={"Prefer": "return=minimal"}
+                    )
+
                 i = 0
                 while i < len(registros):
                     batch = registros[i:i+batch_size]
