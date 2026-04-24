@@ -85,7 +85,7 @@ const Georeferencing: React.FC = () => {
       
       const { data: membros, error: mError } = await supabase
         .from('membros')
-        .select('id, nome, latitude, longitude, grupos_caseiros, estado_civil, sexo, nascimento, tipo_de_pessoa, setor')
+        .select('id, nome, latitude, longitude, grupos_caseiros, estado_civil, sexo, nascimento, tipo_de_pessoa')
         .eq('status', 'Ativo');
 
       const { data: celulas, error: cError } = await supabase
@@ -94,6 +94,14 @@ const Georeferencing: React.FC = () => {
 
       if (mError) throw new Error(`Erro Membros: ${mError.message}`);
       if (cError) throw new Error(`Erro Células: ${cError.message}`);
+
+      // Criar mapa de Setores por Célula para vincular aos membros
+      const setorPorCelula: Record<string, string> = {};
+      (celulas || []).forEach(c => {
+        if (c.grupo_caseiro && c.setor) {
+          setorPorCelula[c.grupo_caseiro] = c.setor;
+        }
+      });
 
       const geoMembros = (membros || []).filter(m => m.latitude && m.longitude);
       const geoCelulas = (celulas || []).filter(c => c.latitude && c.longitude);
@@ -118,7 +126,7 @@ const Georeferencing: React.FC = () => {
               genero: m.sexo,
               faixaEtaria: idade,
               vinculo: m.tipo_de_pessoa,
-              setor: m.setor
+              setor: m.grupos_caseiros ? setorPorCelula[m.grupos_caseiros] : undefined
             }
           };
         }),
