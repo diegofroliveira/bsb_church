@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { supabase } from '../lib/supabase';
-import { Home, Users, Navigation, Info, Search, Filter, X } from 'lucide-react';
+import { Home, Users, Navigation, Info, Search, Filter, X, ArrowRight } from 'lucide-react';
 import { differenceInYears, parseISO } from 'date-fns';
 
 // Fix para ícones do Leaflet
@@ -46,8 +46,24 @@ interface LocationData {
     vinculo?: string;
     lider?: string;
     status?: string;
+    distanciaAteCelula?: string;
+    coordsCelula?: [number, number];
   };
 }
+
+// Função de Haversine para distância
+const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  const R = 6371; // Raio da Terra em km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const d = R * c;
+  return d.toFixed(2);
+};
 
 const Georeferencing: React.FC = () => {
   const [allLocations, setAllLocations] = useState<LocationData[]>([]);
@@ -55,7 +71,6 @@ const Georeferencing: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<LocationData | null>(null);
   
-  // Estados dos Filtros
   const [filters, setFilters] = useState({
     nome: '',
     tipoVinculo: 'Todos',
@@ -67,7 +82,6 @@ const Georeferencing: React.FC = () => {
     discipulador: 'Todos'
   });
 
-  // Opções para os selects
   const [options, setOptions] = useState({
     setores: [] as string[],
     grupos: [] as string[],
@@ -95,11 +109,12 @@ const Georeferencing: React.FC = () => {
       if (mError) throw new Error(`Erro Membros: ${mError.message}`);
       if (cError) throw new Error(`Erro Células: ${cError.message}`);
 
-      // Criar mapa de Setores por Célula para vincular aos membros
       const setorPorCelula: Record<string, string> = {};
+      const coordsPorCelula: Record<string, [number, number]> = {};
       (celulas || []).forEach(c => {
-        if (c.grupo_caseiro && c.setor) {
-          setorPorCelula[c.grupo_caseiro] = c.setor;
+        if (c.grupo_caseiro) {
+          if (c.setor) setorPorCelula[c.grupo_caseiro] = c.setor;
+          if (c.latitude && c.longitude) coordsPorCelula[c.grupo_caseiro] = [c.latitude, c.longitude];
         }
       });
 
@@ -114,6 +129,13 @@ const Georeferencing: React.FC = () => {
               idade = differenceInYears(new Date(), parseISO(m.nascimento));
             } catch (e) {}
           }
+          
+          let dist = '';
+          const coordsCel = m.grupos_caseiros ? coordsPorCelula[m.grupos_caseiros] : null;
+          if (coordsCel) {
+            dist = calculateDistance(m.latitude, m.longitude, coordsCel[0], coordsCel[1]);
+          }
+
           return {
             id: m.id,
             nome: m.nome,
@@ -126,7 +148,9 @@ const Georeferencing: React.FC = () => {
               genero: m.sexo,
               faixaEtaria: idade,
               vinculo: m.tipo_de_pessoa,
-              setor: m.grupos_caseiros ? setorPorCelula[m.grupos_caseiros] : undefined
+              setor: m.grupos_caseiros ? setorPorCelula[m.grupos_caseiros] : undefined,
+              distanciaAteCelula: dist,
+              coordsCelula: coordsCel || undefined
             }
           };
         }),
@@ -142,7 +166,6 @@ const Georeferencing: React.FC = () => {
 
       setAllLocations(formattedLocations);
       
-      // Extrair opções únicas para os filtros
       const setores = Array.from(new Set(formattedLocations.map(l => l.metadata.setor).filter(Boolean))) as string[];
       const grupos = Array.from(new Set(formattedLocations.map(l => l.metadata.grupo || (l.tipo === 'celula' ? l.nome : '')).filter(Boolean))) as string[];
       const vinculos = Array.from(new Set(geoMembros.map(m => m.tipo_de_pessoa).filter(Boolean))) as string[];
@@ -160,29 +183,16 @@ const Georeferencing: React.FC = () => {
     }
   };
 
-  // Lógica de Filtragem
   const filteredLocations = useMemo(() => {
-    return allLocations.filter(loc => {
-      // Filtro por Nome
+    const filteredMembros = allLocations.filter(loc => {
+      if (loc.tipo !== 'membro') return false;
       if (filters.nome && !loc.nome.toLowerCase().includes(filters.nome.toLowerCase())) return false;
-      
-      // Filtro por Tipo/Vínculo
       if (filters.tipoVinculo !== 'Todos' && loc.metadata.vinculo !== filters.tipoVinculo) return false;
-      
-      // Filtro por Sexo
       if (filters.sexo !== 'Todos' && loc.metadata.genero !== filters.sexo) return false;
-      
-      // Filtro por Setor
       if (filters.setor !== 'Todos' && loc.metadata.setor !== filters.setor) return false;
+      if (filters.grupoCaseiro !== 'Todos' && loc.metadata.grupo !== filters.grupoCaseiro) return false;
       
-      // Filtro por Grupo Caseiro
-      if (filters.grupoCaseiro !== 'Todos') {
-        const grupoNome = loc.tipo === 'celula' ? loc.nome : loc.metadata.grupo;
-        if (grupoNome !== filters.grupoCaseiro) return false;
-      }
-      
-      // Filtro por Faixa Etária
-      if (filters.faixaEtaria !== 'Todas' && loc.tipo === 'membro') {
+      if (filters.faixaEtaria !== 'Todas') {
         const idade = loc.metadata.faixaEtaria || 0;
         if (filters.faixaEtaria === '0-12' && idade > 12) return false;
         if (filters.faixaEtaria === '13-18' && (idade < 13 || idade > 18)) return false;
@@ -190,9 +200,21 @@ const Georeferencing: React.FC = () => {
         if (filters.faixaEtaria === '31-60' && (idade < 31 || idade > 60)) return false;
         if (filters.faixaEtaria === '60+' && idade < 60) return false;
       }
-
       return true;
     });
+
+    // Se houver filtro de nome, mostrar também as células dos membros filtrados
+    const celulasParaMostrar = allLocations.filter(loc => {
+      if (loc.tipo !== 'celula') return false;
+      if (filters.nome) {
+        return filteredMembros.some(m => m.metadata.grupo === loc.nome);
+      }
+      if (filters.setor !== 'Todos' && loc.metadata.setor !== filters.setor) return false;
+      if (filters.grupoCaseiro !== 'Todos' && loc.nome !== filters.grupoCaseiro) return false;
+      return true;
+    });
+
+    return [...filteredMembros, ...celulasParaMostrar];
   }, [allLocations, filters]);
 
   const clearFilters = () => {
@@ -213,27 +235,22 @@ const Georeferencing: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Georreferenciamento</h1>
-          <p className="text-gray-500">Mapeamento geográfico de membros e células</p>
+          <p className="text-gray-500">Conexão visual entre membros e células</p>
         </div>
       </div>
 
-      {/* Painel de Filtros Avançados */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-6">
         <div className="flex items-center justify-between border-b pb-4">
           <div className="flex items-center gap-2 text-primary-600 font-semibold">
             <Filter className="h-5 w-5" />
             <span>Painel de Filtros Avançados</span>
           </div>
-          <button 
-            onClick={clearFilters}
-            className="text-red-500 text-sm font-medium hover:text-red-600 flex items-center gap-1"
-          >
+          <button onClick={clearFilters} className="text-red-500 text-sm font-medium hover:text-red-600 flex items-center gap-1">
             <X className="h-4 w-4" /> Limpar Filtros
           </button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {/* Busca por Nome */}
           <div className="space-y-2">
             <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Buscar por Nome</label>
             <div className="relative">
@@ -248,11 +265,10 @@ const Georeferencing: React.FC = () => {
             </div>
           </div>
 
-          {/* Tipo / Vínculo */}
           <div className="space-y-2">
             <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Tipo / Vínculo</label>
             <select
-              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none appearance-none bg-no-repeat bg-[right_1rem_center]"
+              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none appearance-none"
               value={filters.tipoVinculo}
               onChange={(e) => setFilters({...filters, tipoVinculo: e.target.value})}
             >
@@ -261,7 +277,6 @@ const Georeferencing: React.FC = () => {
             </select>
           </div>
 
-          {/* Faixa Etária */}
           <div className="space-y-2">
             <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Faixa Etária</label>
             <select
@@ -278,21 +293,6 @@ const Georeferencing: React.FC = () => {
             </select>
           </div>
 
-          {/* Sexo / Gênero */}
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Sexo / Gênero</label>
-            <select
-              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none appearance-none"
-              value={filters.sexo}
-              onChange={(e) => setFilters({...filters, sexo: e.target.value})}
-            >
-              <option>Todos</option>
-              <option>Masculino</option>
-              <option>Feminino</option>
-            </select>
-          </div>
-
-          {/* Setor */}
           <div className="space-y-2">
             <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Setor</label>
             <select
@@ -304,62 +304,16 @@ const Georeferencing: React.FC = () => {
               {options.setores.map(s => <option key={s}>{s}</option>)}
             </select>
           </div>
-
-          {/* Grupo Caseiro */}
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Grupo Caseiro</label>
-            <select
-              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none appearance-none"
-              value={filters.grupoCaseiro}
-              onChange={(e) => setFilters({...filters, grupoCaseiro: e.target.value})}
-            >
-              <option>Todos</option>
-              {options.grupos.map(g => <option key={g}>{g}</option>)}
-            </select>
-          </div>
-
-          {/* UF / Estado */}
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">UF / Estado</label>
-            <select
-              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none appearance-none"
-              value={filters.uf}
-              onChange={(e) => setFilters({...filters, uf: e.target.value})}
-            >
-              <option>Todos</option>
-              <option>DF</option>
-              <option>GO</option>
-            </select>
-          </div>
-
-          {/* Discipulador */}
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Discipulador</label>
-            <select
-              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none appearance-none"
-              value={filters.discipulador}
-              onChange={(e) => setFilters({...filters, discipulador: e.target.value})}
-            >
-              <option>Todos</option>
-            </select>
-          </div>
         </div>
       </div>
 
-      {/* Mapa */}
       <div className="h-[600px] bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden relative">
         {loading && (
           <div className="absolute inset-0 z-[1000] bg-white/80 backdrop-blur-sm flex items-center justify-center">
             <div className="flex flex-col items-center gap-3">
               <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-600"></div>
-              <p className="text-gray-600 font-medium">Atualizando visualização...</p>
+              <p className="text-gray-600 font-medium">Calculando distâncias...</p>
             </div>
-          </div>
-        )}
-
-        {error && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg shadow-lg">
-            {error}
           </div>
         )}
 
@@ -384,6 +338,18 @@ const Georeferencing: React.FC = () => {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           
+          {/* Desenhar linhas de conexão para o membro selecionado ou quando filtrado por nome */}
+          {filteredLocations.filter(l => l.tipo === 'membro' && l.metadata.coordsCelula).map(m => (
+            <Polyline 
+              key={`line-${m.id}`}
+              positions={[[m.latitude, m.longitude], m.metadata.coordsCelula!]}
+              color={selectedLocation?.id === m.id || filters.nome ? "#3b82f6" : "transparent"}
+              weight={2}
+              dashArray="5, 10"
+              opacity={0.6}
+            />
+          ))}
+
           {filteredLocations.map((loc) => (
             <Marker 
               key={loc.id} 
@@ -403,9 +369,13 @@ const Georeferencing: React.FC = () => {
                   {loc.tipo === 'membro' && (
                     <div className="space-y-1 text-sm text-gray-600">
                       <p><strong>Grupo:</strong> {loc.metadata.grupo || 'Nenhum'}</p>
-                      <p><strong>Setor:</strong> {loc.metadata.setor || 'Nenhum'}</p>
-                      <p><strong>Idade:</strong> {loc.metadata.faixaEtaria} anos</p>
-                      <p><strong>Vínculo:</strong> {loc.metadata.vinculo}</p>
+                      {loc.metadata.distanciaAteCelula && (
+                        <div className="mt-2 p-2 bg-blue-50 rounded text-blue-700 font-semibold flex items-center gap-1">
+                          <Navigation className="h-3 w-3" />
+                          <span>{loc.metadata.distanciaAteCelula} km da célula</span>
+                        </div>
+                      )}
+                      <p className="text-xs mt-2 text-gray-400">Líder: {loc.metadata.lider || 'Ver na célula'}</p>
                     </div>
                   )}
 
@@ -415,10 +385,6 @@ const Georeferencing: React.FC = () => {
                       <p><strong>Setor:</strong> {loc.metadata.setor}</p>
                     </div>
                   )}
-                  
-                  <button className="mt-3 w-full text-xs bg-gray-50 hover:bg-gray-100 text-gray-600 py-1 rounded border transition-colors flex items-center justify-center gap-1">
-                    <Info className="h-3 w-3" /> Ver Detalhes
-                  </button>
                 </div>
               </Popup>
             </Marker>
@@ -426,21 +392,49 @@ const Georeferencing: React.FC = () => {
         </MapContainer>
 
         {selectedLocation && (
-          <div className="absolute top-4 left-4 z-[1000] bg-white p-4 rounded-xl shadow-xl border border-gray-100 w-72 animate-in slide-in-from-left duration-300">
+          <div className="absolute bottom-4 left-4 z-[1000] bg-white p-5 rounded-xl shadow-2xl border border-gray-100 w-80 animate-in fade-in slide-in-from-bottom duration-300">
             <div className="flex justify-between items-start mb-4">
               <div className={`p-2 rounded-lg ${selectedLocation.tipo === 'membro' ? 'bg-blue-50 text-blue-600' : 'bg-red-50 text-red-600'}`}>
-                {selectedLocation.tipo === 'membro' ? <Users className="h-5 w-5" /> : <Home className="h-5 w-5" />}
+                {selectedLocation.tipo === 'membro' ? <Users className="h-6 w-6" /> : <Home className="h-6 w-6" />}
               </div>
-              <button onClick={() => setSelectedLocation(null)} className="text-gray-400 hover:text-gray-600">×</button>
+              <button onClick={() => setSelectedLocation(null)} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
             </div>
-            <h3 className="font-bold text-gray-900 text-lg">{selectedLocation.nome}</h3>
+            
+            <h3 className="font-bold text-gray-900 text-xl leading-tight">{selectedLocation.nome}</h3>
             <p className="text-sm text-gray-500 mb-4 capitalize">{selectedLocation.tipo}</p>
             
-            <div className="space-y-3">
-              <div className="flex items-center gap-3 text-sm">
-                <Navigation className="h-4 w-4 text-gray-400" />
-                <span className="text-gray-600">Coordenadas: {selectedLocation.latitude.toFixed(4)}, {selectedLocation.longitude.toFixed(4)}</span>
-              </div>
+            <div className="space-y-4">
+              {selectedLocation.tipo === 'membro' && (
+                <>
+                  <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg border border-gray-100">
+                    <Home className="h-5 w-5 text-red-400" />
+                    <div>
+                      <p className="text-xs text-gray-400 uppercase font-bold">Célula Vinculada</p>
+                      <p className="text-sm font-medium text-gray-700">{selectedLocation.metadata.grupo || 'Sem grupo'}</p>
+                    </div>
+                  </div>
+                  
+                  {selectedLocation.metadata.distanciaAteCelula && (
+                    <div className="flex items-center gap-3 bg-blue-50 p-3 rounded-lg border border-blue-100">
+                      <Navigation className="h-5 w-5 text-blue-500" />
+                      <div>
+                        <p className="text-xs text-blue-400 uppercase font-bold">Distância Estratégica</p>
+                        <p className="text-sm font-bold text-blue-700">{selectedLocation.metadata.distanciaAteCelula} KM</p>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+              
+              {selectedLocation.tipo === 'celula' && (
+                <div className="flex items-center gap-3 bg-red-50 p-3 rounded-lg border border-red-100">
+                  <Users className="h-5 w-5 text-red-500" />
+                  <div>
+                    <p className="text-xs text-red-400 uppercase font-bold">Responsável</p>
+                    <p className="text-sm font-bold text-red-700">{selectedLocation.metadata.lider}</p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
