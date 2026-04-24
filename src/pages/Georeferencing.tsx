@@ -1,10 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { supabase } from '../lib/supabase';
-import { MapPin, Home, Users, Navigation, Info } from 'lucide-react';
-import { format } from 'date-fns';
+import { Home, Users, Navigation, Info } from 'lucide-react';
 
 // Fix para os ícones do Leaflet que costumam quebrar no React/Vite
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -42,13 +41,6 @@ interface LocationData {
   metadata?: any;
 }
 
-// Componente para ajustar o zoom automaticamente
-const ChangeView = ({ center, zoom }: { center: [number, number], zoom: number }) => {
-  const map = useMap();
-  map.setView(center, zoom);
-  return null;
-};
-
 const Georeferencing: React.FC = () => {
   const [locations, setLocations] = useState<LocationData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,14 +55,12 @@ const Georeferencing: React.FC = () => {
     try {
       setLoading(true);
       
-      // Buscar Membros Ativos com coordenadas
       const { data: membros, error: mError } = await supabase
         .from('membros')
         .select('id, nome, latitude, longitude, grupos_caseiros, estado_civil')
         .eq('status', 'Ativo')
         .not('latitude', 'is', null);
 
-      // Buscar Células com coordenadas
       const { data: celulas, error: cError } = await supabase
         .from('celulas')
         .select('id, "Grupo Caseiro", latitude, longitude, lider, setor')
@@ -107,19 +97,6 @@ const Georeferencing: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  // Cálculo de distância (Haversine)
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371; // Raio da Terra em km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return (R * c).toFixed(2);
   };
 
   return (
@@ -181,7 +158,6 @@ const Georeferencing: React.FC = () => {
                     <div className="space-y-1 text-sm text-gray-600">
                       <p><strong>Grupo:</strong> {loc.metadata.grupo || 'Nenhum'}</p>
                       <p><strong>Estado Civil:</strong> {loc.metadata.status}</p>
-                      {/* Futuro: Mostrar distância para célula aqui */}
                     </div>
                   )}
 
@@ -204,7 +180,6 @@ const Georeferencing: React.FC = () => {
           ))}
         </MapContainer>
 
-        {/* Painel Lateral Informativo (opcional) */}
         {selectedLocation && (
           <div className="absolute top-4 right-4 z-[1000] bg-white p-4 rounded-xl shadow-xl border border-gray-100 w-72 animate-in slide-in-from-right duration-300">
             <div className="flex justify-between items-start mb-4">

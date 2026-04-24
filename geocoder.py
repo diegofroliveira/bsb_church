@@ -1,83 +1,91 @@
 import os
 import pandas as pd
 import httpx
-from geopy.geocoders import Nominatim
-from geopy.extra.rate_limiter import RateLimiter
 import time
+import random
 
 # Configurações do Supabase
 SUPABASE_URL = "https://vadufkgbluisdamgkbln.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZhZHVma2dibHVpc2RhbWdrYmxuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4NjE2NDksImV4cCI6MjA5MjQzNzY0OX0.40XwaADEKukkhuLqcQQnNpx-6a1ipKnz_4Fy8DJdrao"
 
-def main():
-    print("INFO: INICIANDO GEOCODIFICADOR DE MEMBROS ATIVOS")
-    
+def geocode_address(client, address):
+    url = "https://nominatim.openstreetmap.org/search"
+    params = {
+        "q": address,
+        "format": "json",
+        "limit": 1
+    }
     headers = {
+        "User-Agent": f"ChurchPro_Mapping_Bot_{random.randint(1000, 9999)}"
+    }
+    
+    try:
+        response = client.get(url, params=params, headers=headers)
+        if response.status_code == 200:
+            data = response.json()
+            if data:
+                return float(data[0]["lat"]), float(data[0]["lon"])
+        elif response.status_code == 429:
+            print("   AVISO: Limite de taxa atingido. Dormindo por 30 segundos...")
+            time.sleep(30)
+            return geocode_address(client, address) # Tenta novamente após o descanso
+    except Exception as e:
+        print(f"   ERRO na API: {e}")
+    return None, None
+
+def main():
+    print("INFO: INICIANDO GEOCODIFICADOR VERSAO 3 (RESILIENTE)")
+    
+    headers_sb = {
         "apikey": SUPABASE_KEY,
         "Authorization": f"Bearer {SUPABASE_KEY}",
         "Content-Type": "application/json"
     }
 
-    # 1. Buscar membros ativos que não têm latitude/longitude
-    print("INFO: Buscando membros ativos no Supabase...")
-    with httpx.Client(verify=False) as client:
-        res = client.get(
+    print("INFO: Buscando membros ativos sem coordenadas...")
+    with httpx.Client(verify=False) as client_sb, httpx.Client(timeout=20.0) as client_geo:
+        res = client_sb.get(
             f"{SUPABASE_URL}/rest/v1/membros",
             params={
                 "status": "eq.Ativo",
                 "latitude": "is.null",
-                "select": "nome,logradouro,bairro,cidade,estado"
+                "select": "nome,logradouro,bairro,cidade"
             },
-            headers=headers
+            headers=headers_sb
         )
         
-        if res.status_code != 200:
-            print(f"ERRO: Erro ao buscar membros: {res.text}")
-            return
-        
         membros = res.json()
-        print(f"INFO: Encontrados {len(membros)} membros ativos para geocodificar.")
-
-        if not membros:
-            print("OK: Todos os membros ativos ja possuem coordenadas!")
-            return
-
-        # 2. Configurar Geocoder (Nominatim - OpenStreetMap)
-        geolocator = Nominatim(user_agent="igreja_pro_geocoder", timeout=10)
-        geocode = RateLimiter(geolocator.geocode, min_delay_seconds=1.5) # Aumentado um pouco o delay por segurança
+        print(f"INFO: Encontrados {len(membros)} membros para processar.")
 
         for m in membros:
-            try:
-                # Montar endereço completo
-                endereco = f"{m.get('logradouro', '')}, {m.get('bairro', '')}, {m.get('cidade', '')} - {m.get('estado', '')}, Brazil"
-                print(f"INFO: Geocodificando: {m['nome']} -> {endereco}")
-                
-                location = geocode(endereco)
-                
-                if location:
-                    print(f"   OK: Encontrado: {location.latitude}, {location.longitude}")
-                    
-                    # Atualizar no Supabase
-                    update_res = client.patch(
-                        f"{SUPABASE_URL}/rest/v1/membros",
-                        params={"nome": f"eq.{m['nome']}"},
-                        json={
-                            "latitude": location.latitude,
-                            "longitude": location.longitude
-                        },
-                        headers=headers
-                    )
-                    
-                    if update_res.status_code not in [200, 204]:
-                        print(f"   AVISO: Erro ao atualizar: {update_res.text}")
-                else:
-                    print("   AVISO: Endereco nao encontrado.")
-                
-            except Exception as e:
-                print(f"   ERRO processando {m['nome']}: {e}")
-                time.sleep(2)
+            # Endereço simplificado para melhor busca
+            logradouro = (m.get('logradouro') or '').strip()
+            bairro = (m.get('bairro') or '').strip()
+            cidade = (m.get('cidade') or '').strip()
+            
+            if not logradouro: continue
+            
+            endereco = f"{logradouro}, {bairro}, {cidade}, Brazil"
+            print(f"INFO: Localizando: {m['nome']} -> {endereco}")
+            
+            lat, lon = geocode_address(client_geo, endereco)
+            
+            if lat and lon:
+                print(f"   OK: {lat}, {lon}")
+                # Salvar no Supabase
+                client_sb.patch(
+                    f"{SUPABASE_URL}/rest/v1/membros",
+                    params={"nome": f"eq.{m['nome']}"},
+                    json={"latitude": lat, "longitude": lon},
+                    headers=headers_sb
+                )
+            else:
+                print("   ERRO: Nao encontrado.")
+            
+            # Espera entre 5 e 8 segundos para ser bem conservador
+            time.sleep(random.uniform(5, 8))
 
-    print("\nOK: PROCESSO DE GEOCODIFICACAO FINALIZADO")
+    print("\n✅ PROCESSO FINALIZADO")
 
 if __name__ == "__main__":
     main()
