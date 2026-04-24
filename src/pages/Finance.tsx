@@ -180,6 +180,27 @@ export const Finance: React.FC = () => {
         </button>
       </header>
 
+      {/* Histórico Financeiro Real - sem filtros aplicados */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-2">
+        <div className="mb-4">
+          <h3 className="text-xl font-bold text-gray-900">Histórico Financeiro Real</h3>
+          <p className="text-sm text-primary-600 font-medium">Consolidado mensal de Entradas e Saídas</p>
+        </div>
+        <div className="h-80 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={barChartData} barGap={8}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} />
+              <YAxis axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} tickFormatter={(v) => `R$${v/1000}k`} />
+              <RechartsTooltip cursor={{fill: '#f8fafc'}} formatter={(v) => formatCurrency(v as number)} contentStyle={{borderRadius:'16px', border:'none', boxShadow:'0 10px 15px -3px rgba(0,0,0,0.1)'}} />
+              <Legend iconType="circle" wrapperStyle={{paddingTop: '20px'}} />
+              <Bar dataKey="entradas" fill="#10b981" radius={[4, 4, 0, 0]} name="Entradas" barSize={30} />
+              <Bar dataKey="saidas" fill="#ef4444" radius={[4, 4, 0, 0]} name="Saídas" barSize={30} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
       {/* Filter Bar */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col md:flex-row gap-4 mb-6">
          <div className="flex items-center gap-2 text-gray-500 mr-2 shrink-0">

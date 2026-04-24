@@ -42,7 +42,7 @@ export const Dashboard: React.FC = () => {
           supabase.from('membros').select('status, tipo_cadastro, nascimento, grupos_caseiros', { count: 'exact' }),
           supabase.from('celulas').select('grupo_caseiro, lider, setor'),
           supabase.from('financeiro').select('tipo, valor, data').order('data', { ascending: false }).limit(5000),
-          supabase.from('discipulado').select('mestre, discipulo, status')
+          supabase.from('discipulado').select('discipulador, discipulo, status')
         ]);
 
         const allMembros = membrosRes.data || [];
@@ -105,7 +105,7 @@ export const Dashboard: React.FC = () => {
         const discipuladoList = discRes.data || [];
         const mestreCounts: any = {};
         discipuladoList.forEach(d => {
-           if (d.mestre) mestreCounts[d.mestre] = (mestreCounts[d.mestre] || 0) + 1;
+           if (d.discipulador) mestreCounts[d.discipulador] = (mestreCounts[d.discipulador] || 0) + 1;
         });
         const discMestres = Object.keys(mestreCounts).map(k => ({ nome: k, discipulos: mestreCounts[k] })).sort((a,b) => b.discipulos - a.discipulos);
 
@@ -144,7 +144,7 @@ export const Dashboard: React.FC = () => {
         const { data } = await supabase.from('celulas').select('grupo_caseiro, lider').eq('setor', title);
         dataResp = (data||[]).map(d => ({ col1: d.grupo_caseiro, col2: d.lider||'Sem Líder', col3: 'Célula' }));
       } else if (type === 'discipulador') {
-        const { data } = await supabase.from('discipulado').select('discipulo, status, tipo').eq('mestre', title);
+        const { data } = await supabase.from('discipulado').select('discipulo, status, tipo').eq('discipulador', title);
         dataResp = (data||[]).map(d => ({ col1: d.discipulo, col2: d.status||'Ativo', col3: d.tipo||'-' }));
       }
       setModalItems(dataResp);
