@@ -30,24 +30,42 @@ export const Finance: React.FC = () => {
   const formatCurrency = (value: number) => 
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
+  const parseDate = (dateStr: string): Date => {
+    if (!dateStr) return new Date(0);
+    // Handles DD/MM/YYYY format from Prover
+    if (dateStr.includes('/')) {
+      const [day, month, year] = dateStr.split('/').map(Number);
+      return new Date(year, month - 1, day);
+    }
+    return new Date(dateStr);
+  };
+
   useEffect(() => {
     const fetchFinanceData = async () => {
       setIsLoading(true);
       try {
-        const { data, error } = await supabase
-          .from('financeiro')
-          .select('*')
-          .order('data', { ascending: false })
-          .limit(5000);
+        // Fetch all records using pagination (Supabase default limit is 1000)
+        let allData: any[] = [];
+        let from = 0;
+        const batchSize = 1000;
+        while (true) {
+          const { data, error } = await supabase
+            .from('financeiro')
+            .select('id, tipo, valor, data, categoria, centro_custo, historico, pessoa_lancamento')
+            .order('data', { ascending: false })
+            .range(from, from + batchSize - 1);
+          if (error) throw error;
+          if (!data || data.length === 0) break;
+          allData = allData.concat(data);
+          if (data.length < batchSize) break;
+          from += batchSize;
+        }
 
-        if (error) throw error;
-
-        const mapped: Transaction[] = data.map(item => ({
+        const mapped: Transaction[] = allData.map(item => ({
           ...item,
-          valor: parseFloat((item.valor || '0').replace(',', '.')) || 0,
+          valor: parseFloat((String(item.valor) || '0').replace(',', '.')) || 0,
           categoria: item.categoria || 'Sem Categoria',
           centro_custo: item.centro_custo || 'Geral',
-          igreja: item.igreja || 'Principal',
           tipo: item.tipo || 'Desconhecido'
         }));
 
@@ -69,7 +87,7 @@ export const Finance: React.FC = () => {
     const gSet = new Set<string>();
 
     transactions.forEach(t => {
-      const d = new Date(t.data);
+      const d = parseDate(t.data);
       if (!isNaN(d.getTime())) {
         mSet.add(`${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`);
       }
@@ -87,7 +105,7 @@ export const Finance: React.FC = () => {
   // Apply Filters
   const filteredData = useMemo(() => {
     return transactions.filter(t => {
-      const d = new Date(t.data);
+      const d = parseDate(t.data);
       const mStr = `${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
       
       const matchMonth = selectedMonth === 'Todos' || mStr === selectedMonth;
@@ -118,7 +136,7 @@ export const Finance: React.FC = () => {
       }
 
       // Bar Chart grouping
-      const date = new Date(item.data);
+      const date = parseDate(item.data);
       if (!isNaN(date.getTime())) {
         const monthYear = `${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
         if (!monthlyMap[monthYear]) {
@@ -160,7 +178,7 @@ export const Finance: React.FC = () => {
     transactions.forEach(item => {
       const val = item.valor;
       const isEntrada = item.tipo.toLowerCase().includes('entrada') || item.tipo.toLowerCase().includes('receita');
-      const date = new Date(item.data);
+      const date = parseDate(item.data);
       if (isNaN(date.getTime())) return;
       const monthYear = `${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
       if (!monthlyMap[monthYear]) monthlyMap[monthYear] = { name: monthYear, entradas: 0, saidas: 0 };

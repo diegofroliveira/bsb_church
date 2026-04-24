@@ -14,21 +14,25 @@ export const Members: React.FC = () => {
     const fetchMembers = async () => {
       setIsLoading(true);
       try {
-        let query = supabase
-          .from('membros')
-          .select('*', { count: 'exact' });
+        // Fetch page data and total count in parallel
+        const [pageRes, countRes] = await Promise.all([
+          supabase
+            .from('membros')
+            .select('id, nome, tipo_cadastro, grupos_caseiros, email, celular_principal_sms, status, foto')
+            .ilike('nome', searchTerm ? `%${searchTerm}%` : '%')
+            .order('nome', { ascending: true })
+            .range((page - 1) * pageSize, page * pageSize - 1),
+          supabase
+            .from('membros')
+            .select('id', { count: 'exact', head: true })
+            .ilike('nome', searchTerm ? `%${searchTerm}%` : '%')
+        ]);
 
-        if (searchTerm) {
-          query = query.ilike('nome', `%${searchTerm}%`);
-        }
+        if (pageRes.error) throw pageRes.error;
+        if (countRes.error) throw countRes.error;
 
-        const { data, count, error } = await query
-          .order('nome', { ascending: true })
-          .range((page - 1) * pageSize, page * pageSize - 1);
-
-        if (error) throw error;
-        setMembers(data || []);
-        setTotalCount(count || 0);
+        setMembers(pageRes.data || []);
+        setTotalCount(countRes.count || 0);
       } catch (error) {
         console.error('Error fetching members:', error);
       } finally {
