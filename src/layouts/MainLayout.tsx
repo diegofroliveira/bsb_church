@@ -142,8 +142,8 @@ export const MainLayout: React.FC = () => {
       </nav>
 
       <div className="border-t border-gray-100 p-4">
-          <span className="text-sm font-semibold text-gray-900 truncate">{user?.name}</span>
-          <span className="text-xs text-primary-600 font-medium capitalize">{user?.role}</span>
+          <div className="text-sm font-semibold text-gray-900 truncate">{user?.name}</div>
+          <div className="text-xs text-primary-600 font-medium capitalize">{user?.role}</div>
         <button onClick={handleLogout}
           className="mt-4 flex w-full items-center gap-x-3 rounded-md p-2 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors">
           <LogOut className="h-5 w-5 shrink-0" /> Sair
