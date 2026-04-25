@@ -355,11 +355,11 @@ const Georeferencing: React.FC = () => {
   }, [filteredLocations]);
 
   return (
-    <div className="space-y-6 flex flex-col min-h-screen pb-20">
+    <div className="space-y-6 animate-in fade-in duration-700 max-w-7xl mx-auto pb-12 px-4 sm:px-6 lg:px-8 pt-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Georreferenciamento Estratégico</h1>
-          <p className="text-gray-500">Auditoria e Mapeamento de Grupos e Discipulado</p>
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Georreferenciamento Estratégico</h1>
+          <p className="text-sm text-gray-500">Mapeamento dinâmico de células, membros e raios de pastoreio.</p>
         </div>
       </div>
 
@@ -462,7 +462,7 @@ const Georeferencing: React.FC = () => {
 
         <MapContainer 
           center={[-15.7942, -47.8822]} 
-          zoom={11} 
+          zoom={10} 
           className="h-full w-full"
         >
           <TileLayer

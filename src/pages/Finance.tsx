@@ -557,7 +557,7 @@ export const Finance: React.FC = () => {
                   return (
                     <tr key={i} className="group hover:bg-gray-50/80 transition-all">
                       <td className="px-8 py-5 whitespace-nowrap text-sm font-medium text-gray-400">
-                         {new Date(t.data).toLocaleDateString('pt-BR')}
+                         {parseDate(t.data).toLocaleDateString('pt-BR')}
                       </td>
                       <td className="px-8 py-5">
                          <div className="font-bold text-gray-900 text-sm">{t.pessoa_lancamento || 'SISTEMA'}</div>
