@@ -11,7 +11,7 @@ export default async function handler(req: Request) {
   }
 
   try {
-    const { email, password, name, role } = await req.json();
+    const { userId, password } = await req.json();
 
     const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://vadufkgbluisdamgkbln.supabase.co';
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -27,11 +27,9 @@ export default async function handler(req: Request) {
       }
     });
 
-    const { data, error } = await supabaseAdmin.auth.admin.createUser({
-      email,
+    const { data, error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
       password,
-      user_metadata: { name, role, force_password_reset: true },
-      email_confirm: true
+      user_metadata: { force_password_reset: true }
     });
 
     if (error) throw error;

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { UserCog, Plus, Save, X, Loader2, Check, Shield, Eye, EyeOff, Trash2 } from 'lucide-react';
+import { UserCog, Plus, Save, X, Loader2, Check, Shield, Eye, EyeOff, Trash2, Lock } from 'lucide-react';
 import clsx from 'clsx';
 
 // UUID especial para armazenar a configuração global de perfis
@@ -54,6 +54,7 @@ export const AdminUsers: React.FC = () => {
   const [editName, setEditName] = useState('');
   const [savingId, setSavingId] = useState<string | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
+  const [resettingId, setResettingId] = useState<string | null>(null);
 
   // New User State
   const [showNewForm, setShowNewForm] = useState(false);
@@ -126,6 +127,38 @@ export const AdminUsers: React.FC = () => {
       alert('Erro ao salvar permissões: ' + err.message);
     } finally {
       setIsSavingRoles(false);
+    }
+  };
+
+  const handleAdminResetPassword = async (userId: string) => {
+    const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#";
+    let pass = "";
+    for (let i = 0; i < 10; i++) {
+      pass += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+
+    if (!confirm(`Deseja resetar a senha deste usuário para uma senha temporária aleatória?\n\nNova senha proposta: ${pass}`)) {
+      return;
+    }
+
+    setResettingId(userId);
+    try {
+      const response = await fetch('/api/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, password: pass })
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Erro na requisição');
+      }
+
+      alert(`Senha resetada com sucesso!\n\nForneça a nova senha para o usuário:\n🔑 ${pass}\n\nO usuário será obrigado a alterá-la no primeiro acesso.`);
+    } catch (error: any) {
+      alert('Erro ao resetar senha: ' + error.message);
+    } finally {
+      setResettingId(null);
     }
   };
 
@@ -408,14 +441,22 @@ export const AdminUsers: React.FC = () => {
                               <button onClick={() => setEditingId(null)} className="w-full text-xs text-gray-500 border border-gray-200 px-4 py-1.5 rounded-lg hover:bg-gray-50 transition-colors bg-white">Cancelar</button>
                             </div>
                           ) : (
-                            <button onClick={() => { 
-                              setEditingId(u.id); 
-                              setEditRole(u.role); 
-                              setEditName(u.name || ''); 
-                            }}
-                              className="text-xs text-primary-600 hover:text-primary-800 font-bold border border-primary-100 px-3 py-1.5 rounded-lg bg-primary-50/30 hover:bg-primary-50 transition-all">
-                              Editar perfil
-                            </button>
+                                <div className="flex flex-col gap-1.5 items-end">
+                                  <button onClick={() => { 
+                                    setEditingId(u.id); 
+                                    setEditRole(u.role); 
+                                    setEditName(u.name || ''); 
+                                  }}
+                                    className="text-xs text-primary-600 hover:text-primary-800 font-bold border border-primary-100 px-3 py-1.5 rounded-lg bg-primary-50/30 hover:bg-primary-50 transition-all w-full text-center">
+                                    Editar perfil
+                                  </button>
+                                  {!isCurrent && (
+                                    <button onClick={() => handleAdminResetPassword(u.id)} disabled={resettingId === u.id}
+                                      className="text-xs text-amber-600 hover:text-amber-800 font-bold border border-amber-100 px-3 py-1.5 rounded-lg bg-amber-50/30 hover:bg-amber-50 transition-all w-full flex items-center justify-center gap-1 disabled:opacity-50">
+                                      {resettingId === u.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Lock className="w-3 h-3" />} Resetar senha
+                                    </button>
+                                  )}
+                                </div>
                           )}
                         </td>
                       </tr>

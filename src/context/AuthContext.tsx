@@ -11,6 +11,7 @@ export interface User {
   role: Role;
   avatar?: string;
   groupId?: string; 
+  forcePasswordReset?: boolean;
 }
 
 interface AuthContextType {
@@ -45,6 +46,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       role: role,
       avatar: sbUser.user_metadata?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${sbUser.id}`,
       groupId: sbUser.user_metadata?.groupId,
+      forcePasswordReset: sbUser.user_metadata?.force_password_reset === true,
     };
 
     // Auto-resgate: Sincroniza o perfil com a tabela pública no momento do acesso

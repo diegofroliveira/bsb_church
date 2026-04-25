@@ -22,6 +22,12 @@ export const MainLayout: React.FC = () => {
   const [allowedModules, setAllowedModules] = useState<string[]>([]);
 
   useEffect(() => {
+    if (user?.forcePasswordReset) {
+      navigate('/reset-password');
+    }
+  }, [user, navigate]);
+
+  useEffect(() => {
     const fetchAllowedModules = async () => {
       try {
         const { data, error } = await supabase

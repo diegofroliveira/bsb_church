@@ -27,7 +27,10 @@ export const ResetPassword: React.FC = () => {
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.updateUser({ password });
+      const { error } = await supabase.auth.updateUser({ 
+        password, 
+        data: { force_password_reset: false } 
+      });
       if (error) throw error;
       setSuccess(true);
       setTimeout(() => navigate('/login'), 3000);
