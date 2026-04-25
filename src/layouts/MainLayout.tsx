@@ -1,40 +1,70 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, Users, Home, DollarSign, Settings, LogOut,
   Menu, BookOpen, FileText, Network, AlertTriangle, MapPin
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabase';
 import clsx from 'clsx';
 
-const ROLE_LABELS: Record<string, string> = {
-  admin: 'Administrador',
-  pastor: 'Pastor',
-  secretaria: 'Secretaria',
-  financeiro: 'Financeiro',
+const DEFAULT_ROLES: Record<string, string[]> = {
+  admin: ['Dashboard', 'Mapa', 'Membros', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Financeiro', 'Configurações'],
+  pastor: ['Dashboard', 'Mapa', 'Membros', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Financeiro'],
+  secretaria: ['Dashboard', 'Membros', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA'],
+  financeiro: ['Dashboard', 'Financeiro']
 };
 
 export const MainLayout: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [allowedModules, setAllowedModules] = useState<string[]>([]);
+
+  useEffect(() => {
+    const fetchAllowedModules = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', '00000000-0000-0000-0000-000000000000')
+          .single();
+
+        if (!error && data && data.name) {
+          const parsed = JSON.parse(data.name);
+          const userRole = user?.role || 'guest';
+          if (parsed[userRole]) {
+            setAllowedModules(parsed[userRole].modules);
+            return;
+          }
+        }
+      } catch (_) {}
+      
+      const userRole = user?.role || 'guest';
+      setAllowedModules(DEFAULT_ROLES[userRole] || ['Dashboard']);
+    };
+
+    if (user) {
+      fetchAllowedModules();
+    }
+  }, [user]);
 
   const handleLogout = () => { logout(); navigate('/login'); };
 
   const navItems = [
-    { name: 'Dashboard',    path: '/',             icon: LayoutDashboard, roles: ['admin', 'pastor', 'secretaria', 'financeiro'] },
-    { name: 'Mapa',         path: '/georeferencing', icon: MapPin,         roles: ['admin', 'pastor'] },
-    { name: 'Membros',      path: '/members',      icon: Users,           roles: ['admin', 'pastor', 'secretaria'] },
-    { name: 'GCs/Localidades', path: '/cells',      icon: Home,            roles: ['admin', 'pastor', 'secretaria'] },
-    { name: 'Discipulado',  path: '/discipleship', icon: BookOpen,        roles: ['admin', 'pastor', 'secretaria'] },
-    { name: 'Rede',         path: '/network',      icon: Network,         roles: ['admin', 'pastor', 'secretaria'] },
-    { name: 'Relatórios',   path: '/reports',      icon: FileText,        roles: ['admin', 'pastor', 'secretaria'] },
-    { name: 'QA',           path: '/qa',           icon: AlertTriangle,   roles: ['admin', 'pastor', 'secretaria'] },
-    { name: 'Financeiro',   path: '/finance',      icon: DollarSign,      roles: ['admin', 'pastor', 'financeiro'] },
-    { name: 'Configurações',path: '/admin/users',  icon: Settings,        roles: ['admin'] },
+    { id: 'Dashboard',       name: 'Dashboard',       path: '/',             icon: LayoutDashboard },
+    { id: 'Mapa',            name: 'Mapa',            path: '/georeferencing', icon: MapPin },
+    { id: 'Membros',         name: 'Membros',         path: '/members',      icon: Users },
+    { id: 'GCs/Localidades', name: 'GCs/Localidades', path: '/cells',        icon: Home },
+    { id: 'Discipulado',     name: 'Discipulado',     path: '/discipleship', icon: BookOpen },
+    { id: 'Rede',            name: 'Rede',            path: '/network',      icon: Network },
+    { id: 'Relatórios',      name: 'Relatórios',      path: '/reports',      icon: FileText },
+    { id: 'QA',              name: 'QA',              path: '/qa',           icon: AlertTriangle },
+    { id: 'Financeiro',      name: 'Financeiro',      path: '/finance',      icon: DollarSign },
+    { id: 'Configurações',   name: 'Configurações',   path: '/admin/users',  icon: Settings },
   ];
 
-  const authorizedNavItems = navItems.filter(item => item.roles.includes(user?.role || ''));
+  const authorizedNavItems = navItems.filter(item => allowedModules.includes(item.id));
 
   const FamilyLogo = ({ className }: { className?: string }) => (
     <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -96,10 +126,8 @@ export const MainLayout: React.FC = () => {
       </nav>
 
       <div className="border-t border-gray-100 p-4">
-        <div className="flex flex-col min-w-0">
           <span className="text-sm font-semibold text-gray-900 truncate">{user?.name}</span>
-          <span className="text-xs text-primary-600 font-medium">{ROLE_LABELS[user?.role || ''] || user?.role}</span>
-        </div>
+          <span className="text-xs text-primary-600 font-medium capitalize">{user?.role}</span>
         <button onClick={handleLogout}
           className="mt-4 flex w-full items-center gap-x-3 rounded-md p-2 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors">
           <LogOut className="h-5 w-5 shrink-0" /> Sair

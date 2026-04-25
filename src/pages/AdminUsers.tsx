@@ -1,42 +1,66 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { UserCog, Plus, Save, X, Loader2, Check, Shield } from 'lucide-react';
+import { UserCog, Plus, Save, X, Loader2, Check, Shield, Eye, EyeOff, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
 
-type Role = 'admin' | 'pastor' | 'secretaria' | 'financeiro';
+// UUID especial para armazenar a configuração global de perfis
+const SPECIAL_CONFIG_ID = '00000000-0000-0000-0000-000000000000';
 
-const ROLES: { value: Role; label: string; desc: string; color: string }[] = [
-  { value: 'admin',      label: 'Administrador', desc: 'Acesso total, incluindo gestão de usuários', color: 'bg-purple-100 text-purple-700 border-purple-200' },
-  { value: 'pastor',     label: 'Pastor',        desc: 'Acesso a todos os módulos exceto gestão de usuários', color: 'bg-blue-100 text-blue-700 border-blue-200' },
-  { value: 'secretaria', label: 'Secretaria',    desc: 'Membros, Células, Relatórios, QA, Discipulado e Rede — sem Financeiro', color: 'bg-green-100 text-green-700 border-green-200' },
-  { value: 'financeiro', label: 'Financeiro',    desc: 'Somente Dashboard e Financeiro', color: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
+const AVAILABLE_MODULES = [
+  { id: 'Dashboard',       label: 'Dashboard',       path: '/' },
+  { id: 'Mapa',            label: 'Mapa',            path: '/georeferencing' },
+  { id: 'Membros',         label: 'Membros',         path: '/members' },
+  { id: 'GCs/Localidades', label: 'GCs/Localidades', path: '/cells' },
+  { id: 'Discipulado',     label: 'Discipulado',     path: '/discipleship' },
+  { id: 'Rede',            label: 'Rede',            path: '/network' },
+  { id: 'Relatórios',      label: 'Relatórios',      path: '/reports' },
+  { id: 'QA',              label: 'QA',              path: '/qa' },
+  { id: 'Financeiro',      label: 'Financeiro',      path: '/finance' },
+  { id: 'Configurações',   label: 'Configurações',   path: '/admin/users' },
 ];
+
+const DEFAULT_ROLES: Record<string, { label: string; modules: string[] }> = {
+  admin: { label: 'Administrador', modules: ['Dashboard', 'Mapa', 'Membros', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Financeiro', 'Configurações'] },
+  pastor: { label: 'Pastor', modules: ['Dashboard', 'Mapa', 'Membros', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Financeiro'] },
+  secretaria: { label: 'Secretaria', modules: ['Dashboard', 'Membros', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA'] },
+  financeiro: { label: 'Financeiro', modules: ['Dashboard', 'Financeiro'] }
+};
 
 interface AppUser {
   id: string;
   email: string;
   name: string;
-  role: Role;
+  role: string;
   avatar?: string;
   created_at: string;
 }
 
 export const AdminUsers: React.FC = () => {
   const { user: currentUser } = useAuth();
+  const [activeTab, setActiveTab] = useState<'users' | 'roles'>('users');
   const [users, setUsers] = useState<AppUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // Dynamic Roles State
+  const [dynamicRoles, setDynamicRoles] = useState<Record<string, { label: string; modules: string[] }>>(DEFAULT_ROLES);
+  const [isSavingRoles, setIsSavingRoles] = useState(false);
+  const [newRoleName, setNewRoleName] = useState('');
+  const [selectedRoleForEdit, setSelectedRoleForEdit] = useState<string>('admin');
+
+  // Edit User State
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editRole, setEditRole] = useState<Role>('secretaria');
+  const [editRole, setEditRole] = useState<string>('secretaria');
   const [editName, setEditName] = useState('');
-  const [editAvatar, setEditAvatar] = useState('');
   const [savingId, setSavingId] = useState<string | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
+
+  // New User State
   const [showNewForm, setShowNewForm] = useState(false);
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newName, setNewName] = useState('');
-  const [newRole, setNewRole] = useState<Role>('secretaria');
+  const [newRole, setNewRole] = useState<string>('secretaria');
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
 
@@ -45,36 +69,72 @@ export const AdminUsers: React.FC = () => {
     try {
       const { data, error } = await supabase.from('profiles').select('*');
       if (!error && data) { 
-        setUsers(data.map(u => ({ ...u, avatar: u.avatar || u.foto }))); 
-        setIsLoading(false); 
-        return; 
+        // Filtra a linha de configuração especial para não poluir a lista de usuários
+        const realUsers = data.filter(u => u.id !== SPECIAL_CONFIG_ID);
+        setUsers(realUsers.map(u => ({ ...u, avatar: u.avatar || u.foto }))); 
       }
     } catch (_) {}
-    if (currentUser) {
-      setUsers([{ id: currentUser.id, email: currentUser.email, name: currentUser.name, role: currentUser.role as Role, avatar: currentUser.avatar, created_at: new Date().toISOString() }]);
-    }
     setIsLoading(false);
   };
 
-  useEffect(() => { fetchUsers(); }, []);
+  const fetchRolesConfig = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', SPECIAL_CONFIG_ID)
+        .single();
+
+      if (!error && data && data.name) {
+        const parsed = JSON.parse(data.name);
+        setDynamicRoles(parsed);
+      }
+    } catch (_) {
+      console.log('Usando perfis padrão.');
+    }
+  };
+
+  useEffect(() => { 
+    fetchUsers(); 
+    fetchRolesConfig();
+  }, []);
+
+  const saveRolesConfig = async (updatedRoles: typeof dynamicRoles) => {
+    setIsSavingRoles(true);
+    try {
+      const { error } = await supabase.from('profiles').upsert({
+        id: SPECIAL_CONFIG_ID,
+        email: 'roles@system.local',
+        name: JSON.stringify(updatedRoles),
+        role: 'admin',
+        updated_at: new Date().toISOString()
+      });
+
+      if (error) throw error;
+      setDynamicRoles(updatedRoles);
+      alert('Perfis e Permissões salvos com sucesso!');
+    } catch (err: any) {
+      alert('Erro ao salvar permissões: ' + err.message);
+    } finally {
+      setIsSavingRoles(false);
+    }
+  };
 
   const saveProfile = async (userId: string) => {
     setSavingId(userId);
     try {
       const isCurrent = userId === currentUser?.id;
 
-      // 1. Atualizar Metadados no Auth
       if (isCurrent) {
         await supabase.auth.updateUser({ 
-          data: { name: editName, role: editRole, avatar: editAvatar } 
+          data: { name: editName, role: editRole } 
         });
       } else {
         await supabase.auth.admin.updateUserById(userId, { 
-          user_metadata: { name: editName, role: editRole, avatar: editAvatar } 
+          user_metadata: { name: editName, role: editRole } 
         }).catch(() => console.log('Admin API restrita, atualizando apenas tabela pública...'));
       }
 
-      // 2. Atualizar Tabela Pública de Perfis
       const { error } = await supabase.from('profiles').upsert({
         id: userId,
         email: users.find(u => u.id === userId)?.email,
@@ -85,11 +145,10 @@ export const AdminUsers: React.FC = () => {
 
       if (error) throw error;
 
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, name: editName, role: editRole, avatar: editAvatar } : u));
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, name: editName, role: editRole } : u));
       setSavedId(userId); setTimeout(() => setSavedId(null), 2000);
       
       if (userId === currentUser?.id) {
-        // Recarregar para atualizar avatar/nome no Sidebar
         window.location.reload();
       }
     } catch (err: any) {
@@ -106,20 +165,13 @@ export const AdminUsers: React.FC = () => {
       const response = await fetch('/api/create-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: newEmail,
-          password: newPassword,
-          name: newName,
-          role: newRole
-        })
+        body: JSON.stringify({ email: newEmail, password: newPassword, name: newName, role: newRole })
       });
 
       const result = await response.json();
 
       if (!response.ok) {
-        // Se o erro for falta de chave no servidor, tentamos o Plano B (SignUp público)
         if (result.error?.includes('SUPABASE_SERVICE_ROLE_KEY')) {
-           console.log('Tentando Plano B: SignUp público...');
            const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
              email: newEmail,
              password: newPassword,
@@ -131,7 +183,6 @@ export const AdminUsers: React.FC = () => {
            
            if (signUpError) throw signUpError;
 
-           // Criar perfil na tabela pública imediatamente
            if (signUpData.user) {
               await supabase.from('profiles').insert({
                  id: signUpData.user.id,
@@ -144,26 +195,67 @@ export const AdminUsers: React.FC = () => {
            
            setShowNewForm(false); setNewEmail(''); setNewPassword(''); setNewName(''); setNewRole('secretaria');
            fetchUsers();
-           alert('Usuário cadastrado via Plano B. \n\nIMPORTANTE: Ele deve confirmar o e-mail ' + newEmail + '. Ele já aparecerá na lista.');
+           alert('Usuário cadastrado. IMPORTANTE: Ele deve confirmar o e-mail.');
            return;
         }
         throw new Error(result.error || 'Falha ao criar usuário');
       }
 
-      // Sucesso na API Normal:
       fetchUsers();
       setShowNewForm(false); setNewEmail(''); setNewPassword(''); setNewName(''); setNewRole('secretaria');
-      alert('Usuário ' + newName + ' criado com sucesso!');
+      alert('Usuário ' + newName + ' criado!');
     } catch (err: any) {
-      console.error('Erro na criação:', err);
-      setCreateError(err.message || 'Falha ao criar usuário. Verifique se o e-mail já existe ou se a chave de serviço está configurada.');
+      setCreateError(err.message || 'Falha ao criar usuário.');
     } finally { setCreating(false); }
   };
 
-  const roleInfo = (role: string) => ROLES.find(r => r.value === role) || ROLES[2];
+  const handleToggleModule = (roleKey: string, moduleId: string) => {
+    const currentModules = dynamicRoles[roleKey]?.modules || [];
+    const updatedModules = currentModules.includes(moduleId)
+      ? currentModules.filter(m => m !== moduleId)
+      : [...currentModules, moduleId];
+
+    const updatedRoles = {
+      ...dynamicRoles,
+      [roleKey]: {
+        ...dynamicRoles[roleKey],
+        modules: updatedModules
+      }
+    };
+    
+    setDynamicRoles(updatedRoles);
+  };
+
+  const handleAddRole = () => {
+    if (!newRoleName.trim()) return;
+    const key = newRoleName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, '-');
+    if (dynamicRoles[key]) { alert('Este perfil já existe!'); return; }
+
+    const updatedRoles = {
+      ...dynamicRoles,
+      [key]: {
+        label: newRoleName,
+        modules: ['Dashboard']
+      }
+    };
+
+    setDynamicRoles(updatedRoles);
+    setSelectedRoleForEdit(key);
+    setNewRoleName('');
+  };
+
+  const handleDeleteRole = (keyToDelete: string) => {
+    if (['admin', 'pastor', 'secretaria', 'financeiro'].includes(keyToDelete)) {
+      alert('Perfis padrão do sistema não podem ser excluídos.');
+      return;
+    }
+    const { [keyToDelete]: _, ...remainingRoles } = dynamicRoles;
+    setDynamicRoles(remainingRoles);
+    setSelectedRoleForEdit('admin');
+  };
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-4xl mx-auto pb-12">
+    <div className="space-y-6 animate-in fade-in duration-700 max-w-5xl mx-auto pb-12 px-4">
       <header className="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-50 text-purple-700 text-sm font-semibold mb-3 border border-purple-100">
@@ -172,152 +264,272 @@ export const AdminUsers: React.FC = () => {
           <h1 className="text-3xl font-bold tracking-tight text-gray-900">Configurações de Acesso</h1>
           <p className="mt-2 text-sm text-gray-500">Gerencie perfis de acesso e usuários do IgrejaPro.</p>
         </div>
-        <button onClick={() => setShowNewForm(true)}
-          className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
-          <Plus className="w-4 h-4" /> Novo Usuário
-        </button>
+        {activeTab === 'users' && (
+          <button onClick={() => setShowNewForm(true)}
+            className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+            <Plus className="w-4 h-4" /> Novo Usuário
+          </button>
+        )}
       </header>
 
-      {/* Role legend */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-        {ROLES.map(r => (
-          <div key={r.value} className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
-            <span className={clsx('text-xs font-bold px-2 py-0.5 rounded-full border', r.color)}>{r.label}</span>
-            <p className="text-xs text-gray-500 mt-2">{r.desc}</p>
-          </div>
-        ))}
+      {/* Tabs */}
+      <div className="flex border-b border-gray-100 mb-6 gap-6">
+        <button 
+          onClick={() => setActiveTab('users')}
+          className={clsx("pb-4 font-bold text-sm border-b-2 transition-all", activeTab === 'users' ? "border-primary-600 text-primary-600" : "border-transparent text-gray-400 hover:text-gray-600")}
+        >
+          Usuários Cadastrados
+        </button>
+        <button 
+          onClick={() => setActiveTab('roles')}
+          className={clsx("pb-4 font-bold text-sm border-b-2 transition-all", activeTab === 'roles' ? "border-primary-600 text-primary-600" : "border-transparent text-gray-400 hover:text-gray-600")}
+        >
+          Gerenciamento de Perfis (RBAC)
+        </button>
       </div>
 
-      {/* New user form */}
-      {showNewForm && (
-        <div className="bg-white rounded-xl border border-primary-200 ring-1 ring-primary-50 p-6 mb-4 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold text-gray-900 flex items-center gap-2"><UserCog className="w-5 h-5 text-primary-600" /> Novo Usuário</h3>
-            <button onClick={() => setShowNewForm(false)}><X className="w-5 h-5 text-gray-400" /></button>
+      {activeTab === 'users' ? (
+        <>
+          {/* New user form */}
+          {showNewForm && (
+            <div className="bg-white rounded-xl border border-primary-200 ring-1 ring-primary-50 p-6 mb-4 shadow-sm animate-in slide-in-from-top-2 duration-300">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-gray-900 flex items-center gap-2"><UserCog className="w-5 h-5 text-primary-600" /> Novo Usuário</h3>
+                <button onClick={() => setShowNewForm(false)}><X className="w-5 h-5 text-gray-400" /></button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Nome completo</label>
+                  <input value={newName} onChange={e => setNewName(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none" placeholder="Ex: Ana Silva" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">E-mail</label>
+                  <input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none" placeholder="email@igreja.com" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Senha inicial</label>
+                  <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none" placeholder="Mínimo 6 caracteres" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Perfil de acesso</label>
+                  <select value={newRole} onChange={e => setNewRole(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white font-medium">
+                    {Object.entries(dynamicRoles).map(([key, r]) => <option key={key} value={key}>{r.label}</option>)}
+                  </select>
+                </div>
+              </div>
+              {createError && <p className="mt-3 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">{createError}</p>}
+              <div className="flex gap-3 mt-4">
+                <button onClick={createUser} disabled={creating}
+                  className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
+                  {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Criar Usuário
+                </button>
+                <button onClick={() => setShowNewForm(false)} className="text-sm text-gray-600 hover:text-gray-900 px-4 py-2 border border-gray-200 rounded-lg">Cancelar</button>
+              </div>
+            </div>
+          )}
+
+          {/* Users list */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+              <h2 className="font-semibold text-gray-900">Usuários cadastrados ({users.length})</h2>
+            </div>
+            {isLoading ? (
+              <div className="flex items-center justify-center p-12"><Loader2 className="w-8 h-8 animate-spin text-primary-600" /></div>
+            ) : (
+              <table className="min-w-full divide-y divide-gray-100">
+                <thead className="bg-white">
+                  <tr>
+                    <th className="py-3 pl-6 pr-3 text-left text-xs font-semibold text-gray-500 uppercase">Usuário</th>
+                    <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Perfil atual</th>
+                    <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Alterar para</th>
+                    <th className="px-3 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Ação</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {users.map(u => {
+                    const ri = dynamicRoles[u.role] || { label: u.role, modules: [] };
+                    const isEditing = editingId === u.id;
+                    const isCurrent = u.id === currentUser?.id;
+                    return (
+                      <tr key={u.id} className="hover:bg-gray-50/50">
+                        <td className="py-4 pl-6 pr-3">
+                          {isEditing ? (
+                            <div className="flex flex-col gap-2">
+                              <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Nome de exibição</div>
+                              <input 
+                                value={editName} 
+                                onChange={e => setEditName(e.target.value)} 
+                                className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white shadow-sm" 
+                                placeholder="Ex: Diego" 
+                              />
+                            </div>
+                          ) : (
+                            <div className="flex flex-col">
+                              <div className="font-medium text-gray-900 text-sm">{u.name || u.email.split('@')[0]}</div>
+                              <div className="text-xs text-gray-400">{u.email}</div>
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-3 py-4 align-top">
+                          <span className="text-xs font-semibold px-2.5 py-1 rounded-full border bg-gray-50 text-gray-700 border-gray-200">{ri.label}</span>
+                          {isCurrent && <div className="mt-1 text-[10px] text-primary-500 font-bold uppercase tracking-tighter">(Você)</div>}
+                        </td>
+                        <td className="px-3 py-4 align-top">
+                          {isEditing ? (
+                            <select value={editRole} onChange={e => setEditRole(e.target.value)}
+                              className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white shadow-sm font-medium">
+                              {Object.entries(dynamicRoles).map(([key, r]) => <option key={key} value={key}>{r.label}</option>)}
+                            </select>
+                          ) : (
+                            <span className="text-sm text-gray-300">—</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-4 text-right align-top">
+                          {savedId === u.id ? (
+                            <span className="text-green-600 text-sm flex items-center gap-1 justify-end font-bold"><Check className="w-4 h-4" /> Atualizado</span>
+                          ) : isEditing ? (
+                            <div className="flex flex-col gap-2 items-end">
+                              <button onClick={() => saveProfile(u.id)} disabled={!!savingId}
+                                className="w-full flex justify-center items-center gap-2 bg-primary-600 text-white px-4 py-1.5 rounded-lg hover:bg-primary-700 disabled:opacity-50 text-xs font-bold transition-all shadow-md">
+                                {savingId === u.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />} Salvar
+                              </button>
+                              <button onClick={() => setEditingId(null)} className="w-full text-xs text-gray-500 border border-gray-200 px-4 py-1.5 rounded-lg hover:bg-gray-50 transition-colors bg-white">Cancelar</button>
+                            </div>
+                          ) : (
+                            <button onClick={() => { 
+                              setEditingId(u.id); 
+                              setEditRole(u.role); 
+                              setEditName(u.name || ''); 
+                            }}
+                              className="text-xs text-primary-600 hover:text-primary-800 font-bold border border-primary-100 px-3 py-1.5 rounded-lg bg-primary-50/30 hover:bg-primary-50 transition-all">
+                              Editar perfil
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        </>
+      ) : (
+        /* RBAC Roles and Permissions Screen */
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-300">
+          
+          {/* Left Column: Role List */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm flex flex-col justify-between">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nome completo</label>
-              <input value={newName} onChange={e => setNewName(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none" placeholder="Ex: Ana Silva" />
+              <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2"><Shield className="w-5 h-5 text-primary-600" /> Perfis Ativos</h3>
+              
+              <div className="space-y-2">
+                {Object.entries(dynamicRoles).map(([key, r]) => (
+                  <div 
+                    key={key} 
+                    onClick={() => setSelectedRoleForEdit(key)}
+                    className={clsx(
+                      "flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all",
+                      selectedRoleForEdit === key 
+                        ? "border-primary-500 bg-primary-50/30 ring-1 ring-primary-100" 
+                        : "border-gray-100 hover:border-gray-200 bg-gray-50/10"
+                    )}
+                  >
+                    <div className="flex flex-col">
+                      <span className="font-bold text-gray-900 text-sm">{r.label}</span>
+                      <span className="text-[10px] text-gray-400 font-semibold uppercase">{r.modules.length} módulos liberados</span>
+                    </div>
+                    {selectedRoleForEdit === key && <Check className="w-4 h-4 text-primary-600" />}
+                  </div>
+                ))}
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">E-mail</label>
-              <input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none" placeholder="email@igreja.com" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Senha inicial</label>
-              <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none" placeholder="Mínimo 6 caracteres" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Perfil de acesso</label>
-              <select value={newRole} onChange={e => setNewRole(e.target.value as Role)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white">
-                {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
-              </select>
+
+            {/* Add New Role Input */}
+            <div className="mt-6 pt-4 border-t border-gray-100 space-y-2">
+              <label className="text-xs font-bold text-gray-400 uppercase">Criar Novo Perfil</label>
+              <div className="flex gap-2">
+                <input 
+                  type="text" 
+                  value={newRoleName} 
+                  onChange={e => setNewRoleName(e.target.value)}
+                  placeholder="Ex: Diácono, Líder..."
+                  className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none"
+                />
+                <button 
+                  onClick={handleAddRole}
+                  className="p-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg shadow-sm transition-colors"
+                >
+                  <Plus className="w-5 h-5" />
+                </button>
+              </div>
             </div>
           </div>
-          {createError && <p className="mt-3 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">{createError}</p>}
-          <div className="flex gap-3 mt-4">
-            <button onClick={createUser} disabled={creating}
-              className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
-              {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Criar Usuário
-            </button>
-            <button onClick={() => setShowNewForm(false)} className="text-sm text-gray-600 hover:text-gray-900 px-4 py-2 border border-gray-200 rounded-lg">Cancelar</button>
+
+          {/* Right Column: Module Permission Selector */}
+          <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-4 mb-4">
+              <div>
+                <h3 className="font-bold text-gray-900">Módulos permitidos para: <span className="text-primary-600">{dynamicRoles[selectedRoleForEdit]?.label}</span></h3>
+                <p className="text-xs text-gray-400">Ative ou desative os menus que este perfil poderá acessar.</p>
+              </div>
+              {!['admin', 'pastor', 'secretaria', 'financeiro'].includes(selectedRoleForEdit) && (
+                <button 
+                  onClick={() => handleDeleteRole(selectedRoleForEdit)}
+                  className="text-red-500 hover:text-red-600 flex items-center gap-1 text-xs font-bold border border-red-100 px-3 py-1.5 rounded-lg bg-red-50/30"
+                >
+                  <Trash2 className="w-3 h-3" /> Excluir Perfil
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+              {AVAILABLE_MODULES.map((m) => {
+                const isAllowed = dynamicRoles[selectedRoleForEdit]?.modules.includes(m.id);
+                // Admin não pode ter módulos removidos para não se trancar
+                const disabled = selectedRoleForEdit === 'admin';
+
+                return (
+                  <div 
+                    key={m.id}
+                    onClick={() => !disabled && handleToggleModule(selectedRoleForEdit, m.id)}
+                    className={clsx(
+                      "flex items-center justify-between p-4 rounded-xl border transition-all select-none",
+                      disabled ? "opacity-70 cursor-not-allowed" : "cursor-pointer",
+                      isAllowed 
+                        ? "border-green-200 bg-green-50/20 text-green-800" 
+                        : "border-gray-100 text-gray-500 bg-white"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={clsx("p-2 rounded-lg", isAllowed ? "bg-green-100/50 text-green-600" : "bg-gray-100 text-gray-400")}>
+                        {isAllowed ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                      </div>
+                      <span className="font-bold text-sm tracking-tight">{m.label}</span>
+                    </div>
+                    <div className={clsx("w-5 h-5 rounded-md border flex items-center justify-center transition-all", isAllowed ? "bg-green-500 border-green-500 text-white" : "border-gray-300")}>
+                      {isAllowed && <Check className="w-3 h-3 stroke-[3]" />}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex justify-end">
+              <button 
+                onClick={() => saveRolesConfig(dynamicRoles)}
+                disabled={isSavingRoles}
+                className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm transition-all shadow-md disabled:opacity-50"
+              >
+                {isSavingRoles ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Salvar Alterações de Perfil
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Users list */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
-          <h2 className="font-semibold text-gray-900">Usuários cadastrados ({users.length})</h2>
-        </div>
-        {isLoading ? (
-          <div className="flex items-center justify-center p-12"><Loader2 className="w-8 h-8 animate-spin text-primary-600" /></div>
-        ) : (
-          <table className="min-w-full divide-y divide-gray-100">
-            <thead className="bg-white">
-              <tr>
-                <th className="py-3 pl-6 pr-3 text-left text-xs font-semibold text-gray-500 uppercase">Usuário</th>
-                <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Perfil atual</th>
-                <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Alterar para</th>
-                <th className="px-3 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Ação</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {users.map(u => {
-                const ri = roleInfo(u.role);
-                const isEditing = editingId === u.id;
-                const isCurrent = u.id === currentUser?.id;
-                return (
-                  <tr key={u.id} className="hover:bg-gray-50/50">
-                    <td className="py-4 pl-6 pr-3">
-                      {isEditing ? (
-                        <div className="flex flex-col gap-2">
-                          <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Nome de exibição</div>
-                          <input 
-                            value={editName} 
-                            onChange={e => setEditName(e.target.value)} 
-                            className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white shadow-sm" 
-                            placeholder="Ex: Diego" 
-                          />
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-3">
-                          <div className="flex flex-col">
-                            <div className="font-medium text-gray-900 text-sm">{u.name || u.email.split('@')[0]}</div>
-                            <div className="text-xs text-gray-400">{u.email}</div>
-                          </div>
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-3 py-4 align-top">
-                      <span className={clsx('text-xs font-semibold px-2 py-1 rounded-full border', ri.color)}>{ri.label}</span>
-                      {isCurrent && <div className="mt-1 text-[10px] text-primary-500 font-bold uppercase tracking-tighter">(Você)</div>}
-                    </td>
-                    <td className="px-3 py-4 align-top">
-                      {isEditing ? (
-                        <select value={editRole} onChange={e => setEditRole(e.target.value as Role)}
-                          className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white shadow-sm">
-                          {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
-                        </select>
-                      ) : (
-                        <span className="text-sm text-gray-300">—</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-4 text-right align-top">
-                      {savedId === u.id ? (
-                        <span className="text-green-600 text-sm flex items-center gap-1 justify-end font-bold"><Check className="w-4 h-4" /> Atualizado</span>
-                      ) : isEditing ? (
-                        <div className="flex flex-col gap-2 items-end">
-                          <button onClick={() => saveProfile(u.id)} disabled={!!savingId}
-                            className="w-full flex justify-center items-center gap-2 bg-primary-600 text-white px-4 py-1.5 rounded-lg hover:bg-primary-700 disabled:opacity-50 text-xs font-bold transition-all shadow-md">
-                            {savingId === u.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />} Salvar
-                          </button>
-                          <button onClick={() => setEditingId(null)} className="w-full text-xs text-gray-500 border border-gray-200 px-4 py-1.5 rounded-lg hover:bg-gray-50 transition-colors bg-white">Cancelar</button>
-                        </div>
-                      ) : (
-                        <button onClick={() => { 
-                          setEditingId(u.id); 
-                          setEditRole(u.role); 
-                          setEditName(u.name || ''); 
-                          setEditAvatar(u.avatar || ''); 
-                        }}
-                          className="text-xs text-primary-600 hover:text-primary-800 font-bold border border-primary-100 px-3 py-1.5 rounded-lg bg-primary-50/30 hover:bg-primary-50 transition-all">
-                          Editar perfil
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
-
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
-        <strong>Nota:</strong> A criação e edição de senhas de usuários requer acesso ao painel do Supabase (Authentication → Users). 
-        O perfil de acesso (role) é gerenciado aqui e salvo nos metadados do usuário.
+        <strong>Regra de Segurança:</strong> O perfil `Administrador` possui acesso irrevogável a todas as telas para evitar bloqueios acidentais no sistema.
       </div>
     </div>
   );
