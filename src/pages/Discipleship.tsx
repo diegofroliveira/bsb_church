@@ -49,7 +49,7 @@ export const Discipleship: React.FC = () => {
                 <input
                    type="text"
                    className="block w-full rounded-lg border-0 py-2 pl-10 pr-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 sm:text-sm sm:leading-6"
-                   placeholder="Buscar mestre ou discípulo..."
+                   placeholder="Buscar discipulador ou discípulo..."
                    value={searchTerm}
                    onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -66,8 +66,8 @@ export const Discipleship: React.FC = () => {
              <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-white">
                    <tr>
-                      <th className="py-3.5 pl-6 pr-3 text-left text-sm font-semibold text-gray-900">Mestre (Discipulador)</th>
-                      <th className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Discípulo</th>
+                      <th className="py-3.5 pl-6 pr-3 text-left text-sm font-semibold text-gray-900">Discípulo</th>
+                      <th className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Discipulador</th>
                       <th className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Status</th>
                       <th className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Início</th>
                    </tr>
@@ -75,8 +75,8 @@ export const Discipleship: React.FC = () => {
                 <tbody className="divide-y divide-gray-100 bg-white">
                    {data.map((item, i) => (
                       <tr key={i} className="hover:bg-gray-50 transition-colors">
-                         <td className="whitespace-nowrap py-4 pl-6 pr-3 text-sm font-medium text-gray-900">{item.discipulador}</td>
-                         <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-700">{item.discipulo}</td>
+                         <td className="whitespace-nowrap py-4 pl-6 pr-3 text-sm font-medium text-gray-900">{item.discipulo}</td>
+                         <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-700">{item.discipulador}</td>
                          <td className="whitespace-nowrap px-3 py-4 text-sm">
                             <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
                                {item.status}

@@ -61,10 +61,18 @@ export const AdminUsers: React.FC = () => {
   const saveProfile = async (userId: string) => {
     setSavingId(userId);
     try {
-      // 1. Atualizar Metadados no Auth (se possível)
-      await supabase.auth.admin.updateUserById(userId, { 
-        user_metadata: { name: editName, role: editRole, avatar: editAvatar } 
-      }).catch(() => console.log('Admin API restrita, atualizando apenas tabela pública...'));
+      const isCurrent = userId === currentUser?.id;
+
+      // 1. Atualizar Metadados no Auth
+      if (isCurrent) {
+        await supabase.auth.updateUser({ 
+          data: { name: editName, role: editRole, avatar: editAvatar } 
+        });
+      } else {
+        await supabase.auth.admin.updateUserById(userId, { 
+          user_metadata: { name: editName, role: editRole, avatar: editAvatar } 
+        }).catch(() => console.log('Admin API restrita, atualizando apenas tabela pública...'));
+      }
 
       // 2. Atualizar Tabela Pública de Perfis
       const { error } = await supabase.from('profiles').upsert({
@@ -161,8 +169,8 @@ export const AdminUsers: React.FC = () => {
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-50 text-purple-700 text-sm font-semibold mb-3 border border-purple-100">
             <Shield className="w-4 h-4" /> Administração
           </div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Gestão de Usuários</h1>
-          <p className="mt-2 text-sm text-gray-500">Gerencie perfis de acesso ao IgrejaPro.</p>
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Configurações de Acesso</h1>
+          <p className="mt-2 text-sm text-gray-500">Gerencie perfis de acesso e usuários do IgrejaPro.</p>
         </div>
         <button onClick={() => setShowNewForm(true)}
           className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">

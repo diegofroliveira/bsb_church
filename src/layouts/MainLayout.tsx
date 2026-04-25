@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, Users, Home, DollarSign, Settings, LogOut,
-  Menu, BookOpen, FileText, Network, AlertTriangle, UserCog, MapPin
+  Menu, BookOpen, FileText, Network, AlertTriangle, MapPin
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import clsx from 'clsx';
@@ -25,14 +25,13 @@ export const MainLayout: React.FC = () => {
     { name: 'Dashboard',    path: '/',             icon: LayoutDashboard, roles: ['admin', 'pastor', 'secretaria', 'financeiro'] },
     { name: 'Mapa',         path: '/georeferencing', icon: MapPin,         roles: ['admin', 'pastor'] },
     { name: 'Membros',      path: '/members',      icon: Users,           roles: ['admin', 'pastor', 'secretaria'] },
-    { name: 'Células',      path: '/cells',        icon: Home,            roles: ['admin', 'pastor', 'secretaria'] },
-    { name: 'Relatórios',   path: '/reports',      icon: FileText,        roles: ['admin', 'pastor', 'secretaria'] },
-    { name: 'QA',           path: '/qa',           icon: AlertTriangle,   roles: ['admin', 'pastor', 'secretaria'] },
+    { name: 'GCs/Localidades', path: '/cells',      icon: Home,            roles: ['admin', 'pastor', 'secretaria'] },
     { name: 'Discipulado',  path: '/discipleship', icon: BookOpen,        roles: ['admin', 'pastor', 'secretaria'] },
     { name: 'Rede',         path: '/network',      icon: Network,         roles: ['admin', 'pastor', 'secretaria'] },
+    { name: 'Relatórios',   path: '/reports',      icon: FileText,        roles: ['admin', 'pastor', 'secretaria'] },
+    { name: 'QA',           path: '/qa',           icon: AlertTriangle,   roles: ['admin', 'pastor', 'secretaria'] },
     { name: 'Financeiro',   path: '/finance',      icon: DollarSign,      roles: ['admin', 'pastor', 'financeiro'] },
-    { name: 'Usuários',     path: '/admin/users',  icon: UserCog,         roles: ['admin'] },
-    { name: 'Configurações',path: '/settings',     icon: Settings,        roles: ['admin'] },
+    { name: 'Configurações',path: '/admin/users',  icon: Settings,        roles: ['admin'] },
   ];
 
   const authorizedNavItems = navItems.filter(item => item.roles.includes(user?.role || ''));

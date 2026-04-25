@@ -24,7 +24,7 @@ export const Reports: React.FC = () => {
         const [membrosRes, celulasRes, discRes] = await Promise.all([
            supabase.from('membros').select('*').limit(10000),
            supabase.from('celulas').select('grupo_caseiro, setor'),
-           supabase.from('discipulado').select('mestre, discipulo, status')
+           supabase.from('discipulado').select('discipulo, discipulador, status')
         ]);
         
         const allMembros = membrosRes.data || [];
@@ -39,21 +39,21 @@ export const Reports: React.FC = () => {
            }
         });
 
-        const mestreMap: Record<string, string> = {};
+        const discipuladorMap: Record<string, string> = {};
         allDisc.forEach(d => {
-           if (d.discipulo && d.mestre) {
-               mestreMap[d.discipulo.toLowerCase()] = d.mestre;
+           if (d.discipulo && d.discipulador) {
+               discipuladorMap[d.discipulo.trim().toLowerCase()] = d.discipulador;
            }
         });
 
         // Enrich members with relational data
         const enrichedMembers = allMembros.map(m => {
-           const nomeLower = (m.nome || m.name || '').toLowerCase();
-           const gcLower = (m.grupos_caseiros || '').toLowerCase();
+           const nomeLower = (m.nome || m.name || '').trim().toLowerCase();
+           const gcLower = (m.grupos_caseiros || '').trim().toLowerCase();
            return {
                ...m,
                setor: setorMap[gcLower] || 'Sem Setor',
-               discipulador: mestreMap[nomeLower] || 'Sem Discipulador'
+               discipulador: discipuladorMap[nomeLower] || 'Sem Discipulador'
            };
         });
 

@@ -123,9 +123,14 @@ export const Members: React.FC = () => {
              Gestão completa do cadastro de pessoas da igreja.
            </p>
         </div>
-        <button className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm text-center">
-            + Novo Cadastro
-        </button>
+        <a 
+          href="https://sis.sistemaprover.com.br/pt-BR/cadastro/0/dados" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm text-center flex items-center gap-2"
+        >
+            + Novo Cadastro no Prover
+        </a>
       </header>
 
       {/* Advanced Filters Panel */}

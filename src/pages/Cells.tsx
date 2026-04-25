@@ -14,6 +14,7 @@ interface CellInfo {
   status: string;
   limite_de_pessoas: number;
   memberCount: number;
+  avgDistance: number | null;
 }
 
 export const Cells: React.FC = () => {
@@ -22,28 +23,59 @@ export const Cells: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSetor, setSelectedSetor] = useState<string>('Todos');
 
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    if (!lat1 || !lon1 || !lat2 || !lon2) return null;
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
         const [celulasRes, membrosRes] = await Promise.all([
           supabase.from('celulas').select('*'),
-          supabase.from('membros').select('grupos_caseiros').eq('status', 'Ativo')
+          supabase.from('membros').select('grupos_caseiros, latitude, longitude').eq('status', 'Ativo')
         ]);
 
         const celulas = celulasRes.data || [];
         const membros = membrosRes.data || [];
 
-        // Contar membros ativos por grupo
-        const groupCounts: Record<string, number> = {};
+        // Agrupar membros e coordenadas por grupo
+        const groupMembers: Record<string, { lat: number, lng: number }[]> = {};
         membros.forEach(m => {
           if (!m.grupos_caseiros) return;
           const groupName = m.grupos_caseiros.trim().replace(/\s+/g, ' ').toUpperCase();
-          groupCounts[groupName] = (groupCounts[groupName] || 0) + 1;
+          if (!groupMembers[groupName]) groupMembers[groupName] = [];
+          if (m.latitude && m.longitude) {
+            groupMembers[groupName].push({ lat: m.latitude, lng: m.longitude });
+          }
         });
 
         const mappedCells: CellInfo[] = celulas.map(c => {
           const groupNameNormalized = (c.grupo_caseiro || '').trim().replace(/\s+/g, ' ').toUpperCase();
+          const membersInGroup = groupMembers[groupNameNormalized] || [];
+          
+          let totalDist = 0;
+          let countDist = 0;
+
+          if (c.latitude && c.longitude && membersInGroup.length > 0) {
+            membersInGroup.forEach(m => {
+              const dist = calculateDistance(c.latitude, c.longitude, m.lat, m.lng);
+              // Ignore outliers (>100km) which are likely geocoding errors (e.g., center of Brazil)
+              if (dist !== null && dist < 100) {
+                totalDist += dist;
+                countDist++;
+              }
+            });
+          }
+
           return {
             id: c.id,
             grupo_caseiro: c.grupo_caseiro,
@@ -54,7 +86,8 @@ export const Cells: React.FC = () => {
             cidade: c.cidade || '',
             status: c.status || 'Desconhecido',
             limite_de_pessoas: parseFloat(c.limite_de_pessoas || '0'),
-            memberCount: groupCounts[groupNameNormalized] || 0
+            memberCount: membersInGroup.length || 0,
+            avgDistance: countDist > 0 ? totalDist / countDist : null
           };
         });
 
@@ -96,9 +129,9 @@ export const Cells: React.FC = () => {
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-7xl mx-auto pb-12">
       <header className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Módulo de Células</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900">GCs & Localidades</h1>
           <p className="mt-2 text-sm text-gray-500 max-w-2xl">
-            Acompanhe a saúde, frequência e métricas de todos os Pequenos Grupos e Células da igreja.
+            Acompanhe a saúde, métricas geográficas e engajamento de todos os grupos da igreja.
           </p>
         </div>
         
@@ -109,7 +142,7 @@ export const Cells: React.FC = () => {
                  <Home className="text-blue-600 w-5 h-5" />
                </div>
                <div>
-                 <p className="text-sm text-gray-500 font-medium">Células Listadas</p>
+                 <p className="text-sm text-gray-500 font-medium">Grupos Listados</p>
                  <p className="text-xl font-bold text-gray-900">{filteredCells.length}</p>
                </div>
              </div>
@@ -118,7 +151,7 @@ export const Cells: React.FC = () => {
                  <Users className="text-green-600 w-5 h-5" />
                </div>
                <div>
-                 <p className="text-sm text-gray-500 font-medium">Membros Engajados</p>
+                 <p className="text-sm text-gray-500 font-medium">Membros Ativos</p>
                  <p className="text-xl font-bold text-gray-900">{totalMembersInCells}</p>
                </div>
              </div>
@@ -131,7 +164,7 @@ export const Cells: React.FC = () => {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
           <input
             type="text"
-            placeholder="Buscar célula ou líder..."
+            placeholder="Buscar grupo ou líder..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
@@ -154,7 +187,7 @@ export const Cells: React.FC = () => {
       {isLoading ? (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-12 flex flex-col items-center justify-center min-h-[400px]">
           <Loader2 className="h-10 w-10 animate-spin text-primary-600 mb-4" />
-          <p className="text-gray-500 font-medium">Carregando métricas dos grupos...</p>
+          <p className="text-gray-500 font-medium">Processando métricas geográficas...</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -164,6 +197,11 @@ export const Cells: React.FC = () => {
               : cell.memberCount < 5 
                 ? 'text-red-600 bg-red-50 border-red-200'
                 : 'text-blue-600 bg-blue-50 border-blue-200';
+
+            const distColor = !cell.avgDistance ? 'text-gray-400 bg-gray-50' :
+                             cell.avgDistance < 10 ? 'text-blue-600 bg-blue-50 border-blue-100' :
+                             cell.avgDistance < 20 ? 'text-orange-600 bg-orange-50 border-orange-100' :
+                             'text-red-600 bg-red-50 border-red-100';
 
             return (
               <div key={cell.id} className="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-all p-5 flex flex-col">
@@ -194,6 +232,16 @@ export const Cells: React.FC = () => {
                     <MapPin className="w-4 h-4 text-gray-400 shrink-0" />
                     <span className="line-clamp-1">{cell.bairro} {cell.cidade && `- ${cell.cidade}`}</span>
                   </div>
+
+                  {cell.avgDistance !== null && (
+                    <div className={clsx("mt-2 p-2 rounded-lg border flex items-center justify-between", distColor)}>
+                      <div className="flex items-center gap-2">
+                        <MapPin className="w-3.5 h-3.5" />
+                        <span className="text-[11px] font-bold uppercase tracking-tight">Média de Distância</span>
+                      </div>
+                      <span className="text-sm font-black">{cell.avgDistance.toFixed(1)} km</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="mt-5 pt-4 border-t border-gray-100 flex items-center justify-between">
