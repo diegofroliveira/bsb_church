@@ -29,7 +29,8 @@ export default async function handler(req: Request) {
 
     const { data, error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
       password,
-      user_metadata: { force_password_reset: true }
+      user_metadata: { force_password_reset: true },
+      email_confirm: true
     });
 
     if (error) throw error;
