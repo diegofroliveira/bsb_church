@@ -30,14 +30,9 @@ export const MainLayout: React.FC = () => {
   useEffect(() => {
     const fetchAllowedModules = async () => {
       try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', '00000000-0000-0000-0000-000000000000')
-          .single();
-
-        if (!error && data && data.name) {
-          const parsed = JSON.parse(data.name);
+        const stored = localStorage.getItem('church_dynamic_roles');
+        if (stored) {
+          const parsed = JSON.parse(stored);
           const userRole = user?.role || 'guest';
           if (parsed[userRole]) {
             setAllowedModules(parsed[userRole].modules);

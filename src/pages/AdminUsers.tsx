@@ -89,14 +89,9 @@ export const AdminUsers: React.FC = () => {
 
   const fetchRolesConfig = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', SPECIAL_CONFIG_ID)
-        .single();
-
-      if (!error && data && data.name) {
-        const parsed = JSON.parse(data.name);
+      const stored = localStorage.getItem('church_dynamic_roles');
+      if (stored) {
+        const parsed = JSON.parse(stored);
         setDynamicRoles(parsed);
       }
     } catch (_) {
@@ -112,15 +107,7 @@ export const AdminUsers: React.FC = () => {
   const saveRolesConfig = async (updatedRoles: typeof dynamicRoles) => {
     setIsSavingRoles(true);
     try {
-      const { error } = await supabase.from('profiles').upsert({
-        id: SPECIAL_CONFIG_ID,
-        email: 'roles@system.local',
-        name: JSON.stringify(updatedRoles),
-        role: 'admin',
-        updated_at: new Date().toISOString()
-      });
-
-      if (error) throw error;
+      localStorage.setItem('church_dynamic_roles', JSON.stringify(updatedRoles));
       setDynamicRoles(updatedRoles);
       alert('Perfis e Permissões salvos com sucesso!');
     } catch (err: any) {
