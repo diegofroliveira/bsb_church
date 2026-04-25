@@ -28,19 +28,34 @@ export const MainLayout: React.FC = () => {
 
   useEffect(() => {
     const fetchAllowedModules = async () => {
+      const userRole = user?.role || 'guest';
       try {
         const stored = localStorage.getItem('church_dynamic_roles');
         if (stored) {
           const parsed = JSON.parse(stored);
-          const userRole = user?.role || 'guest';
           if (parsed[userRole]) {
             setAllowedModules(parsed[userRole].modules);
+          }
+        }
+
+        // Busca a configuração global do Supabase para sincronia em tempo real
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('name')
+          .eq('id', '00000000-0000-0000-0000-000000000000')
+          .single();
+
+        if (data && data.name) {
+          const parsed = JSON.parse(data.name);
+          if (parsed[userRole]) {
+            setAllowedModules(parsed[userRole].modules);
+            localStorage.setItem('church_dynamic_roles', data.name);
             return;
           }
         }
       } catch (_) {}
-      
-      const userRole = user?.role || 'guest';
+
+      // Fallback para os perfis padrão do sistema
       setAllowedModules(DEFAULT_ROLES[userRole] || ['Dashboard']);
     };
 

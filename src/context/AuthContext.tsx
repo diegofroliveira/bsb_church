@@ -35,10 +35,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let role = (sbUser.user_metadata?.role as Role) || 'secretaria';
     let name = sbUser.user_metadata?.name || email.split('@')[0] || 'Usuário';
     
-    // Salvaguarda: Garante que o administrador principal sempre tenha acesso total
-    if (email.toLowerCase().includes('diego')) {
-      role = 'admin';
-    }
+    // Salvaguarda removida para permitir testes dinâmicos de perfis customizados
+    // if (email.toLowerCase().includes('diego')) {
+    //   role = 'admin';
+    // }
 
     const userData: User = {
       id: sbUser.id,

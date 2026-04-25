@@ -124,6 +124,19 @@ export const AdminUsers: React.FC = () => {
         const parsed = JSON.parse(stored);
         setDynamicRoles(parsed);
       }
+
+      // Busca dados sincronizados na nuvem
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('name')
+        .eq('id', SPECIAL_CONFIG_ID)
+        .single();
+
+      if (data && data.name) {
+        const parsed = JSON.parse(data.name);
+        setDynamicRoles(parsed);
+        localStorage.setItem('church_dynamic_roles', data.name);
+      }
     } catch (_) {
       console.log('Usando perfis padrão.');
     }
@@ -165,10 +178,21 @@ export const AdminUsers: React.FC = () => {
     setIsSavingRoles(true);
     try {
       localStorage.setItem('church_dynamic_roles', JSON.stringify(updatedRoles));
+      
+      const { error } = await supabase.from('profiles').upsert({
+        id: SPECIAL_CONFIG_ID,
+        name: JSON.stringify(updatedRoles),
+        email: 'config@church.internal',
+        role: 'admin',
+        updated_at: new Date().toISOString()
+      });
+
+      if (error) throw error;
+
       setDynamicRoles(updatedRoles);
-      alert('Perfis e Permissões salvos com sucesso!');
+      alert('Perfis e Permissões salvos com sucesso na nuvem!');
     } catch (err: any) {
-      alert('Erro ao salvar permissões: ' + err.message);
+      alert('Erro ao salvar permissões na nuvem: ' + err.message);
     } finally {
       setIsSavingRoles(false);
     }
