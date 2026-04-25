@@ -60,7 +60,35 @@ export const Login: React.FC = () => {
       <div className="w-full max-w-md p-8 bg-white/80 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/40 z-10 mx-4">
         <div className="flex flex-col items-center mb-8">
           <div className="w-16 h-16 bg-gradient-to-br from-primary-500 to-primary-700 rounded-2xl flex items-center justify-center shadow-lg shadow-primary-500/30 mb-4">
-            <Church className="w-8 h-8 text-white" />
+            <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8 text-white">
+              {/* Estrela Guia */}
+              <path d="M32 4 L33.5 10 L39 11.5 L33.5 13 L32 19 L30.5 13 L25 11.5 L30.5 10 Z" fill="currentColor" stroke="none" />
+              
+              {/* Figura Central (Jesus) */}
+              <circle cx="32" cy="28" r="4" /> {/* Cabeça */}
+              <path d="M32 32 L32 52" /> {/* Corpo */}
+              <path d="M32 36 C24 36 18 42 16 46" /> {/* Braço Esquerdo Aberto */}
+              <path d="M32 36 C40 36 46 42 48 46" /> {/* Braço Direito Aberto */}
+              <path d="M28 32 Q32 30 36 32" strokeWidth="1" /> {/* Detalhe Manto */}
+
+              {/* Círculo de Pessoas (Multidão) */}
+              {/* Topo / Laterais */}
+              <circle cx="20" cy="22" r="2.5" /> <path d="M17 28 Q20 26 23 28" />
+              <circle cx="44" cy="22" r="2.5" /> <path d="M41 28 Q44 26 47 28" />
+              
+              {/* Meio */}
+              <circle cx="14" cy="36" r="2" /> <path d="M12 42 Q14 40 16 42" />
+              <circle cx="50" cy="36" r="2" /> <path d="M48 42 Q50 40 52 42" />
+              
+              {/* Base (Crianças e Adultos) */}
+              <circle cx="18" cy="50" r="2.2" /> <path d="M15 56 Q18 54 21 56" />
+              <circle cx="46" cy="50" r="2.2" /> <path d="M43 56 Q46 54 49 56" />
+              <circle cx="26" cy="58" r="1.8" /> <path d="M24 62 Q26 61 28 62" />
+              <circle cx="38" cy="58" r="1.8" /> <path d="M36 62 Q38 61 40 62" />
+              
+              {/* Pequenos pontos de brilho extras */}
+              <circle cx="32" cy="32" r="15" strokeDasharray="2 6" opacity="0.3" />
+            </svg>
           </div>
           <h2 className="text-3xl font-bold text-gray-900 tracking-tight">Igreja<span className="text-primary-600">Pro</span></h2>
           <p className="text-gray-500 mt-2 text-sm text-center">
