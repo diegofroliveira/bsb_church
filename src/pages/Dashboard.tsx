@@ -54,7 +54,7 @@ export const Dashboard: React.FC = () => {
       }
     };
     fetchDashboardData();
-  }, []);
+  }, [user]);
 
   const dashboardData = useMemo(() => {
     if (isLoading || rawMembros.length === 0) return null;

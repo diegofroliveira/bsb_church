@@ -29,43 +29,22 @@ function App() {
           <Route element={<ProtectedRoute />}>
             <Route element={<MainLayout />}>
               {/* All authenticated users */}
+              {/* All authenticated users */}
               <Route path="/" element={<Dashboard />} />
 
-              {/* Geo — Pastor + Admin */}
-              <Route element={<ProtectedRoute allowedRoles={['admin', 'pastor']} />}>
-                <Route path="/georeferencing" element={<Georeferencing />} />
-              </Route>
-
-              {/* Secretaria + Pastor + Admin */}
-              <Route element={<ProtectedRoute allowedRoles={['admin', 'pastor', 'secretaria']} />}>
-                <Route path="/members" element={<Members />} />
-                <Route path="/cells" element={<Cells />} />
-                <Route path="/reports" element={<Reports />} />
-                <Route path="/qa" element={<QA />} />
-                <Route path="/discipleship" element={<Discipleship />} />
-                <Route path="/network" element={<Network />} />
-              </Route>
-
-              {/* CRM — pastor + admin + secretaria */}
-              <Route element={<ProtectedRoute allowedRoles={['admin', 'pastor', 'secretaria']} />}>
-                <Route path="/crm/:name" element={<MemberProfile />} />
-              </Route>
-
-              {/* Finance — financeiro + pastor + admin */}
-              <Route element={<ProtectedRoute allowedRoles={['admin', 'pastor', 'financeiro']} />}>
-                <Route path="/finance" element={<Finance />} />
-              </Route>
-
-              {/* Admin only */}
-              <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
-                <Route path="/admin/users" element={<AdminUsers />} />
-                <Route path="/settings" element={<Settings />} />
-              </Route>
-
-              {/* Legacy */}
-              <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
-                <Route path="/my-group" element={<MyGroup />} />
-              </Route>
+              {/* Dynamic accessible routes */}
+              <Route path="/georeferencing" element={<Georeferencing />} />
+              <Route path="/members" element={<Members />} />
+              <Route path="/cells" element={<Cells />} />
+              <Route path="/reports" element={<Reports />} />
+              <Route path="/qa" element={<QA />} />
+              <Route path="/discipleship" element={<Discipleship />} />
+              <Route path="/network" element={<Network />} />
+              <Route path="/crm/:name" element={<MemberProfile />} />
+              <Route path="/finance" element={<Finance />} />
+              <Route path="/admin/users" element={<AdminUsers />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/my-group" element={<MyGroup />} />
             </Route>
           </Route>
 

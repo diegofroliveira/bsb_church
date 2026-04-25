@@ -71,7 +71,7 @@ export const Members: React.FC = () => {
       }
     };
     fetchAllData();
-  }, []);
+  }, [user]);
 
   const calculateAge = (dob: string) => {
     if (!dob) return -1;
