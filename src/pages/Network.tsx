@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { Search, Loader2, ChevronDown, ChevronRight, Network as NetworkIcon, Users } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../context/AuthContext';
 import clsx from 'clsx';
 
 interface DiscipleshipData {

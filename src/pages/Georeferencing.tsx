@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../context/AuthContext';
 import { Home, Users, Navigation, Search, Filter, X, ClipboardList } from 'lucide-react';
 import { differenceInYears, parseISO } from 'date-fns';
 
@@ -151,16 +152,18 @@ const Georeferencing: React.FC = () => {
 
       if (gError) console.error('Erro ao buscar grupos:', gError.message);
 
-      let membros = fullMembros;
+      let membros: any[] = [];
 
-      if (mError) {
-        console.error('Erro ao buscar membros com endereços:', mError.message);
+      if (!mError && fullMembros) {
+        membros = fullMembros;
+      } else {
+        if (mError) console.error('Erro ao buscar membros com endereços:', mError.message);
         let fallbackQuery = supabase.from('membros').select('id, nome, latitude, longitude, grupos_caseiros, estado_civil, sexo, nascimento, tipo_de_pessoa').eq('status', 'Ativo');
         if (user?.assigned_gc) {
           fallbackQuery = fallbackQuery.ilike('grupos_caseiros', `%${user.assigned_gc}%`);
         }
         const { data: fallbackMembros } = await fallbackQuery;
-        membros = fallbackMembros;
+        membros = fallbackMembros || [];
       }
 
       // 3. Buscar Discipulado
