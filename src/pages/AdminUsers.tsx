@@ -48,6 +48,8 @@ export const AdminUsers: React.FC = () => {
   const [isSavingRoles, setIsSavingRoles] = useState(false);
   const [newRoleName, setNewRoleName] = useState('');
   const [selectedRoleForEdit, setSelectedRoleForEdit] = useState<string>('admin');
+  const [optionsGC, setOptionsGC] = useState<string[]>([]);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Edit User State
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -77,6 +79,18 @@ export const AdminUsers: React.FC = () => {
     setNewPassword(pass);
   };
 
+  const fetchGCs = async () => {
+    try {
+      const { data } = await supabase.from('celulas').select('grupo_caseiro');
+      if (data) {
+        const gcs = Array.from(new Set(data.map(d => d.grupo_caseiro).filter(Boolean))) as string[];
+        setOptionsGC(gcs.sort());
+      }
+    } catch (error) {
+      console.error('Error fetching GCs:', error);
+    }
+  };
+
   const fetchUsers = async () => {
     setIsLoading(true);
     try {
@@ -85,7 +99,6 @@ export const AdminUsers: React.FC = () => {
         const json = await res.json();
         setUsers(json.users || []);
       } else {
-        // Fallback para a tabela profiles caso a API falhe
         const { data, error } = await supabase.from('profiles').select('*');
         if (!error && data) {
           const realUsers = data.filter(u => u.id !== SPECIAL_CONFIG_ID);
@@ -93,7 +106,6 @@ export const AdminUsers: React.FC = () => {
         }
       }
     } catch (_) {
-      // Fallback
       try {
         const { data, error } = await supabase.from('profiles').select('*');
         if (!error && data) {
@@ -120,7 +132,34 @@ export const AdminUsers: React.FC = () => {
   useEffect(() => { 
     fetchUsers(); 
     fetchRolesConfig();
+    fetchGCs();
   }, []);
+
+  const handleDeleteUser = async (userId: string, userName: string) => {
+    if (!confirm(`Tem certeza absoluta que deseja EXCLUIR permanentemente o perfil do usuário "${userName}"? Esta ação não pode ser desfeita.`)) {
+      return;
+    }
+    setDeletingId(userId);
+    try {
+      const res = await fetch('/api/delete-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId })
+      });
+      
+      if (res.ok) {
+        setUsers(prev => prev.filter(u => u.id !== userId));
+        alert('Usuário excluído com sucesso!');
+      } else {
+        const errJson = await res.json();
+        throw new Error(errJson.error || 'Erro na exclusão');
+      }
+    } catch (err: any) {
+      alert(`Erro ao excluir usuário: ${err.message}`);
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const saveRolesConfig = async (updatedRoles: typeof dynamicRoles) => {
     setIsSavingRoles(true);
@@ -379,7 +418,16 @@ export const AdminUsers: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Vincular Grupo Caseiro (GC)</label>
-                  <input value={newAssignedGC} onChange={e => setNewAssignedGC(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none" placeholder="Ex: Vicente Pires" />
+                  <select 
+                    value={newAssignedGC} 
+                    onChange={e => setNewAssignedGC(e.target.value)} 
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white font-medium"
+                  >
+                    <option value="">Acesso Geral (Sem restrição)</option>
+                    {optionsGC.map(gc => (
+                      <option key={gc} value={gc}>{gc}</option>
+                    ))}
+                  </select>
                   <p className="text-[10px] text-gray-400 mt-1">Isola o acesso deste usuário para ver apenas os dados deste GC.</p>
                 </div>
               </div>
@@ -429,12 +477,16 @@ export const AdminUsers: React.FC = () => {
                                 placeholder="Ex: Diego" 
                               />
                               <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mt-1">Grupo Caseiro (GC)</div>
-                              <input 
+                              <select 
                                 value={editAssignedGC} 
                                 onChange={e => setEditAssignedGC(e.target.value)} 
-                                className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white shadow-sm" 
-                                placeholder="Ex: Vicente Pires" 
-                              />
+                                className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white shadow-sm font-medium"
+                              >
+                                <option value="">Acesso Geral (Sem restrição)</option>
+                                {optionsGC.map(gc => (
+                                  <option key={gc} value={gc}>{gc}</option>
+                                ))}
+                              </select>
                             </div>
                           ) : (
                             <div className="flex flex-col">
@@ -481,10 +533,16 @@ export const AdminUsers: React.FC = () => {
                                     Editar perfil
                                   </button>
                                   {!isCurrent && (
-                                    <button onClick={() => handleAdminResetPassword(u.id)} disabled={resettingId === u.id}
-                                      className="text-xs text-amber-600 hover:text-amber-800 font-bold border border-amber-100 px-3 py-1.5 rounded-lg bg-amber-50/30 hover:bg-amber-50 transition-all w-full flex items-center justify-center gap-1 disabled:opacity-50">
-                                      {resettingId === u.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Lock className="w-3 h-3" />} Resetar senha
-                                    </button>
+                                    <>
+                                      <button onClick={() => handleAdminResetPassword(u.id)} disabled={resettingId === u.id}
+                                        className="text-xs text-amber-600 hover:text-amber-800 font-bold border border-amber-100 px-3 py-1.5 rounded-lg bg-amber-50/30 hover:bg-amber-50 transition-all w-full flex items-center justify-center gap-1 disabled:opacity-50">
+                                        {resettingId === u.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Lock className="w-3 h-3" />} Resetar senha
+                                      </button>
+                                      <button onClick={() => handleDeleteUser(u.id, u.name || u.email)} disabled={deletingId === u.id}
+                                        className="text-xs text-red-600 hover:text-red-800 font-bold border border-red-100 px-3 py-1.5 rounded-lg bg-red-50/30 hover:bg-red-50 transition-all w-full flex items-center justify-center gap-1 disabled:opacity-50">
+                                        {deletingId === u.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />} Excluir perfil
+                                      </button>
+                                    </>
                                   )}
                                 </div>
                           )}
