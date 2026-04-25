@@ -5,6 +5,7 @@ import {
   Menu, BookOpen, FileText, Network, AlertTriangle, MapPin
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabase';
 import clsx from 'clsx';
 
 const DEFAULT_ROLES: Record<string, string[]> = {
@@ -39,7 +40,7 @@ export const MainLayout: React.FC = () => {
         }
 
         // Busca a configuração global do Supabase para sincronia em tempo real
-        const { data, error } = await supabase
+        const { data } = await supabase
           .from('profiles')
           .select('name')
           .eq('id', '00000000-0000-0000-0000-000000000000')

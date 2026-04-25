@@ -126,7 +126,7 @@ export const AdminUsers: React.FC = () => {
       }
 
       // Busca dados sincronizados na nuvem
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('profiles')
         .select('name')
         .eq('id', SPECIAL_CONFIG_ID)
