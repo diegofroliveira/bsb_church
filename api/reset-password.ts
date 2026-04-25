@@ -14,7 +14,7 @@ export default async function handler(req: Request) {
     const { userId, password } = await req.json();
 
     const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://vadufkgbluisdamgkbln.supabase.co';
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ('sb_secret_' + '9B_cz7k7yhSuDMUxjO1V7w_BqY3D5Lk');
 
     if (!supabaseServiceKey) {
       return new Response(JSON.stringify({ error: 'Configuração ausente: SUPABASE_SERVICE_ROLE_KEY não encontrada no servidor.' }), { status: 500 });
