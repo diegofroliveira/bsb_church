@@ -154,7 +154,12 @@ export const AdminUsers: React.FC = () => {
         throw new Error(err.error || 'Erro na requisição');
       }
 
-      alert(`Senha resetada com sucesso!\n\nForneça a nova senha para o usuário:\n🔑 ${pass}\n\nO usuário será obrigado a alterá-la no primeiro acesso.`);
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(pass);
+        alert(`Senha resetada com sucesso!\n\n🔑 ${pass}\n\nA senha já foi COPIADA automaticamente para a sua área de transferência! Cole onde precisar.\n\nO usuário será obrigado a alterá-la no primeiro acesso.`);
+      } else {
+        alert(`Senha resetada com sucesso!\n\nForneça a nova senha para o usuário:\n🔑 ${pass}\n\nO usuário será obrigado a alterá-la no primeiro acesso.`);
+      }
     } catch (error: any) {
       alert('Erro ao resetar senha: ' + error.message);
     } finally {
