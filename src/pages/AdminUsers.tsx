@@ -64,6 +64,15 @@ export const AdminUsers: React.FC = () => {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
 
+  const generateRandomPassword = () => {
+    const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#";
+    let pass = "";
+    for (let i = 0; i < 10; i++) {
+      pass += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setNewPassword(pass);
+  };
+
   const fetchUsers = async () => {
     setIsLoading(true);
     try {
@@ -265,7 +274,7 @@ export const AdminUsers: React.FC = () => {
           <p className="mt-2 text-sm text-gray-500">Gerencie perfis de acesso e usuários do IgrejaPro.</p>
         </div>
         {activeTab === 'users' && (
-          <button onClick={() => setShowNewForm(true)}
+          <button onClick={() => { setShowNewForm(true); generateRandomPassword(); }}
             className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
             <Plus className="w-4 h-4" /> Novo Usuário
           </button>
@@ -307,8 +316,11 @@ export const AdminUsers: React.FC = () => {
                   <input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none" placeholder="email@igreja.com" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Senha inicial</label>
-                  <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none" placeholder="Mínimo 6 caracteres" />
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-sm font-medium text-gray-700">Senha temporária</label>
+                    <button type="button" onClick={generateRandomPassword} className="text-xs font-bold text-primary-600 hover:text-primary-500">Gerar nova</button>
+                  </div>
+                  <input type="text" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none font-mono font-semibold bg-gray-50/50" placeholder="Mínimo 6 caracteres" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Perfil de acesso</label>
