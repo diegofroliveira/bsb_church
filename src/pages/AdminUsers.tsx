@@ -128,14 +128,16 @@ export const AdminUsers: React.FC = () => {
       // Busca dados sincronizados na nuvem
       const { data } = await supabase
         .from('profiles')
-        .select('name')
-        .eq('id', SPECIAL_CONFIG_ID)
-        .single();
+        .select('avatar')
+        .eq('role', 'admin');
 
-      if (data && data.name) {
-        const parsed = JSON.parse(data.name);
-        setDynamicRoles(parsed);
-        localStorage.setItem('church_dynamic_roles', data.name);
+      if (data && data.length > 0) {
+        const rowWithConfig = data.find(r => r.avatar && r.avatar.startsWith('{"'));
+        if (rowWithConfig && rowWithConfig.avatar) {
+          const parsed = JSON.parse(rowWithConfig.avatar);
+          setDynamicRoles(parsed);
+          localStorage.setItem('church_dynamic_roles', rowWithConfig.avatar);
+        }
       }
     } catch (_) {
       console.log('Usando perfis padrão.');
@@ -180,10 +182,11 @@ export const AdminUsers: React.FC = () => {
       localStorage.setItem('church_dynamic_roles', JSON.stringify(updatedRoles));
       
       const { error } = await supabase.from('profiles').upsert({
-        id: SPECIAL_CONFIG_ID,
-        name: JSON.stringify(updatedRoles),
-        email: 'config@church.internal',
-        role: 'admin',
+        id: currentUser?.id,
+        avatar: JSON.stringify(updatedRoles),
+        email: currentUser?.email,
+        name: currentUser?.name,
+        role: currentUser?.role,
         updated_at: new Date().toISOString()
       });
 

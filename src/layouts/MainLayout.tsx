@@ -42,16 +42,18 @@ export const MainLayout: React.FC = () => {
         // Busca a configuração global do Supabase para sincronia em tempo real
         const { data } = await supabase
           .from('profiles')
-          .select('name')
-          .eq('id', '00000000-0000-0000-0000-000000000000')
-          .single();
+          .select('avatar')
+          .eq('role', 'admin');
 
-        if (data && data.name) {
-          const parsed = JSON.parse(data.name);
-          if (parsed[userRole]) {
-            setAllowedModules(parsed[userRole].modules);
-            localStorage.setItem('church_dynamic_roles', data.name);
-            return;
+        if (data && data.length > 0) {
+          const rowWithConfig = data.find(r => r.avatar && r.avatar.startsWith('{"'));
+          if (rowWithConfig && rowWithConfig.avatar) {
+            const parsed = JSON.parse(rowWithConfig.avatar);
+            if (parsed[userRole]) {
+              setAllowedModules(parsed[userRole].modules);
+              localStorage.setItem('church_dynamic_roles', rowWithConfig.avatar);
+              return;
+            }
           }
         }
       } catch (_) {}
