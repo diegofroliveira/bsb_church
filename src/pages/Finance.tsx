@@ -147,8 +147,9 @@ export const Finance: React.FC = () => {
       totalEntradas: sumEntradasMonth,
       totalSaidas: sumSaidasMonth,
       saldoMensal: sumEntradasMonth - sumSaidasMonth,
-      fullHistoryBalance: totalReservas + netFlow,
+      fullHistoryBalance: totalReservas, // Adjusted to be the real current wealth
       reservas: totalReservas,
+      fluxoAcumulado: netFlow,
       taxaEficiencia: sumEntradasMonth > 0 ? ((sumEntradasMonth - sumSaidasMonth) / sumEntradasMonth) * 100 : 0
     };
   }, [transactions, selectedMonth, totalReservas]);
@@ -292,8 +293,8 @@ export const Finance: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] text-gray-400 uppercase font-bold">Fluxo Acumulado:</span>
-                    <span className={clsx("text-sm font-bold", (stats.fullHistoryBalance - stats.reservas) >= 0 ? "text-green-400" : "text-red-400")}>
-                      {formatCurrency(stats.fullHistoryBalance - stats.reservas)}
+                    <span className={clsx("text-sm font-bold", stats.fluxoAcumulado >= 0 ? "text-green-400" : "text-red-400")}>
+                      {formatCurrency(stats.fluxoAcumulado)}
                     </span>
                   </div>
                </div>
