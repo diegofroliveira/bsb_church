@@ -80,6 +80,7 @@ const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
 };
 
 const Georeferencing: React.FC = () => {
+  const { user } = useAuth();
   const [allLocations, setAllLocations] = useState<LocationData[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedLocation, setSelectedLocation] = useState<LocationData | null>(null);
@@ -106,7 +107,7 @@ const Georeferencing: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [user?.assigned_gc]);
 
   const handleMarkerDragEnd = async (id: string, latLng: L.LatLng) => {
     try {
@@ -132,31 +133,33 @@ const Georeferencing: React.FC = () => {
     try {
       setLoading(true);
       
-      // 1. Buscar Grupos (Células) - Independente e Seguro
-      const { data: grupos, error: gError } = await supabase
-        .from('celulas')
-        .select('id, grupo_caseiro, latitude, longitude, lider, setor');
+      let celQuery = supabase.from('celulas').select('id, grupo_caseiro, latitude, longitude, lider, setor');
+      let membQuery = supabase.from('membros').select(`
+        id, nome, latitude, longitude, grupos_caseiros, estado_civil, sexo, nascimento, tipo_de_pessoa,
+        logradouro, bairro, cidade, estado
+      `).eq('status', 'Ativo');
+
+      if (user?.assigned_gc) {
+        celQuery = celQuery.ilike('grupo_caseiro', `%${user.assigned_gc}%`);
+        membQuery = membQuery.ilike('grupos_caseiros', `%${user.assigned_gc}%`);
+      }
+
+      const [{ data: grupos, error: gError }, { data: fullMembros, error: mError }] = await Promise.all([
+        celQuery,
+        membQuery
+      ]);
 
       if (gError) console.error('Erro ao buscar grupos:', gError.message);
 
-      // 2. Buscar Membros - Usando colunas confirmadas via inspeção direta
-      let membros: any[] | null = null;
-      const { data: fullMembros, error: mError } = await supabase
-        .from('membros')
-        .select(`
-          id, nome, latitude, longitude, grupos_caseiros, estado_civil, sexo, nascimento, tipo_de_pessoa,
-          logradouro, bairro, cidade, estado
-        `)
-        .eq('status', 'Ativo');
-  
-      membros = fullMembros;
+      let membros = fullMembros;
 
       if (mError) {
         console.error('Erro ao buscar membros com endereços:', mError.message);
-        const { data: fallbackMembros } = await supabase
-          .from('membros')
-          .select('id, nome, latitude, longitude, grupos_caseiros, estado_civil, sexo, nascimento, tipo_de_pessoa')
-          .eq('status', 'Ativo');
+        let fallbackQuery = supabase.from('membros').select('id, nome, latitude, longitude, grupos_caseiros, estado_civil, sexo, nascimento, tipo_de_pessoa').eq('status', 'Ativo');
+        if (user?.assigned_gc) {
+          fallbackQuery = fallbackQuery.ilike('grupos_caseiros', `%${user.assigned_gc}%`);
+        }
+        const { data: fallbackMembros } = await fallbackQuery;
         membros = fallbackMembros;
       }
 

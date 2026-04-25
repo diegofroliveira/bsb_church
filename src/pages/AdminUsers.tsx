@@ -34,6 +34,7 @@ interface AppUser {
   role: string;
   avatar?: string;
   created_at: string;
+  assigned_gc?: string;
 }
 
 export const AdminUsers: React.FC = () => {
@@ -52,6 +53,7 @@ export const AdminUsers: React.FC = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editRole, setEditRole] = useState<string>('secretaria');
   const [editName, setEditName] = useState('');
+  const [editAssignedGC, setEditAssignedGC] = useState('');
   const [savingId, setSavingId] = useState<string | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
   const [resettingId, setResettingId] = useState<string | null>(null);
@@ -62,6 +64,7 @@ export const AdminUsers: React.FC = () => {
   const [newPassword, setNewPassword] = useState('');
   const [newName, setNewName] = useState('');
   const [newRole, setNewRole] = useState<string>('secretaria');
+  const [newAssignedGC, setNewAssignedGC] = useState('');
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
 
@@ -77,13 +80,28 @@ export const AdminUsers: React.FC = () => {
   const fetchUsers = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.from('profiles').select('*');
-      if (!error && data) { 
-        // Filtra a linha de configuração especial para não poluir a lista de usuários
-        const realUsers = data.filter(u => u.id !== SPECIAL_CONFIG_ID);
-        setUsers(realUsers.map(u => ({ ...u, avatar: u.avatar || u.foto }))); 
+      const res = await fetch('/api/list-users');
+      if (res.ok) {
+        const json = await res.json();
+        setUsers(json.users || []);
+      } else {
+        // Fallback para a tabela profiles caso a API falhe
+        const { data, error } = await supabase.from('profiles').select('*');
+        if (!error && data) {
+          const realUsers = data.filter(u => u.id !== SPECIAL_CONFIG_ID);
+          setUsers(realUsers.map(u => ({ ...u, avatar: u.avatar || u.foto })));
+        }
       }
-    } catch (_) {}
+    } catch (_) {
+      // Fallback
+      try {
+        const { data, error } = await supabase.from('profiles').select('*');
+        if (!error && data) {
+          const realUsers = data.filter(u => u.id !== SPECIAL_CONFIG_ID);
+          setUsers(realUsers.map(u => ({ ...u, avatar: u.avatar || u.foto })));
+        }
+      } catch (__) {}
+    }
     setIsLoading(false);
   };
 
@@ -161,12 +179,18 @@ export const AdminUsers: React.FC = () => {
 
       if (isCurrent) {
         await supabase.auth.updateUser({ 
-          data: { name: editName, role: editRole } 
+          data: { name: editName, role: editRole, assigned_gc: editAssignedGC } 
         });
       } else {
-        await supabase.auth.admin.updateUserById(userId, { 
-          user_metadata: { name: editName, role: editRole } 
-        }).catch(() => console.log('Admin API restrita, atualizando apenas tabela pública...'));
+        const res = await fetch('/api/update-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, name: editName, role: editRole, assigned_gc: editAssignedGC })
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || 'Erro ao salvar perfil');
+        }
       }
 
       const { error } = await supabase.from('profiles').upsert({
@@ -179,7 +203,7 @@ export const AdminUsers: React.FC = () => {
 
       if (error) throw error;
 
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, name: editName, role: editRole } : u));
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, name: editName, role: editRole, assigned_gc: editAssignedGC } : u));
       setSavedId(userId); setTimeout(() => setSavedId(null), 2000);
       
       if (userId === currentUser?.id) {
@@ -199,7 +223,7 @@ export const AdminUsers: React.FC = () => {
       const response = await fetch('/api/create-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: newEmail, password: newPassword, name: newName, role: newRole })
+        body: JSON.stringify({ email: newEmail, password: newPassword, name: newName, role: newRole, assigned_gc: newAssignedGC })
       });
 
       const result = await response.json();
@@ -210,7 +234,7 @@ export const AdminUsers: React.FC = () => {
              email: newEmail,
              password: newPassword,
              options: {
-               data: { name: newName, role: newRole },
+               data: { name: newName, role: newRole, assigned_gc: newAssignedGC },
                emailRedirectTo: window.location.origin
              }
            });
@@ -236,7 +260,7 @@ export const AdminUsers: React.FC = () => {
       }
 
       fetchUsers();
-      setShowNewForm(false); setNewEmail(''); setNewPassword(''); setNewName(''); setNewRole('secretaria');
+      setShowNewForm(false); setNewEmail(''); setNewPassword(''); setNewName(''); setNewRole('secretaria'); setNewAssignedGC('');
       alert('Usuário ' + newName + ' criado!');
     } catch (err: any) {
       setCreateError(err.message || 'Falha ao criar usuário.');
@@ -353,6 +377,11 @@ export const AdminUsers: React.FC = () => {
                     {Object.entries(dynamicRoles).map(([key, r]) => <option key={key} value={key}>{r.label}</option>)}
                   </select>
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Vincular Grupo Caseiro (GC)</label>
+                  <input value={newAssignedGC} onChange={e => setNewAssignedGC(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none" placeholder="Ex: Vicente Pires" />
+                  <p className="text-[10px] text-gray-400 mt-1">Isola o acesso deste usuário para ver apenas os dados deste GC.</p>
+                </div>
               </div>
               {createError && <p className="mt-3 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">{createError}</p>}
               <div className="flex gap-3 mt-4">
@@ -399,11 +428,19 @@ export const AdminUsers: React.FC = () => {
                                 className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white shadow-sm" 
                                 placeholder="Ex: Diego" 
                               />
+                              <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mt-1">Grupo Caseiro (GC)</div>
+                              <input 
+                                value={editAssignedGC} 
+                                onChange={e => setEditAssignedGC(e.target.value)} 
+                                className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white shadow-sm" 
+                                placeholder="Ex: Vicente Pires" 
+                              />
                             </div>
                           ) : (
                             <div className="flex flex-col">
                               <div className="font-medium text-gray-900 text-sm">{u.name || u.email.split('@')[0]}</div>
                               <div className="text-xs text-gray-400">{u.email}</div>
+                              {u.assigned_gc && <div className="text-[10px] text-purple-600 font-bold bg-purple-50 border border-purple-100 rounded px-1.5 py-0.5 mt-1 w-max">GC: {u.assigned_gc}</div>}
                             </div>
                           )}
                         </td>
@@ -438,6 +475,7 @@ export const AdminUsers: React.FC = () => {
                                     setEditingId(u.id); 
                                     setEditRole(u.role); 
                                     setEditName(u.name || ''); 
+                                    setEditAssignedGC(u.assigned_gc || '');
                                   }}
                                     className="text-xs text-primary-600 hover:text-primary-800 font-bold border border-primary-100 px-3 py-1.5 rounded-lg bg-primary-50/30 hover:bg-primary-50 transition-all w-full text-center">
                                     Editar perfil

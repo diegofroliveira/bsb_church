@@ -154,6 +154,7 @@ const TreeNode: React.FC<{ node: TreeNodeData; level?: number; searchTerm: strin
 };
 
 export const Network: React.FC = () => {
+  const { user } = useAuth();
   const [data, setData] = useState<DiscipleshipData[]>([]);
   const [pastores, setPastores] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
@@ -163,12 +164,33 @@ export const Network: React.FC = () => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
+        let allowedNames: string[] = [];
+        if (user?.assigned_gc) {
+          const { data: relatedMembros } = await supabase
+            .from('membros')
+            .select('nome')
+            .ilike('grupos_caseiros', `%${user.assigned_gc}%`);
+          
+          if (relatedMembros) {
+            allowedNames = relatedMembros.map(m => m.nome.trim().toUpperCase());
+          }
+        }
+
         const [discRes, membRes] = await Promise.all([
           supabase.from('discipulado').select('*'),
           supabase.from('membros').select('nome, tipo_cadastro').ilike('tipo_cadastro', '%pastor%')
         ]);
         if (discRes.error) throw discRes.error;
-        setData(discRes.data || []);
+
+        if (user?.assigned_gc) {
+          const filteredDisc = (discRes.data || []).filter(d => 
+            allowedNames.includes(d.discipulador?.trim().toUpperCase()) || 
+            allowedNames.includes(d.discipulo?.trim().toUpperCase())
+          );
+          setData(filteredDisc);
+        } else {
+          setData(discRes.data || []);
+        }
 
         // Build set of pastor names (normalized)
         const pastorSet = new Set<string>(
@@ -182,7 +204,7 @@ export const Network: React.FC = () => {
       }
     };
     fetchData();
-  }, []);
+  }, [user?.assigned_gc]);
 
   const tree = useMemo(() => buildTree(data, pastores), [data, pastores]);
 

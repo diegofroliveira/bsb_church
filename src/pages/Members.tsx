@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Search, Filter, Mail, Phone, MoreVertical, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../context/AuthContext';
 import clsx from 'clsx';
 
 export const Members: React.FC = () => {
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [members, setMembers] = useState<any[]>([]);
   const [page, setPage] = useState(1);
@@ -23,9 +25,17 @@ export const Members: React.FC = () => {
     const fetchAllData = async () => {
       setIsLoading(true);
       try {
+        let membrosQuery = supabase.from('membros').select('*').limit(10000);
+        let celulasQuery = supabase.from('celulas').select('grupo_caseiro, setor');
+
+        if (user?.assigned_gc) {
+          membrosQuery = membrosQuery.ilike('grupos_caseiros', `%${user.assigned_gc}%`);
+          celulasQuery = celulasQuery.ilike('grupo_caseiro', `%${user.assigned_gc}%`);
+        }
+
         const [membrosRes, celulasRes, discRes] = await Promise.all([
-           supabase.from('membros').select('*').limit(10000),
-           supabase.from('celulas').select('grupo_caseiro, setor'),
+           membrosQuery,
+           celulasQuery,
            supabase.from('discipulado').select('mestre, discipulo, status')
         ]);
         

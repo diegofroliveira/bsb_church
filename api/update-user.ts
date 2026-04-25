@@ -11,7 +11,7 @@ export default async function handler(req: Request) {
   }
 
   try {
-    const { email, password, name, role, assigned_gc } = await req.json();
+    const { userId, name, role, assigned_gc } = await req.json();
 
     const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://vadufkgbluisdamgkbln.supabase.co';
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -27,11 +27,8 @@ export default async function handler(req: Request) {
       }
     });
 
-    const { data, error } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password,
-      user_metadata: { name, role, assigned_gc, force_password_reset: true },
-      email_confirm: true
+    const { data, error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+      user_metadata: { name, role, assigned_gc }
     });
 
     if (error) throw error;

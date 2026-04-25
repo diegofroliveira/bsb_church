@@ -30,9 +30,17 @@ export const Dashboard: React.FC = () => {
     const fetchDashboardData = async () => {
       setIsLoading(true);
       try {
+        let membrosQuery = supabase.from('membros').select('nome, status, tipo_cadastro, nascimento, grupos_caseiros, sexo, cidade, estado, tipo_de_pessoa, data_de_cadastro, data_atualizacao, estado_civil');
+        let celulasQuery = supabase.from('celulas').select('grupo_caseiro, lider, auxiliar, setor');
+
+        if (user?.assigned_gc) {
+          membrosQuery = membrosQuery.ilike('grupos_caseiros', `%${user.assigned_gc}%`);
+          celulasQuery = celulasQuery.ilike('grupo_caseiro', `%${user.assigned_gc}%`);
+        }
+
         const [membrosRes, celulasRes, discRes] = await Promise.all([
-          supabase.from('membros').select('nome, status, tipo_cadastro, nascimento, grupos_caseiros, sexo, cidade, estado, tipo_de_pessoa, data_de_cadastro, data_atualizacao, estado_civil'),
-          supabase.from('celulas').select('grupo_caseiro, lider, auxiliar, setor'),
+          membrosQuery,
+          celulasQuery,
           supabase.from('discipulado').select('discipulador, discipulo, status')
         ]);
 
