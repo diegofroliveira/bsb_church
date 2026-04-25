@@ -5,7 +5,6 @@ import {
   Menu, BookOpen, FileText, Network, AlertTriangle, MapPin
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../lib/supabase';
 import clsx from 'clsx';
 
 const DEFAULT_ROLES: Record<string, string[]> = {
