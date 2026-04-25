@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
-import { Church, Lock, Mail, ArrowRight, ArrowLeft, CheckCircle } from 'lucide-react';
+import { Lock, Mail, ArrowRight, ArrowLeft, CheckCircle } from 'lucide-react';
 
 export const Login: React.FC = () => {
   const [email, setEmail] = useState('');
