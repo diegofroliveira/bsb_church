@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Brain, Send, Bot, User, Sparkles } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 interface Message {
   id: string;
@@ -43,10 +44,9 @@ export const AiConsultant: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const processQuery = (query: string): string => {
+  const processQueryLocal = (query: string): string => {
     const q = query.toLowerCase();
     
-    // 1. INTENT: Membros / Cadastros
     if (
       q.includes('membros') || 
       q.includes('quantos membros') || 
@@ -65,24 +65,18 @@ export const AiConsultant: React.FC = () => {
       return `Atualmente, a igreja conta com um total de ${members.length} pessoas/cadastros no sistema, sendo ${active} considerados membros ativos.`;
     }
     
-    // 2. INTENT: GCs / Células
-    if (
-      q.includes('gc') || 
-      q.includes('celula') || 
-      q.includes('célula') ||
-      q.includes('grupos caseiros')
-    ) {
+    if (q.includes('gc') || q.includes('celula') || q.includes('célula') || q.includes('grupos caseiros')) {
       return `Temos ${cells.length} Grupos de Crescimento (GCs/Células) ativos e mapeados nas localidades.`;
     }
 
-    // 3. INTENT: Cidades / Bairros
-    const places = ['arniqueira', 'águas claras', 'aguas claras', 'taguatinga', 'ceilândia', 'ceilandia', 'guará', 'guara'];
+    const places = ['arniqueira', 'águas claras', 'aguas claras', 'taguatinga', 'ceilândia', 'ceilandia', 'guará', 'guara', 'vicente pires'];
     const matchedPlace = places.find(p => q.includes(p));
     if (matchedPlace) {
       const filtered = members.filter(m => {
         const addr = (m.endereco || m.address || '').toLowerCase();
         const city = (m.cidade || m.city || '').toLowerCase();
-        return addr.includes(matchedPlace) || city.includes(matchedPlace);
+        const neigh = (m.bairro || '').toLowerCase();
+        return addr.includes(matchedPlace) || city.includes(matchedPlace) || neigh.includes(matchedPlace);
       });
       if (filtered.length === 0) {
         return `Não localizei nenhum membro explicitamente vinculado à região de ${matchedPlace} nos dados de endereços.`;
@@ -91,12 +85,10 @@ export const AiConsultant: React.FC = () => {
       return `Encontrei ${filtered.length} pessoas morando ou mapeadas para ${matchedPlace}. Exemplos: ${names}${filtered.length > 10 ? '...' : ''}`;
     }
 
-    // 4. INTENT: Aniversariantes
     if (q.includes('aniversário') || q.includes('aniversariantes')) {
       return `Os aniversariantes da semana podem ser filtrados no módulo principal de Relatórios ou através das métricas do Dashboard!`;
     }
 
-    // 5. INTENT: Líderes
     if (q.includes('líder') || q.includes('lider')) {
       const leaders = Array.from(new Set(cells.map(c => c.lider || c.leader).filter(Boolean)));
       if (leaders.length > 0) {
@@ -104,10 +96,10 @@ export const AiConsultant: React.FC = () => {
       }
     }
 
-    return `Entendido. Verifiquei na base que possuímos ${members.length} pessoas cadastradas e ${cells.length} GCs. Tente ser mais específico, pergunte por exemplo sobre 'sem telefone' ou filtre por 'Arniqueira'.`;
+    return `Entendido. Verifiquei na base que possuímos ${members.length} pessoas cadastradas e ${cells.length} GCs. Para ativar respostas ricas e contextualizadas via IA, configure uma Chave API Gemini no módulo 'Insights IA'.`;
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!input.trim()) return;
 
     const userMsg: Message = {
@@ -121,17 +113,55 @@ export const AiConsultant: React.FC = () => {
     setInput('');
     setIsTyping(true);
 
-    setTimeout(() => {
-      const botResponse = processQuery(userMsg.text);
-      const botMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        sender: 'bot',
-        text: botResponse,
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, botMsg]);
-      setIsTyping(false);
-    }, 1500);
+    const apiKey = localStorage.getItem('church_gemini_api_key');
+
+    if (apiKey && apiKey.trim() !== '') {
+      try {
+        const genAI = new GoogleGenerativeAI(apiKey.trim());
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+        const prompt = `
+          Você é o "Consultor IA" do IgrejaPro, um Pastor Auxiliar focado no cuidado do Corpo de Cristo.
+          Considere o banco de dados atual da igreja:
+          - Total de pessoas cadastradas: ${members.length}
+          - Total de GCs/Células: ${cells.length}
+          
+          Responda com empatia, conhecimento bíblico prático e dados exatos à seguinte pergunta do usuário: "${userMsg.text}".
+          Evite jargões excessivamente técnicos.
+        `;
+
+        const result = await model.generateContent(prompt);
+        const botResponse = result.response.text();
+
+        const botMsg: Message = {
+          id: (Date.now() + 1).toString(),
+          sender: 'bot',
+          text: botResponse,
+          timestamp: new Date()
+        };
+        setMessages(prev => [...prev, botMsg]);
+      } catch (error) {
+        console.error('Error invoking Gemini:', error);
+        // Fallback to local heuristic
+        const fallback = processQueryLocal(userMsg.text);
+        setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), sender: 'bot', text: `(Modo Local) ${fallback}`, timestamp: new Date() }]);
+      } finally {
+        setIsTyping(false);
+      }
+    } else {
+      // Sem chave - Modo Local Heurístico
+      setTimeout(() => {
+        const botResponse = processQueryLocal(userMsg.text);
+        const botMsg: Message = {
+          id: (Date.now() + 1).toString(),
+          sender: 'bot',
+          text: botResponse,
+          timestamp: new Date()
+        };
+        setMessages(prev => [...prev, botMsg]);
+        setIsTyping(false);
+      }, 1000);
+    }
   };
 
   return (
@@ -145,7 +175,7 @@ export const AiConsultant: React.FC = () => {
           <div>
             <h1 className="text-lg font-bold text-gray-900">Consultor IA</h1>
             <p className="text-xs text-gray-500 flex items-center gap-1">
-              <Sparkles className="h-3 w-3 text-amber-500" /> Alimentado pela base de dados local
+              <Sparkles className="h-3 w-3 text-amber-500" /> Alimentado por inteligência avançada
             </p>
           </div>
         </div>
@@ -191,7 +221,7 @@ export const AiConsultant: React.FC = () => {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-          placeholder="Pergunte algo (Ex: Quantos membros temos? Quem mora em Arniqueira?)"
+          placeholder="Pergunte algo (Ex: Quem mora em Vicente Pires?)"
           className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-primary-500 focus:bg-white transition-all"
         />
         <button

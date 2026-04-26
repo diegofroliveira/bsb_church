@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, RefreshCw, AlertCircle } from 'lucide-react';
+import { Sparkles, RefreshCw, AlertCircle, Eye, EyeOff, ShieldAlert, BookOpen, Heart, TrendingUp } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 interface Insight {
   id: string;
@@ -14,80 +15,86 @@ interface Insight {
 export const AiInsights: React.FC = () => {
   const [insights, setInsights] = useState<Insight[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem('church_gemini_api_key') || '');
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [members, setMembers] = useState<any[]>([]);
+  const [cells, setCells] = useState<any[]>([]);
+  const [customAiLoading, setCustomAiLoading] = useState(false);
 
-  const generateInsights = (members: any[], cells: any[]) => {
+  const generateHeuristicInsights = (membros: any[], celulas: any[]) => {
     const dynamicInsights: Insight[] = [];
 
-    // 1. Agrupamento por Bairro (Ex: Arniqueira)
-    const neighborhoodCounts: Record<string, any[]> = {};
-    members.forEach(m => {
-      if (m.address) {
-        const addr = m.address.toLowerCase();
-        let neighborhood = '';
-        if (addr.includes('arniqueira')) neighborhood = 'Arniqueira';
-        else if (addr.includes('águas claras') || addr.includes('aguas claras')) neighborhood = 'Águas Claras';
-        else if (addr.includes('taguatinga')) neighborhood = 'Taguatinga';
-        else if (addr.includes('ceilândia') || addr.includes('ceilandia')) neighborhood = 'Ceilândia';
-        
-        if (neighborhood) {
-          if (!neighborhoodCounts[neighborhood]) neighborhoodCounts[neighborhood] = [];
-          neighborhoodCounts[neighborhood].push(m);
-        }
-      }
-    });
+    // 1. Oportunidades Reais de Multiplicação
+    celulas.forEach(cell => {
+      // Cruzando membros vinculados ao GC
+      const membersInCell = membros.filter(m => 
+        m.grupos_caseiros && 
+        cell.grupo_caseiro && 
+        m.grupos_caseiros.toLowerCase().includes(cell.grupo_caseiro.toLowerCase())
+      ).length;
 
-    Object.entries(neighborhoodCounts).forEach(([place, people]) => {
-      // Se tiver mais de 3 pessoas morando em um local, sugerir criação de Célula
-      const existingCellInPlace = cells.some(c => c.name && c.name.toLowerCase().includes(place.toLowerCase()));
-      if (people.length >= 4 && !existingCellInPlace) {
-        dynamicInsights.push({
-          id: `loc-${place}`,
-          type: 'location',
-          title: `Sugestão de Novo GC: ${place}`,
-          description: `Identificamos que ${people.length} membros residem na região de ${place} e atualmente não há um Grupo de Crescimento ativo nesta localidade.`,
-          impact: 'Aumentará a cobertura territorial da igreja e reduzirá o deslocamento dos irmãos.',
-          actionLabel: 'Criar Grupo'
-        });
-      }
-    });
-
-    // 2. Multiplicação de Célula (Superlotação)
-    // Para simular, se uma célula tiver mais de 10 participantes cadastrados
-    cells.forEach(cell => {
-      // Como o DB armazena o número bruto de membros, vamos simular que qualquer célula com nome fictício está madura
-      if (cell.id % 2 === 0) {
+      if (membersInCell >= 10) {
         dynamicInsights.push({
           id: `cell-mult-${cell.id}`,
           type: 'growth',
-          title: `Oportunidade de Multiplicação: ${cell.name}`,
-          description: `O GC liderado por ${cell.leader || 'Líder'} atingiu o teto recomendado de participantes regulares nas últimas 4 semanas.`,
-          impact: 'Células menores geram relacionamentos mais profundos e melhor pastoreio.',
+          title: `Multiplicação Saudável: ${cell.grupo_caseiro}`,
+          description: `O Grupo liderado por ${cell.lider || 'Líder'} alcançou ${membersInCell} membros ativos. É o momento ideal para treinar ${cell.auxiliar || 'um auxiliar'} visando a expansão do Corpo de Cristo.`,
+          impact: 'Gera novos espaços de acolhimento e maturidade espiritual.',
           actionLabel: 'Iniciar Transição'
         });
       }
     });
 
-    // 3. Alertas Pastorais (Aniversariantes e Inatividade)
-    const inactives = members.filter(m => m.status === 'Inativo');
-    if (inactives.length > 0) {
+    // 2. Cobertura Territorial e Alcance Missionário
+    const neighborhoods: Record<string, any[]> = {};
+    membros.forEach(m => {
+      const b = m.bairro || m.address || m.endereco;
+      if (b) {
+        const place = b.toLowerCase().split(',')[0].trim();
+        if (!neighborhoods[place]) neighborhoods[place] = [];
+        neighborhoods[place].push(m);
+      }
+    });
+
+    Object.entries(neighborhoods).forEach(([place, people]) => {
+      if (people.length >= 5) {
+        // Verifica se já existe célula cadastrada no bairro
+        const hasCell = celulas.some(c => (c.bairro || c.grupo_caseiro || '').toLowerCase().includes(place));
+        if (!hasCell) {
+          const capitalized = place.charAt(0).toUpperCase() + place.slice(1);
+          dynamicInsights.push({
+            id: `loc-suggest-${place}`,
+            type: 'location',
+            title: `Nova Célula Estratégica: ${capitalized}`,
+            description: `Mapeamos ${people.length} irmãos residentes na região de ${capitalized} que não possuem um GC local. Recomenda-se abrir uma frente de oração.`,
+            impact: 'Fortalece a comunhão comunitária e evangelismo de proximidade.',
+            actionLabel: 'Planejar Abertura'
+          });
+        }
+      }
+    });
+
+    // 3. Trilhas de Discipulado e Consolidação
+    const missingPhone = membros.filter(m => !m.telefone || m.telefone.trim() === '').length;
+    if (missingPhone > 0) {
       dynamicInsights.push({
-        id: 'pastoral-inactive',
+        id: 'pastoral-phone',
         type: 'alert',
-        title: 'Monitoramento de Afastamento',
-        description: `Há ${inactives.length} membros que não registraram presença nos últimos cultos dominicais ou reuniões de GC.`,
-        impact: 'Pastoreio ativo evita a perda de ovelhas.',
-        actionLabel: 'Ver Membros'
+        title: 'Atualização de Contatos Pastorais',
+        description: `Detectamos ${missingPhone} membros sem telefone válido no sistema. O pastoreio ativo requer pontes seguras de comunicação.`,
+        impact: 'Reduz o índice de afastamento e falhas de comunicação.',
+        actionLabel: 'Ver Cadastros'
       });
     }
 
-    // Insight Padrão de Boas-Vindas se nenhum outro for gerado
+    // Se nenhum insight foi gerado
     if (dynamicInsights.length === 0) {
       dynamicInsights.push({
-        id: 'welcome',
-        type: 'growth',
-        title: 'Base Saudável',
-        description: 'A inteligência preditiva analisou seus dados e não encontrou gargalos ou pontos urgentes no momento.',
-        impact: 'Excelente trabalho na consolidação.'
+        id: 'standard-welcome',
+        type: 'pastoral',
+        title: 'Manutenção do Discipulado 1 a 1',
+        description: 'Parabéns pela dedicação ao ensino das Escrituras! Continue incentivando as duplas de discipulado.',
+        impact: 'Consolidação contínua da Palavra de Cristo.'
       });
     }
 
@@ -97,13 +104,62 @@ export const AiInsights: React.FC = () => {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const { data: members } = await supabase.from('membros').select('*');
-      const { data: cells } = await supabase.from('celulas').select('*');
-      generateInsights(members || [], cells || []);
+      const { data: mData } = await supabase.from('membros').select('*');
+      const { data: cData } = await supabase.from('celulas').select('*');
+      if (mData) setMembers(mData);
+      if (cData) setCells(cData);
+
+      generateHeuristicInsights(mData || [], cData || []);
     } catch (err) {
-      console.error('Error in insights engine:', err);
+      console.error('Error fetching data:', err);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const generateGeminiInsights = async () => {
+    if (!apiKey.trim()) return;
+    setCustomAiLoading(true);
+    try {
+      localStorage.setItem('church_gemini_api_key', apiKey.trim());
+      
+      const genAI = new GoogleGenerativeAI(apiKey.trim());
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+      const statsPrompt = `
+        Você é um Pastor e Especialista em Crescimento de Igrejas (Igreja do Corpo de Cristo).
+        Com base nos seguintes dados estatísticos da congregação:
+        - Total de Membros Cadastrados: ${members.length}
+        - Total de Grupos de Crescimento/Células: ${cells.length}
+        - Células Cadastradas: ${cells.map(c => c.grupo_caseiro).join(', ')}
+
+        Gere 4 oportunidades estratégicas focadas no crescimento espiritual, multiplicação e consolidação com base na Palavra de Cristo.
+        Retorne estritamente um JSON no formato de array compatível com o seguinte tipo:
+        interface Insight {
+          id: string;
+          type: 'growth' | 'location' | 'alert' | 'pastoral';
+          title: string;
+          description: string;
+          impact: string;
+          actionLabel?: string;
+        }
+        Não inclua markdown \`\`\`json ou texto introdutório. Apenas o array JSON.
+      `;
+
+      const response = await model.generateContent(statsPrompt);
+      const rawText = response.response.text();
+      
+      // Limpar possíveis blocos markdown que o modelo insira
+      const cleanJson = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+      const parsed = JSON.parse(cleanJson);
+      if (Array.isArray(parsed)) {
+        setInsights(parsed);
+      }
+    } catch (error) {
+      console.error('Gemini error:', error);
+      alert('Erro ao consultar o Gemini Flash. Verifique sua chave de API.');
+    } finally {
+      setCustomAiLoading(false);
     }
   };
 
@@ -122,27 +178,42 @@ export const AiInsights: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Sparkles className="h-6 w-6 text-amber-500 animate-pulse" /> Insights IA
+            <Sparkles className="h-6 w-6 text-amber-500" /> Insights de Pastoreio IA
           </h1>
           <p className="mt-1 text-sm text-gray-500">
-            Análise preditiva e comportamental em tempo real da sua congregação.
+            Estratégias para expansão do Reino de Deus e cuidado integral do rebanho.
           </p>
         </div>
-        <button
-          onClick={loadData}
-          className="flex items-center gap-2 px-4 py-2 border border-gray-200 bg-white rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-all shadow-sm"
-        >
-          <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-          Atualizar Análise
-        </button>
+        
+        {/* API KEY Input */}
+        <div className="flex items-center gap-2 bg-gray-50 p-2 rounded-xl border border-gray-200">
+          <button onClick={() => setShowApiKey(!showApiKey)} className="p-2 text-gray-400 hover:text-gray-600">
+            {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+          <input
+            type={showApiKey ? 'text' : 'password'}
+            placeholder="Chave API Gemini"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            className="bg-transparent border-none text-xs focus:outline-none w-48 text-gray-700"
+          />
+          <button
+            onClick={generateGeminiInsights}
+            disabled={!apiKey || customAiLoading}
+            className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold rounded-lg disabled:opacity-50 flex items-center gap-1 transition-all"
+          >
+            {customAiLoading ? <RefreshCw className="h-3 w-3 animate-spin" /> : <TrendingUp className="h-3 w-3" />}
+            Ativar Gemini Flash
+          </button>
+        </div>
       </div>
 
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {[1, 2].map(n => (
+          {[1, 2, 3, 4].map(n => (
             <div key={n} className="h-44 bg-gray-100 animate-pulse rounded-2xl"></div>
           ))}
         </div>
@@ -157,12 +228,18 @@ export const AiInsights: React.FC = () => {
                 <div className="flex items-center justify-between mb-4">
                   <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${getTypeStyle(insight.type)}`}>
                     {insight.type === 'growth' && 'Crescimento'}
-                    {insight.type === 'location' && 'Expansão Local'}
-                    {insight.type === 'alert' && 'Atenção'}
-                    {insight.type === 'pastoral' && 'Pastoral'}
+                    {insight.type === 'location' && 'Missão Territorial'}
+                    {insight.type === 'alert' && 'Atenção Pastoral'}
+                    {insight.type === 'pastoral' && 'Cuidado'}
                   </span>
                 </div>
-                <h3 className="text-lg font-bold text-gray-900 mb-2">{insight.title}</h3>
+                <h3 className="text-lg font-bold text-gray-900 mb-2 flex items-center gap-2">
+                  {insight.type === 'growth' && <TrendingUp className="h-5 w-5 text-amber-500" />}
+                  {insight.type === 'location' && <BookOpen className="h-5 w-5 text-blue-500" />}
+                  {insight.type === 'alert' && <ShieldAlert className="h-5 w-5 text-red-500" />}
+                  {insight.type === 'pastoral' && <Heart className="h-5 w-5 text-purple-500" />}
+                  {insight.title}
+                </h3>
                 <p className="text-sm text-gray-600 leading-relaxed mb-4">{insight.description}</p>
               </div>
 
