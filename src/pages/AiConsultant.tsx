@@ -19,6 +19,8 @@ export const AiConsultant: React.FC = () => {
       timestamp: new Date()
     }
   ]);
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem('church_gemini_api_key') || '');
+  const [showKeyInput, setShowKeyInput] = useState(false);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -140,6 +142,28 @@ export const AiConsultant: React.FC = () => {
     return `Entendido. Verifiquei na base que possuímos ${members.length} pessoas cadastradas e ${cells.length} GCs. Tente ser mais específico, pergunte por exemplo sobre 'sem telefone' ou filtre por 'Arniqueira'.`;
   };
 
+  const calcularIdade = (dataNasc: string): number => {
+    if (!dataNasc) return 30; // Padrão adulto
+    try {
+      const parts = dataNasc.split('/');
+      let birthDate: Date;
+      if (parts.length === 3) {
+        birthDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+      } else {
+        birthDate = new Date(dataNasc);
+      }
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const m = today.getMonth() - birthDate.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      return isNaN(age) ? 30 : age;
+    } catch (_) {
+      return 30;
+    }
+  };
+
   const handleSend = async () => {
     if (!input.trim()) return;
 
@@ -154,22 +178,39 @@ export const AiConsultant: React.FC = () => {
     setInput('');
     setIsTyping(true);
 
-    const apiKey = localStorage.getItem('church_gemini_api_key');
+    const activeKey = apiKey || localStorage.getItem('church_gemini_api_key');
 
-    if (apiKey && apiKey.trim() !== '') {
+    if (activeKey && activeKey.trim() !== '') {
       try {
-        const genAI = new GoogleGenerativeAI(apiKey.trim());
+        const genAI = new GoogleGenerativeAI(activeKey.trim());
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
+        const payloadMembers = members.map(m => {
+          const age = m.data_nascimento ? calcularIdade(m.data_nascimento) : 30;
+          return {
+            nome: m.nome || m.name,
+            bairro: m.bairro || m.address || m.endereco || 'Não informado',
+            cidade: m.cidade || 'Brasília',
+            idade: age,
+            classificacao: age >= 18 ? 'Adulto' : 'Criança',
+            sexo: m.sexo || 'Não informado',
+            status: m.status || m.tipo_cadastro || 'Ativo'
+          };
+        });
+
         const prompt = `
-          Você é o "Consultor IA" do IgrejaPro, um Pastor Auxiliar focado no cuidado do Corpo de Cristo.
-          Considere o banco de dados atual da igreja:
-          - Total de pessoas cadastradas: ${members.length}
-          - Total de GCs/Células: ${cells.length}
+          Você é a Inteligência do IgrejaPro, um Pastor Auxiliar focado no cuidado do Corpo de Cristo.
+          Responda com empatia bíblica e precisão matemática.
           
-          Responda com empatia, conhecimento bíblico prático e dados exatos à seguinte pergunta do usuário: "${userMsg.text}".
-          Evite jargões excessivamente técnicos.
+          Considere a base de dados exata da igreja:
+          - Membros Cadastrados: ${JSON.stringify(payloadMembers)}
+          - Células/GCs Ativos: ${JSON.stringify(cells.map(c => ({ nome: c.nome || c.name, lider: c.lider || c.leader, local: c.local || c.address })))}
+          
+          Atenda à seguinte solicitação: "${userMsg.text}".
+          Sinta-se livre para desenhar tabelas markdown com pipes (|) ou listas.
         `;
+
+
 
         const result = await model.generateContent(prompt);
         const botResponse = result.response.text();
@@ -208,7 +249,7 @@ export const AiConsultant: React.FC = () => {
   return (
     <div className="flex flex-col h-[calc(100vh-140px)] bg-gray-50 rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
       {/* Header */}
-      <div className="bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between">
+      <div className="bg-white border-b border-gray-100 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-primary-50 text-primary-600 rounded-xl">
             <Brain className="h-6 w-6" />
@@ -216,9 +257,39 @@ export const AiConsultant: React.FC = () => {
           <div>
             <h1 className="text-lg font-bold text-gray-900">IA</h1>
             <p className="text-xs text-gray-500 flex items-center gap-1">
-              <Sparkles className="h-3 w-3 text-amber-500" /> Alimentado por inteligência avançada
+              <Sparkles className="h-3 w-3 text-amber-500" /> {apiKey ? 'Gemini 1.5 Ativo' : 'Alimentado por inteligência avançada'}
             </p>
           </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {showKeyInput ? (
+            <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 p-1 rounded-xl">
+              <input
+                type="password"
+                placeholder="Insira sua Chave Gemini"
+                value={apiKey}
+                onChange={(e) => {
+                  setApiKey(e.target.value);
+                  localStorage.setItem('church_gemini_api_key', e.target.value);
+                }}
+                className="text-xs px-3 py-2 bg-transparent border-none focus:outline-none focus:ring-0 w-48 text-gray-700"
+              />
+              <button
+                onClick={() => setShowKeyInput(false)}
+                className="bg-primary-600 hover:bg-primary-700 text-white text-xs px-3 py-2 rounded-lg font-medium transition-colors"
+              >
+                Ativar
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowKeyInput(true)}
+              className="text-xs bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-600 px-3 py-2 rounded-xl flex items-center gap-1.5 transition-colors"
+            >
+              🔑 {apiKey ? 'Atualizar Chave' : 'Conectar Gemini'}
+            </button>
+          )}
         </div>
       </div>
 
