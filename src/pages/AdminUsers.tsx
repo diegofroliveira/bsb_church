@@ -17,13 +17,15 @@ const AVAILABLE_MODULES = [
   { id: 'Relatórios',      label: 'Relatórios',      path: '/reports' },
   { id: 'QA',              label: 'QA',              path: '/qa' },
   { id: 'Financeiro',      label: 'Financeiro',      path: '/finance' },
+  { id: 'Consultor IA',    label: 'Consultor IA',    path: '/ai-consultant' },
+  { id: 'Insights IA',     label: 'Insights IA',     path: '/ai-insights' },
   { id: 'Configurações',   label: 'Configurações',   path: '/admin/users' },
 ];
 
 const DEFAULT_ROLES: Record<string, { label: string; modules: string[] }> = {
-  admin: { label: 'Administrador', modules: ['Dashboard', 'Mapa', 'Membros', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Financeiro', 'Configurações'] },
-  pastor: { label: 'Pastor', modules: ['Dashboard', 'Mapa', 'Membros', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Financeiro'] },
-  secretaria: { label: 'Secretaria', modules: ['Dashboard', 'Membros', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA'] },
+  admin: { label: 'Administrador', modules: ['Dashboard', 'Mapa', 'Membros', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Financeiro', 'Consultor IA', 'Insights IA', 'Configurações'] },
+  pastor: { label: 'Pastor', modules: ['Dashboard', 'Mapa', 'Membros', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Financeiro', 'Consultor IA', 'Insights IA'] },
+  secretaria: { label: 'Secretaria', modules: ['Dashboard', 'Membros', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Consultor IA'] },
   financeiro: { label: 'Financeiro', modules: ['Dashboard', 'Financeiro'] }
 };
 
