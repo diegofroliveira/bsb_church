@@ -2,16 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, Users, Home, DollarSign, Settings, LogOut,
-  Menu, BookOpen, FileText, Network, AlertTriangle, MapPin
+  Menu, BookOpen, FileText, Network, AlertTriangle, MapPin,
+  Brain, Sparkles
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import clsx from 'clsx';
 
 const DEFAULT_ROLES: Record<string, string[]> = {
-  admin: ['Dashboard', 'Mapa', 'Membros', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Financeiro', 'Configurações'],
-  pastor: ['Dashboard', 'Mapa', 'Membros', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Financeiro'],
-  secretaria: ['Dashboard', 'Membros', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA'],
+  admin: ['Dashboard', 'Mapa', 'Membros', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Financeiro', 'Consultor IA', 'Insights IA', 'Configurações'],
+  pastor: ['Dashboard', 'Mapa', 'Membros', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Financeiro', 'Consultor IA', 'Insights IA'],
+  secretaria: ['Dashboard', 'Membros', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Consultor IA'],
   financeiro: ['Dashboard', 'Financeiro']
 };
 
@@ -79,6 +80,8 @@ export const MainLayout: React.FC = () => {
     { id: 'Relatórios',      name: 'Relatórios',      path: '/reports',      icon: FileText },
     { id: 'QA',              name: 'QA',              path: '/qa',           icon: AlertTriangle },
     { id: 'Financeiro',      name: 'Financeiro',      path: '/finance',      icon: DollarSign },
+    { id: 'Consultor IA',    name: 'Consultor IA',    path: '/ai-consultant', icon: Brain },
+    { id: 'Insights IA',     name: 'Insights IA',     path: '/ai-insights',   icon: Sparkles },
     { id: 'Configurações',   name: 'Configurações',   path: '/admin/users',  icon: Settings },
   ];
 
