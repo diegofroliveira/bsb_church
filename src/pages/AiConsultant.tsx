@@ -237,8 +237,14 @@ export const AiConsultant: React.FC = () => {
       } catch (error) {
         console.error('Error invoking Gemini:', error);
         // Fallback to local heuristic
+        const errMsg = error instanceof Error ? error.message : String(error);
         const fallback = processQueryLocal(userMsg.text);
-        setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), sender: 'bot', text: `(Modo Local) ${fallback}`, timestamp: new Date() }]);
+        setMessages(prev => [...prev, { 
+          id: (Date.now() + 1).toString(), 
+          sender: 'bot', 
+          text: `(Modo Local - Erro na Chave API: ${errMsg}). ${fallback}`, 
+          timestamp: new Date() 
+        }]);
       } finally {
         setIsTyping(false);
       }
