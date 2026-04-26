@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Brain, Send, Bot, User, Sparkles } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { useAuth } from '../context/AuthContext';
 
 interface Message {
   id: string;
@@ -19,6 +20,8 @@ export const AiConsultant: React.FC = () => {
       timestamp: new Date()
     }
   ]);
+  const { user } = useAuth();
+  const [adminApiKey, setAdminApiKey] = useState('');
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('church_gemini_api_key') || '');
   const [showKeyInput, setShowKeyInput] = useState(false);
   const [input, setInput] = useState('');
@@ -36,6 +39,15 @@ export const AiConsultant: React.FC = () => {
   useEffect(() => {
     const loadData = async () => {
       try {
+        const { data: configData } = await supabase
+          .from('profiles')
+          .select('avatar')
+          .eq('email', 'config@igrejapro.ia')
+          .maybeSingle();
+
+        if (configData && configData.avatar) {
+          setAdminApiKey(configData.avatar);
+        }
         const { data: mData } = await supabase.from('membros').select('*');
         const { data: cData } = await supabase.from('celulas').select('*');
         if (mData) setMembers(mData);
@@ -178,7 +190,7 @@ export const AiConsultant: React.FC = () => {
     setInput('');
     setIsTyping(true);
 
-    const activeKey = apiKey || localStorage.getItem('church_gemini_api_key');
+    const activeKey = apiKey || adminApiKey || localStorage.getItem('church_gemini_api_key');
 
     if (activeKey && activeKey.trim() !== '') {
       try {
@@ -257,37 +269,62 @@ export const AiConsultant: React.FC = () => {
           <div>
             <h1 className="text-lg font-bold text-gray-900">IA</h1>
             <p className="text-xs text-gray-500 flex items-center gap-1">
-              <Sparkles className="h-3 w-3 text-amber-500" /> {apiKey ? 'Gemini 1.5 Ativo' : 'Alimentado por inteligência avançada'}
+              <Sparkles className="h-3 w-3 text-amber-500" /> {(apiKey || adminApiKey) ? 'Gemini 1.5 Ativo' : 'Alimentado por inteligência avançada'}
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
           {showKeyInput ? (
-            <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 p-1 rounded-xl">
+            <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 bg-gray-50 border border-gray-200 p-2 rounded-xl">
               <input
                 type="password"
                 placeholder="Insira sua Chave Gemini"
                 value={apiKey}
-                onChange={(e) => {
-                  setApiKey(e.target.value);
-                  localStorage.setItem('church_gemini_api_key', e.target.value);
-                }}
+                onChange={(e) => setApiKey(e.target.value)}
                 className="text-xs px-3 py-2 bg-transparent border-none focus:outline-none focus:ring-0 w-48 text-gray-700"
               />
-              <button
-                onClick={() => setShowKeyInput(false)}
-                className="bg-primary-600 hover:bg-primary-700 text-white text-xs px-3 py-2 rounded-lg font-medium transition-colors"
-              >
-                Ativar
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => {
+                    localStorage.setItem('church_gemini_api_key', apiKey);
+                    setShowKeyInput(false);
+                  }}
+                  className="bg-primary-600 hover:bg-primary-700 text-white text-xs px-3 py-2 rounded-lg font-medium transition-colors"
+                >
+                  Pessoal
+                </button>
+                {user?.role === 'admin' && (
+                  <button
+                    onClick={async () => {
+                      try {
+                        await supabase.from('profiles').upsert({
+                          id: '00000000-0000-0000-0000-000000000000',
+                          name: 'Configuração Global IA',
+                          email: 'config@igrejapro.ia',
+                          role: 'admin',
+                          avatar: apiKey
+                        });
+                        setAdminApiKey(apiKey);
+                        setShowKeyInput(false);
+                        alert('Chave Administrativa salva para todos os usuários!');
+                      } catch (err) {
+                        console.error('Error saving global key:', err);
+                      }
+                    }}
+                    className="bg-amber-600 hover:bg-amber-700 text-white text-xs px-3 py-2 rounded-lg font-medium transition-colors"
+                  >
+                    Global (Admin)
+                  </button>
+                )}
+              </div>
             </div>
           ) : (
             <button
               onClick={() => setShowKeyInput(true)}
               className="text-xs bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-600 px-3 py-2 rounded-xl flex items-center gap-1.5 transition-colors"
             >
-              🔑 {apiKey ? 'Atualizar Chave' : 'Conectar Gemini'}
+              🔑 {(apiKey || adminApiKey) ? 'Atualizar Chave' : 'Conectar Gemini'}
             </button>
           )}
         </div>
