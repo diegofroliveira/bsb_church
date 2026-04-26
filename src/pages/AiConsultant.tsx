@@ -25,6 +25,11 @@ export const AiConsultant: React.FC = () => {
 
   const [members, setMembers] = useState<any[]>([]);
   const [cells, setCells] = useState<any[]>([]);
+  const [lastContext, setLastContext] = useState<{
+    type: 'place' | 'missing-phone' | 'members' | 'cells';
+    placeName?: string;
+    filteredMembers?: any[];
+  } | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -47,6 +52,23 @@ export const AiConsultant: React.FC = () => {
   const processQueryLocal = (query: string): string => {
     const q = query.toLowerCase();
     
+    // Suporte ao contexto anterior
+    if (q.includes('listar') || q.includes('lista') || q.includes('quem sao') || q.includes('quem são') || q.includes('quais sao') || q.includes('quais são') || q.includes('pode listá-los') || q.includes('pode listalos')) {
+      if (lastContext) {
+        if (lastContext.type === 'place' && lastContext.filteredMembers) {
+          const names = lastContext.filteredMembers.map(m => m.nome || m.name).filter(Boolean).join(', ');
+          return `Aqui está a lista completa de pessoas em ${lastContext.placeName}: \n\n${names}`;
+        }
+        if (lastContext.type === 'missing-phone' && lastContext.filteredMembers) {
+          const names = lastContext.filteredMembers.map(m => m.nome || m.name).filter(Boolean).join(', ');
+          return `Os membros sem telefone cadastrado são: \n\n${names}`;
+        }
+      } else {
+        return `Não tenho certeza sobre o que você deseja listar. Tente fazer a pergunta inicial primeiro (Ex: Quantos moram em Vicente Pires?)`;
+      }
+    }
+
+    // 1. INTENT: Membros / Cadastros
     if (
       q.includes('membros') || 
       q.includes('quantos membros') || 
@@ -57,15 +79,18 @@ export const AiConsultant: React.FC = () => {
       q.includes('quantos tem')
     ) {
       if (q.includes('telefone') || q.includes('sem telefone')) {
-        const missing = members.filter(m => !m.telefone || m.telefone.trim() === '').length;
-        return `Existem ${missing} registros de membros sem o número de telefone informado na base de dados.`;
+        const missing = members.filter(m => !m.telefone || m.telefone.trim() === '');
+        setLastContext({ type: 'missing-phone', filteredMembers: missing });
+        return `Existem ${missing.length} registros de membros sem o número de telefone informado na base de dados.`;
       }
 
-      const active = members.filter(m => (m.status || m.tipo_cadastro) !== 'Inativo').length;
-      return `Atualmente, a igreja conta com um total de ${members.length} pessoas/cadastros no sistema, sendo ${active} considerados membros ativos.`;
+      const active = members.filter(m => (m.status || m.tipo_cadastro) !== 'Inativo');
+      setLastContext({ type: 'members', filteredMembers: active });
+      return `Atualmente, a igreja conta com um total de ${members.length} pessoas/cadastros no sistema, sendo ${active.length} considerados membros ativos.`;
     }
     
     if (q.includes('gc') || q.includes('celula') || q.includes('célula') || q.includes('grupos caseiros')) {
+      setLastContext({ type: 'cells' });
       return `Temos ${cells.length} Grupos de Crescimento (GCs/Células) ativos e mapeados nas localidades.`;
     }
 
@@ -79,8 +104,10 @@ export const AiConsultant: React.FC = () => {
         return addr.includes(matchedPlace) || city.includes(matchedPlace) || neigh.includes(matchedPlace);
       });
       if (filtered.length === 0) {
+        setLastContext(null);
         return `Não localizei nenhum membro explicitamente vinculado à região de ${matchedPlace} nos dados de endereços.`;
       }
+      setLastContext({ type: 'place', placeName: matchedPlace, filteredMembers: filtered });
       const names = filtered.map(m => m.nome || m.name).filter(Boolean).slice(0, 10).join(', ');
       return `Encontrei ${filtered.length} pessoas morando ou mapeadas para ${matchedPlace}. Exemplos: ${names}${filtered.length > 10 ? '...' : ''}`;
     }
@@ -96,7 +123,7 @@ export const AiConsultant: React.FC = () => {
       }
     }
 
-    return `Entendido. Verifiquei na base que possuímos ${members.length} pessoas cadastradas e ${cells.length} GCs. Para ativar respostas ricas e contextualizadas via IA, configure uma Chave API Gemini no módulo 'Insights IA'.`;
+    return `Entendido. Verifiquei na base que possuímos ${members.length} pessoas cadastradas e ${cells.length} GCs. Tente ser mais específico, pergunte por exemplo sobre 'sem telefone' ou filtre por 'Arniqueira'.`;
   };
 
   const handleSend = async () => {
