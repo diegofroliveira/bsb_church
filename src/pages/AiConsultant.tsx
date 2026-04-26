@@ -28,8 +28,8 @@ export const AiConsultant: React.FC = () => {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const { data: mData } = await supabase.from('profiles').select('*');
-        const { data: cData } = await supabase.from('cells').select('*');
+        const { data: mData } = await supabase.from('membros').select('*');
+        const { data: cData } = await supabase.from('celulas').select('*');
         if (mData) setMembers(mData);
         if (cData) setCells(cData);
       } catch (err) {
@@ -46,34 +46,65 @@ export const AiConsultant: React.FC = () => {
   const processQuery = (query: string): string => {
     const q = query.toLowerCase();
     
-    if (q.includes('quantos membros') || q.includes('total de membros')) {
-      const active = members.filter(m => m.status !== 'Inativo').length;
-      return `Atualmente, a igreja conta com um total de ${members.length} registros de membros cadastrados, sendo ${active} considerados membros ativos.`;
+    // 1. INTENT: Membros / Cadastros
+    if (
+      q.includes('membros') || 
+      q.includes('quantos membros') || 
+      q.includes('total de membros') ||
+      q.includes('cadastros') ||
+      q.includes('quantas pessoas') ||
+      q.includes('qmts') ||
+      q.includes('quantos tem')
+    ) {
+      if (q.includes('telefone') || q.includes('sem telefone')) {
+        const missing = members.filter(m => !m.telefone || m.telefone.trim() === '').length;
+        return `Existem ${missing} registros de membros sem o número de telefone informado na base de dados.`;
+      }
+
+      const active = members.filter(m => (m.status || m.tipo_cadastro) !== 'Inativo').length;
+      return `Atualmente, a igreja conta com um total de ${members.length} pessoas/cadastros no sistema, sendo ${active} considerados membros ativos.`;
     }
     
-    if (q.includes('quantos gcs') || q.includes('quantas celulas') || q.includes('total de gcs')) {
-      return `Temos ${cells.length} Grupos de Crescimento (GCs) ativos espalhados pelas localidades mapeadas.`;
+    // 2. INTENT: GCs / Células
+    if (
+      q.includes('gc') || 
+      q.includes('celula') || 
+      q.includes('célula') ||
+      q.includes('grupos caseiros')
+    ) {
+      return `Temos ${cells.length} Grupos de Crescimento (GCs/Células) ativos e mapeados nas localidades.`;
     }
 
-    if (q.includes('famílias') && q.includes('arniqueira') || q.includes('arniqueira')) {
-      const filtered = members.filter(m => m.address && m.address.toLowerCase().includes('arniqueira'));
+    // 3. INTENT: Cidades / Bairros
+    const places = ['arniqueira', 'águas claras', 'aguas claras', 'taguatinga', 'ceilândia', 'ceilandia', 'guará', 'guara'];
+    const matchedPlace = places.find(p => q.includes(p));
+    if (matchedPlace) {
+      const filtered = members.filter(m => {
+        const addr = (m.endereco || m.address || '').toLowerCase();
+        const city = (m.cidade || m.city || '').toLowerCase();
+        return addr.includes(matchedPlace) || city.includes(matchedPlace);
+      });
       if (filtered.length === 0) {
-        return `Não localizei nenhum membro que tenha o endereço explicitamente vinculado ao bairro Arniqueira na base atual.`;
+        return `Não localizei nenhum membro explicitamente vinculado à região de ${matchedPlace} nos dados de endereços.`;
       }
-      const names = filtered.map(m => m.name).join(', ');
-      return `Encontrei ${filtered.length} pessoas morando em Arniqueira: ${names}.`;
+      const names = filtered.map(m => m.nome || m.name).filter(Boolean).slice(0, 10).join(', ');
+      return `Encontrei ${filtered.length} pessoas morando ou mapeadas para ${matchedPlace}. Exemplos: ${names}${filtered.length > 10 ? '...' : ''}`;
     }
 
+    // 4. INTENT: Aniversariantes
     if (q.includes('aniversário') || q.includes('aniversariantes')) {
-      return `No momento, os aniversariantes da semana podem ser consultados no módulo de Relatórios ou no painel principal do Dashboard.`;
+      return `Os aniversariantes da semana podem ser filtrados no módulo principal de Relatórios ou através das métricas do Dashboard!`;
     }
 
-    if (q.includes('líderes') || q.includes('lideres de gc')) {
-      const leaders = Array.from(new Set(cells.map(c => c.leader).filter(Boolean)));
-      return `Os líderes cadastrados à frente das células são: ${leaders.join(', ')}.`;
+    // 5. INTENT: Líderes
+    if (q.includes('líder') || q.includes('lider')) {
+      const leaders = Array.from(new Set(cells.map(c => c.lider || c.leader).filter(Boolean)));
+      if (leaders.length > 0) {
+        return `Os líderes responsáveis à frente das células são: ${leaders.join(', ')}.`;
+      }
     }
 
-    return `Entendido. Como agente IA da base do IgrejaPro, verifiquei que o sistema possui ${members.length} registros e ${cells.length} GCs. Para responder com máxima precisão a cenários livres mais complexos, as chaves de processamento natural NLP podem ser expandidas através de chaves de API.`;
+    return `Entendido. Verifiquei na base que possuímos ${members.length} pessoas cadastradas e ${cells.length} GCs. Tente ser mais específico, pergunte por exemplo sobre 'sem telefone' ou filtre por 'Arniqueira'.`;
   };
 
   const handleSend = () => {

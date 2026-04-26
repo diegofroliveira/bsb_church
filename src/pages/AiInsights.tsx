@@ -97,8 +97,8 @@ export const AiInsights: React.FC = () => {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const { data: members } = await supabase.from('profiles').select('*');
-      const { data: cells } = await supabase.from('cells').select('*');
+      const { data: members } = await supabase.from('membros').select('*');
+      const { data: cells } = await supabase.from('celulas').select('*');
       generateInsights(members || [], cells || []);
     } catch (err) {
       console.error('Error in insights engine:', err);
