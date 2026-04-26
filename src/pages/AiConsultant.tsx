@@ -39,14 +39,16 @@ export const AiConsultant: React.FC = () => {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const { data: configData } = await supabase
+        const { data: adminProfiles } = await supabase
           .from('profiles')
           .select('avatar')
-          .eq('email', 'config@igrejapro.ia')
-          .maybeSingle();
+          .eq('role', 'admin');
 
-        if (configData && configData.avatar) {
-          setAdminApiKey(configData.avatar);
+        if (adminProfiles && adminProfiles.length > 0) {
+          const validKey = adminProfiles.find(p => p.avatar && p.avatar.startsWith('AIza'));
+          if (validKey && validKey.avatar) {
+            setAdminApiKey(validKey.avatar);
+          }
         }
         const { data: mData } = await supabase.from('membros').select('*');
         const { data: cData } = await supabase.from('celulas').select('*');
@@ -195,7 +197,7 @@ export const AiConsultant: React.FC = () => {
     if (activeKey && activeKey.trim() !== '') {
       try {
         const genAI = new GoogleGenerativeAI(activeKey.trim());
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
         const payloadMembers = members.map(m => {
           const age = m.data_nascimento ? calcularIdade(m.data_nascimento) : 30;
@@ -275,7 +277,7 @@ export const AiConsultant: React.FC = () => {
           <div>
             <h1 className="text-lg font-bold text-gray-900">IA</h1>
             <p className="text-xs text-gray-500 flex items-center gap-1">
-              <Sparkles className="h-3 w-3 text-amber-500" /> {(apiKey || adminApiKey) ? 'Gemini 1.5 Ativo' : 'Alimentado por inteligência avançada'}
+              <Sparkles className="h-3 w-3 text-amber-500" /> {(apiKey || adminApiKey) ? 'Gemini 2.0 Ativo' : 'Alimentado por inteligência avançada'}
             </p>
           </div>
         </div>
@@ -305,10 +307,10 @@ export const AiConsultant: React.FC = () => {
                     onClick={async () => {
                       try {
                         await supabase.from('profiles').upsert({
-                          id: '00000000-0000-0000-0000-000000000000',
-                          name: 'Configuração Global IA',
-                          email: 'config@igrejapro.ia',
-                          role: 'admin',
+                          id: user.id,
+                          name: user.name,
+                          email: user.email,
+                          role: user.role,
                           avatar: apiKey
                         });
                         setAdminApiKey(apiKey);
