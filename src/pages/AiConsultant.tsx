@@ -15,7 +15,7 @@ export const AiConsultant: React.FC = () => {
     {
       id: '1',
       sender: 'bot',
-      text: 'Olá! Sou o assistente de inteligência do IgrejaPro. Posso responder qualquer dúvida sobre a base de dados da igreja. O que você gostaria de saber hoje?',
+      text: 'Olá! Sou a Inteligência do IgrejaPro. Como posso ajudar com os dados da congregação hoje?',
       timestamp: new Date()
     }
   ]);
@@ -52,7 +52,7 @@ export const AiConsultant: React.FC = () => {
   const processQueryLocal = (query: string): string => {
     const q = query.toLowerCase();
     
-    // Suporte ao contexto anterior
+    // Suporte ao contexto anterior (Listagem)
     if (q.includes('listar') || q.includes('lista') || q.includes('quem sao') || q.includes('quem são') || q.includes('quais sao') || q.includes('quais são') || q.includes('pode listá-los') || q.includes('pode listalos')) {
       if (lastContext) {
         if (lastContext.type === 'place' && lastContext.filteredMembers) {
@@ -65,6 +65,20 @@ export const AiConsultant: React.FC = () => {
         }
       } else {
         return `Não tenho certeza sobre o que você deseja listar. Tente fazer a pergunta inicial primeiro (Ex: Quantos moram em Vicente Pires?)`;
+      }
+    }
+
+    // Suporte ao contexto anterior (Tabela)
+    if (q.includes('tabela') || q.includes('quadro') || q.includes('tabelar') || q.includes('grade')) {
+      if (lastContext && lastContext.filteredMembers) {
+        let table = "| Nome | Bairro | Cidade |\n| :--- | :--- | :--- |\n";
+        lastContext.filteredMembers.forEach(m => {
+          const b = m.bairro || m.address || m.endereco || '-';
+          table += `| ${m.nome || m.name || '-'} | ${b} | ${m.cidade || '-'} |\n`;
+        });
+        return `Com certeza! Aqui estão os dados organizados em tabela:\n\n${table}`;
+      } else {
+        return `Não localizei registros anteriores para criar uma tabela. Faça uma pergunta sobre uma localidade ou filtro primeiro!`;
       }
     }
 
@@ -200,7 +214,7 @@ export const AiConsultant: React.FC = () => {
             <Brain className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-lg font-bold text-gray-900">Consultor IA</h1>
+            <h1 className="text-lg font-bold text-gray-900">IA</h1>
             <p className="text-xs text-gray-500 flex items-center gap-1">
               <Sparkles className="h-3 w-3 text-amber-500" /> Alimentado por inteligência avançada
             </p>
@@ -219,7 +233,38 @@ export const AiConsultant: React.FC = () => {
               {msg.sender === 'bot' ? <Bot className="h-5 w-5" /> : <User className="h-5 w-5" />}
             </div>
             <div className={`p-4 rounded-2xl shadow-sm ${msg.sender === 'bot' ? 'bg-white text-gray-800 border border-gray-100' : 'bg-primary-600 text-white'}`}>
-              <p className="text-sm leading-relaxed whitespace-pre-line">{msg.text}</p>
+              {(() => {
+                const text = msg.text;
+                if (text.includes('|') && text.includes('\n|')) {
+                  const lines = text.split('\n').filter(line => line.trim().startsWith('|'));
+                  if (lines.length >= 3) {
+                    const headerLine = lines[0];
+                    const dataLines = lines.slice(2); // Pula separador | --- |
+                    const headers = headerLine.split('|').map(h => h.trim()).filter(Boolean);
+                    const rows = dataLines.map(line => line.split('|').map(cell => cell.trim()).filter(Boolean)).filter(r => r.length > 0);
+
+                    return (
+                      <div className="overflow-x-auto my-2">
+                        <table className="min-w-full divide-y divide-gray-200 text-xs border border-gray-100 rounded-lg">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              {headers.map((h, i) => <th key={i} className="px-3 py-2 text-left font-bold text-gray-700">{h}</th>)}
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100 bg-white">
+                            {rows.map((row, i) => (
+                              <tr key={i} className="hover:bg-gray-50/50 transition-colors">
+                                {row.map((cell, j) => <td key={j} className="px-3 py-2 text-gray-600">{cell}</td>)}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    );
+                  }
+                }
+                return <p className="text-sm leading-relaxed whitespace-pre-line">{msg.text}</p>;
+              })()}
               <span className={`text-[10px] block mt-1 ${msg.sender === 'bot' ? 'text-gray-400' : 'text-primary-200'}`}>
                 {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </span>

@@ -3,7 +3,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, Users, Home, DollarSign, Settings, LogOut,
   Menu, BookOpen, FileText, Network, AlertTriangle, MapPin,
-  Brain, Sparkles
+  Brain
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -80,8 +80,7 @@ export const MainLayout: React.FC = () => {
     { id: 'Relatórios',      name: 'Relatórios',      path: '/reports',      icon: FileText },
     { id: 'QA',              name: 'QA',              path: '/qa',           icon: AlertTriangle },
     { id: 'Financeiro',      name: 'Financeiro',      path: '/finance',      icon: DollarSign },
-    { id: 'Consultor IA',    name: 'Consultor IA',    path: '/ai-consultant', icon: Brain },
-    { id: 'Insights IA',     name: 'Insights IA',     path: '/ai-insights',   icon: Sparkles },
+    { id: 'Consultor IA',    name: 'IA',              path: '/ai-consultant', icon: Brain },
     { id: 'Configurações',   name: 'Configurações',   path: '/admin/users',  icon: Settings },
   ];
 
