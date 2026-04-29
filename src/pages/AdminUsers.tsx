@@ -164,18 +164,30 @@ export const AdminUsers: React.FC = () => {
         setDynamicRoles(parsed);
       }
 
-      // Busca dados sincronizados na nuvem
+      // Busca dados sincronizados na nuvem usando o ID especial
       const { data } = await supabase
         .from('profiles')
         .select('avatar')
-        .eq('role', 'admin');
+        .eq('id', SPECIAL_CONFIG_ID);
 
-      if (data && data.length > 0) {
-        const rowWithConfig = data.find(r => r.avatar && r.avatar.startsWith('{"'));
-        if (rowWithConfig && rowWithConfig.avatar) {
-          const parsed = JSON.parse(rowWithConfig.avatar);
-          setDynamicRoles(parsed);
-          localStorage.setItem('church_dynamic_roles', rowWithConfig.avatar);
+      if (data && data.length > 0 && data[0].avatar) {
+        const parsed = JSON.parse(data[0].avatar);
+        setDynamicRoles(parsed);
+        localStorage.setItem('church_dynamic_roles', data[0].avatar);
+      } else {
+        // Fallback: busca em admins caso a transição ainda não tenha ocorrido
+        const { data: adminData } = await supabase
+          .from('profiles')
+          .select('avatar')
+          .eq('role', 'admin');
+
+        if (adminData && adminData.length > 0) {
+          const rowWithConfig = adminData.find(r => r.avatar && r.avatar.startsWith('{"'));
+          if (rowWithConfig && rowWithConfig.avatar) {
+            const parsed = JSON.parse(rowWithConfig.avatar);
+            setDynamicRoles(parsed);
+            localStorage.setItem('church_dynamic_roles', rowWithConfig.avatar);
+          }
         }
       }
     } catch (_) {
@@ -221,11 +233,11 @@ export const AdminUsers: React.FC = () => {
       localStorage.setItem('church_dynamic_roles', JSON.stringify(updatedRoles));
       
       const { error } = await supabase.from('profiles').upsert({
-        id: currentUser?.id,
+        id: SPECIAL_CONFIG_ID,
         avatar: JSON.stringify(updatedRoles),
-        email: currentUser?.email,
-        name: currentUser?.name,
-        role: currentUser?.role,
+        email: 'config@system.internal',
+        name: 'Configuração Global de Perfis',
+        role: 'system',
         updated_at: new Date().toISOString()
       });
 
@@ -298,11 +310,13 @@ export const AdminUsers: React.FC = () => {
         }
       }
 
+      const existingUser = users.find(u => u.id === userId);
       const { error } = await supabase.from('profiles').upsert({
         id: userId,
-        email: users.find(u => u.id === userId)?.email,
+        email: existingUser?.email,
         name: editName,
         role: editRole,
+        avatar: existingUser?.avatar || null,
         updated_at: new Date().toISOString()
       });
 

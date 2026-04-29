@@ -44,16 +44,31 @@ export const MainLayout: React.FC = () => {
         const { data } = await supabase
           .from('profiles')
           .select('avatar')
-          .eq('role', 'admin');
+          .eq('id', '00000000-0000-0000-0000-000000000000');
 
-        if (data && data.length > 0) {
-          const rowWithConfig = data.find(r => r.avatar && r.avatar.startsWith('{"'));
-          if (rowWithConfig && rowWithConfig.avatar) {
-            const parsed = JSON.parse(rowWithConfig.avatar);
-            if (parsed[userRole]) {
-              setAllowedModules(parsed[userRole].modules);
-              localStorage.setItem('church_dynamic_roles', rowWithConfig.avatar);
-              return;
+        if (data && data.length > 0 && data[0].avatar) {
+          const parsed = JSON.parse(data[0].avatar);
+          if (parsed[userRole]) {
+            setAllowedModules(parsed[userRole].modules);
+            localStorage.setItem('church_dynamic_roles', data[0].avatar);
+            return;
+          }
+        } else {
+          // Fallback: busca em admins antigos
+          const { data: adminData } = await supabase
+            .from('profiles')
+            .select('avatar')
+            .eq('role', 'admin');
+
+          if (adminData && adminData.length > 0) {
+            const rowWithConfig = adminData.find(r => r.avatar && r.avatar.startsWith('{"'));
+            if (rowWithConfig && rowWithConfig.avatar) {
+              const parsed = JSON.parse(rowWithConfig.avatar);
+              if (parsed[userRole]) {
+                setAllowedModules(parsed[userRole].modules);
+                localStorage.setItem('church_dynamic_roles', rowWithConfig.avatar);
+                return;
+              }
             }
           }
         }
