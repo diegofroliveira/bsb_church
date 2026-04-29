@@ -6,7 +6,7 @@ import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 EMAIL = "diego.fjddf@gmail.com"
-API_TOKEN = "ATATT3xFfGF0RKl7dKetWZ0bSZBFUjiPBX7g6ZNWP43ycoKY3bg1gg4i7DoVluHJRuBrEHo20F4kFOc9Hp4vdq0f65Ru58N5Y3IjLv2unRFLfULnTQhHr4fjrUvUVmMiJI_Wh9sGrjeHSK5SLyg83hrx7Ya1ZISGDQ332mvoA_-mN-9IQLRGfaE=01163D3B"
+API_TOKEN = "SEU_TOKEN_AQUI"
 PROJECT_KEY = "CHC"
 JIRA_URL = "https://sark-live.atlassian.net"
 ACCOUNT_ID = "70121:cc3fee71-9441-4291-b9f6-da340eddbfe2"
