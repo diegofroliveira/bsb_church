@@ -49,6 +49,28 @@ export const AdminUsers: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [syncMessage, setSyncMessage] = useState('');
+  const [cloudStatus, setCloudStatus] = useState<{
+    status: string;
+    conclusion: string | null;
+    updated_at: string | null;
+  } | null>(null);
+
+  const fetchCloudStatus = async () => {
+    try {
+      const res = await fetch('/api/trigger-sync');
+      if (res.ok) {
+        const data = await res.json();
+        setCloudStatus(data);
+      }
+    } catch (_) {}
+  };
+
+  useEffect(() => {
+    fetchCloudStatus();
+    // Atualiza a cada 15 segundos
+    const interval = setInterval(fetchCloudStatus, 15000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleTriggerSync = async () => {
     setIsSyncing(true);
@@ -463,6 +485,39 @@ export const AdminUsers: React.FC = () => {
                      A base de dados é atualizada automaticamente todo Domingo às 03:00. 
                      Caso você precise forçar uma atualização agora mesmo, clique no botão ao lado.
                   </p>
+                  
+                  {cloudStatus && cloudStatus.status !== 'none' && (
+                     <div className="mt-4 p-3 bg-gray-50 rounded-xl border border-gray-200/50 flex flex-col gap-1.5 max-w-md">
+                        <div className="flex items-center gap-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                           <span className={`w-2 h-2 rounded-full ${
+                              cloudStatus.status === 'in_progress' || cloudStatus.status === 'queued'
+                              ? 'bg-amber-500 animate-pulse' 
+                              : cloudStatus.conclusion === 'success' 
+                              ? 'bg-green-500' 
+                              : 'bg-red-500'
+                           }`}/>
+                           Robô: {
+                              cloudStatus.status === 'in_progress' || cloudStatus.status === 'queued' 
+                              ? 'Atualizando dados...' 
+                              : cloudStatus.conclusion === 'success' 
+                              ? 'Atualização finalizada' 
+                              : 'Falha na última execução'
+                           }
+                        </div>
+                        
+                        {cloudStatus.updated_at && (
+                           <div className="text-xs text-gray-400">
+                              Última sincronia completa: {new Date(cloudStatus.updated_at).toLocaleString('pt-BR', {
+                                 day: '2-digit',
+                                 month: '2-digit',
+                                 year: 'numeric',
+                                 hour: '2-digit',
+                                 minute: '2-digit'
+                              })}
+                           </div>
+                        )}
+                     </div>
+                  )}
                   
                   {syncStatus !== 'idle' && (
                      <div className={`mt-3 flex items-center gap-2 text-sm font-medium ${syncStatus === 'success' ? 'text-green-600' : 'text-red-600'}`}>
