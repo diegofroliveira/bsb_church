@@ -1,6 +1,9 @@
 name: Sincronização Automática Prover -> Supabase
 
 on:
+  push:
+    branches:
+      - feature/ai-features
   schedule:
     # Executa todo domingo às 03:00 da manhã (horário de Brasília/UTC-3 seria 06:00 UTC)
     # Formato Cron: Minuto Hora Dia Mês DiaDaSemana
