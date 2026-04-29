@@ -1,0 +1,43 @@
+name: Sincronização Automática Prover -> Supabase
+
+on:
+  schedule:
+    # Executa todo domingo às 03:00 da manhã (horário de Brasília/UTC-3 seria 06:00 UTC)
+    # Formato Cron: Minuto Hora Dia Mês DiaDaSemana
+    - cron: '0 6 * * 0'
+  
+  # Permite disparar o script manualmente clicando num botão lá no GitHub (Run workflow)
+  workflow_dispatch:
+
+jobs:
+  run-sync:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Baixar o código do repositório
+        uses: actions/checkout@v4
+        
+      - name: Instalar Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip' # Otimiza o tempo de build mantendo cache dos pacotes
+          
+      - name: Instalar Dependências do Python
+        run: |
+          python -m pip install --upgrade pip
+          pip install playwright pandas openpyxl supabase httpx beautifulsoup4
+          
+      - name: Instalar Navegador Chromium (Playwright)
+        run: playwright install chromium
+        
+      - name: Executar Script de Sincronização
+        env:
+          # O script Python vai puxar os Secrets que você vai cadastrar no repositório GitHub
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          # Se o seu extrator precisar de senhas de login do Prover via .env, mapeie aqui:
+          # PROVER_LOGIN: ${{ secrets.PROVER_LOGIN }}
+          # PROVER_SENHA: ${{ secrets.PROVER_SENHA }}
+        run: |
+          python run_sync.py
