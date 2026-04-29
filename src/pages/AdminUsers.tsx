@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { UserCog, Plus, Save, X, Loader2, Check, Shield, Eye, EyeOff, Trash2, Lock } from 'lucide-react';
+import { UserCog, Plus, Save, X, Loader2, Check, Shield, Eye, EyeOff, Trash2, Lock, Cloud, CloudLightning, AlertCircle, CheckCircle2 } from 'lucide-react';
 import clsx from 'clsx';
 
 // UUID especial para armazenar a configuração global de perfis
@@ -44,6 +44,43 @@ export const AdminUsers: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'users' | 'roles'>('users');
   const [users, setUsers] = useState<AppUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // States for the sync button
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [syncMessage, setSyncMessage] = useState('');
+
+  const handleTriggerSync = async () => {
+    setIsSyncing(true);
+    setSyncStatus('idle');
+    setSyncMessage('');
+    
+    try {
+      const response = await fetch('/api/trigger-sync', {
+        method: 'POST',
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        setSyncStatus('success');
+        setSyncMessage('Automação iniciada! Os dados serão atualizados em 1-2 minutos.');
+      } else {
+        setSyncStatus('error');
+        setSyncMessage(data.error || 'Erro ao acionar a nuvem.');
+      }
+    } catch (error) {
+      setSyncStatus('error');
+      setSyncMessage('Erro de conexão com o servidor.');
+    } finally {
+      setIsSyncing(false);
+      
+      // Limpar a mensagem de sucesso depois de um tempo
+      if (syncStatus === 'success') {
+         setTimeout(() => setSyncStatus('idle'), 8000);
+      }
+    }
+  };
   
   // Dynamic Roles State
   const [dynamicRoles, setDynamicRoles] = useState<Record<string, { label: string; modules: string[] }>>(DEFAULT_ROLES);
@@ -397,6 +434,39 @@ export const AdminUsers: React.FC = () => {
           </button>
         )}
       </header>
+
+      {/* Cloud Automation Card */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col mb-8 p-6">
+         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="flex gap-4 items-start">
+               <div className="p-3 bg-blue-50 text-blue-600 rounded-xl shrink-0">
+                  <CloudLightning className="w-6 h-6"/>
+               </div>
+               <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Automação de Dados (Nuvem)</h3>
+                  <p className="text-sm text-gray-500 max-w-xl mt-1">
+                     A base de dados é atualizada automaticamente todo Domingo às 03:00. 
+                     Caso você precise forçar uma atualização agora mesmo, clique no botão ao lado.
+                  </p>
+                  
+                  {syncStatus !== 'idle' && (
+                     <div className={`mt-3 flex items-center gap-2 text-sm font-medium ${syncStatus === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+                        {syncStatus === 'success' ? <CheckCircle2 className="w-4 h-4"/> : <AlertCircle className="w-4 h-4"/>}
+                        {syncMessage}
+                     </div>
+                  )}
+               </div>
+            </div>
+            <button 
+               onClick={handleTriggerSync}
+               disabled={isSyncing}
+               className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed text-white px-5 py-2.5 rounded-xl text-sm font-medium transition-colors shadow-sm shrink-0 w-full sm:w-auto"
+            >
+               {isSyncing ? <Loader2 className="w-4 h-4 animate-spin"/> : <Cloud className="w-4 h-4"/>}
+               {isSyncing ? 'Conectando...' : 'Forçar Atualização'}
+            </button>
+         </div>
+      </div>
 
       {/* Tabs */}
       <div className="flex border-b border-gray-100 mb-6 gap-6">
