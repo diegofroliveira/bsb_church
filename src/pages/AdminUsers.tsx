@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { UserCog, Plus, Save, X, Loader2, Check, Shield, Eye, EyeOff, Trash2, Lock, Cloud, CloudLightning, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { UserCog, Plus, Save, X, Loader2, Check, Shield, Eye, EyeOff, Trash2, Lock, Cloud, CloudLightning, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
 import clsx from 'clsx';
 
 // UUID especial para armazenar a configuração global de perfis
@@ -49,28 +49,49 @@ export const AdminUsers: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [syncMessage, setSyncMessage] = useState('');
-  const [cloudStatus, setCloudStatus] = useState<{
-    status: string;
-    conclusion: string | null;
-    updated_at: string | null;
-  } | null>(null);
+  const [cloudRuns, setCloudRuns] = useState<any[]>([]);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [progress, setProgress] = useState(0);
+
+  const latestRun = cloudRuns[0] || null;
 
   const fetchCloudStatus = async () => {
     try {
       const res = await fetch('/api/trigger-sync');
       if (res.ok) {
         const data = await res.json();
-        setCloudStatus(data);
+        setCloudRuns(data.runs || []);
       }
     } catch (_) {}
   };
 
   useEffect(() => {
     fetchCloudStatus();
-    // Atualiza a cada 15 segundos
-    const interval = setInterval(fetchCloudStatus, 15000);
+    const interval = setInterval(fetchCloudStatus, 10000); // Polling 10s
     return () => clearInterval(interval);
   }, []);
+
+  // Efeito da barra de progresso artificial
+  useEffect(() => {
+    let timer: any;
+    if (latestRun && (latestRun.status === 'in_progress' || latestRun.status === 'queued')) {
+      setProgress(5);
+      timer = setInterval(() => {
+        setProgress(prev => {
+          if (prev >= 95) return 95; // Trava em 95% até terminar
+          return prev + Math.floor(Math.random() * 5) + 1; // Incrementos aleatórios
+        });
+      }, 5000);
+    } else {
+      setProgress(100);
+      const clearTimer = setTimeout(() => setProgress(0), 4000);
+      return () => {
+         clearInterval(timer);
+         clearTimeout(clearTimer);
+      };
+    }
+    return () => clearInterval(timer);
+  }, [latestRun?.status]);
 
   const handleTriggerSync = async () => {
     setIsSyncing(true);
@@ -486,28 +507,47 @@ export const AdminUsers: React.FC = () => {
                      Caso você precise forçar uma atualização agora mesmo, clique no botão ao lado.
                   </p>
                   
-                  {cloudStatus && cloudStatus.status !== 'none' && (
-                     <div className="mt-4 p-3 bg-gray-50 rounded-xl border border-gray-200/50 flex flex-col gap-1.5 max-w-md">
-                        <div className="flex items-center gap-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                           <span className={`w-2 h-2 rounded-full ${
-                              cloudStatus.status === 'in_progress' || cloudStatus.status === 'queued'
-                              ? 'bg-amber-500 animate-pulse' 
-                              : cloudStatus.conclusion === 'success' 
-                              ? 'bg-green-500' 
-                              : 'bg-red-500'
-                           }`}/>
-                           Robô: {
-                              cloudStatus.status === 'in_progress' || cloudStatus.status === 'queued' 
-                              ? 'Atualizando dados...' 
-                              : cloudStatus.conclusion === 'success' 
-                              ? 'Atualização finalizada' 
-                              : 'Falha na última execução'
-                           }
+                  {latestRun && (
+                     <div className="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-200/50 flex flex-col gap-3 max-w-md">
+                        <div className="flex justify-between items-center">
+                           <div className="flex items-center gap-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                              <span className={`w-2 h-2 rounded-full ${
+                                 latestRun.status === 'in_progress' || latestRun.status === 'queued'
+                                 ? 'bg-amber-500 animate-pulse' 
+                                 : latestRun.conclusion === 'success' 
+                                 ? 'bg-green-500' 
+                                 : 'bg-red-500'
+                              }`}/>
+                              Robô: {
+                                 latestRun.status === 'in_progress' || latestRun.status === 'queued' 
+                                 ? 'Atualizando dados...' 
+                                 : latestRun.conclusion === 'success' 
+                                 ? 'Atualização finalizada' 
+                                 : 'Falha na última execução'
+                              }
+                           </div>
+                           
+                           <button 
+                              onClick={() => setShowHistoryModal(true)}
+                              className="text-xs text-blue-600 hover:text-blue-800 font-semibold underline flex items-center gap-1"
+                           >
+                              <Clock className="w-3 h-3"/> Ver Histórico
+                           </button>
                         </div>
+
+                        {/* Artificial Progress Bar */}
+                        {(latestRun.status === 'in_progress' || latestRun.status === 'queued' || progress > 0) && (
+                           <div className="w-full bg-gray-200 h-1.5 rounded-full overflow-hidden mt-1">
+                              <div 
+                                 className="bg-blue-600 h-full transition-all duration-500 ease-out rounded-full" 
+                                 style={{ width: `${progress}%` }}
+                              />
+                           </div>
+                        )}
                         
-                        {cloudStatus.updated_at && (
+                        {latestRun.updated_at && (
                            <div className="text-xs text-gray-400">
-                              Última sincronia completa: {new Date(cloudStatus.updated_at).toLocaleString('pt-BR', {
+                              Última sincronia completa: {new Date(latestRun.updated_at).toLocaleString('pt-BR', {
                                  day: '2-digit',
                                  month: '2-digit',
                                  year: 'numeric',
@@ -518,7 +558,7 @@ export const AdminUsers: React.FC = () => {
                         )}
                      </div>
                   )}
-                  
+
                   {syncStatus !== 'idle' && (
                      <div className={`mt-3 flex items-center gap-2 text-sm font-medium ${syncStatus === 'success' ? 'text-green-600' : 'text-red-600'}`}>
                         {syncStatus === 'success' ? <CheckCircle2 className="w-4 h-4"/> : <AlertCircle className="w-4 h-4"/>}
@@ -841,6 +881,86 @@ export const AdminUsers: React.FC = () => {
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
         <strong>Regra de Segurança:</strong> O perfil `Administrador` possui acesso irrevogável a todas as telas para evitar bloqueios acidentais no sistema.
       </div>
+
+      {/* History Modal Popup */}
+      {showHistoryModal && (
+         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
+            <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 w-full max-w-lg overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
+               <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                  <div className="flex items-center gap-2">
+                     <Clock className="w-5 h-5 text-gray-500"/>
+                     <h3 className="text-lg font-bold text-gray-900">Histórico de Atualizações</h3>
+                  </div>
+                  <button 
+                     onClick={() => setShowHistoryModal(false)}
+                     className="p-1 rounded-xl bg-gray-200/50 text-gray-500 hover:bg-gray-200 hover:text-gray-700 transition-colors"
+                  >
+                     <X className="w-5 h-5"/>
+                  </button>
+               </div>
+
+               <div className="p-6 flex-1 overflow-y-auto max-h-[60vh] space-y-3">
+                  {cloudRuns.length === 0 ? (
+                     <div className="text-center text-sm text-gray-400 py-8">
+                        Nenhuma execução encontrada.
+                     </div>
+                  ) : (
+                     cloudRuns.map((run) => (
+                        <div key={run.id} className="p-4 bg-white border border-gray-100 rounded-2xl flex items-center justify-between gap-4 shadow-sm hover:border-gray-200 transition-all">
+                           <div className="flex flex-col gap-1">
+                              <div className="flex items-center gap-2">
+                                 <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${
+                                    run.event === 'schedule' 
+                                    ? 'bg-purple-100 text-purple-700' 
+                                    : 'bg-blue-100 text-blue-700'
+                                 }`}>
+                                    {run.event === 'schedule' ? '🗓️ Agendada' : '⚡ Forçada'}
+                                 </span>
+                                 
+                                 <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${
+                                    run.status === 'completed' 
+                                       ? run.conclusion === 'success' 
+                                          ? 'bg-green-100 text-green-700' 
+                                          : 'bg-red-100 text-red-700'
+                                       : 'bg-amber-100 text-amber-700 animate-pulse'
+                                 }`}>
+                                    {run.status === 'completed' 
+                                       ? run.conclusion === 'success' 
+                                          ? 'Sucesso' 
+                                          : 'Falha'
+                                       : 'Executando...'}
+                                 </span>
+                              </div>
+                              <div className="text-xs text-gray-500 mt-1 font-medium">
+                                 {new Date(run.created_at).toLocaleString('pt-BR', {
+                                    day: '2-digit',
+                                    month: '2-digit',
+                                    year: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                 })}
+                              </div>
+                           </div>
+                           
+                           <div className="text-xs text-gray-400 font-mono">
+                              #{String(run.id).substring(0, 8)}
+                           </div>
+                        </div>
+                     ))
+                  )}
+               </div>
+
+               <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-end">
+                  <button 
+                     onClick={() => setShowHistoryModal(false)}
+                     className="px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white text-sm font-semibold rounded-xl transition-all shadow-sm"
+                  >
+                     Fechar
+                  </button>
+               </div>
+            </div>
+         </div>
+      )}
     </div>
   );
 };

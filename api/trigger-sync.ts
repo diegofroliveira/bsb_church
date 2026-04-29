@@ -14,7 +14,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Se for GET, busca o status das execuções
   if (req.method === 'GET') {
     try {
-      const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/actions/workflows/${workflow_id}/runs`, {
+      const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/actions/workflows/${workflow_id}/runs?per_page=10`, {
         method: 'GET',
         headers: {
           'Accept': 'application/vnd.github.v3+json',
@@ -27,17 +27,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const data = await response.json();
-      if (!data.workflow_runs || data.workflow_runs.length === 0) {
-        return res.status(200).json({ status: 'none', conclusion: null, updated_at: null });
+      if (!data.workflow_runs) {
+        return res.status(200).json({ runs: [] });
       }
 
-      // Pega a execução mais recente
-      const latestRun = data.workflow_runs[0];
-      return res.status(200).json({
-        status: latestRun.status, // e.g. completed, in_progress, queued
-        conclusion: latestRun.conclusion, // e.g. success, failure, null
-        updated_at: latestRun.updated_at
-      });
+      // Mapeia as 10 execuções mais recentes
+      const runs = data.workflow_runs.map((run: any) => ({
+        id: run.id,
+        status: run.status,
+        conclusion: run.conclusion,
+        event: run.event, // 'schedule' ou 'workflow_dispatch'
+        created_at: run.created_at,
+        updated_at: run.updated_at
+      }));
+
+      return res.status(200).json({ runs });
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao buscar status no GitHub' });
