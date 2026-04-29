@@ -7,8 +7,8 @@ def run_step(name, command):
     print(f"INICIANDO: {name}")
     print(f"{'='*60}")
     
-    # Usa o executável do venv
-    python_exe = ".\\venv\\Scripts\\python.exe"
+    # Usa o mesmo executável do Python atual
+    python_exe = sys.executable
     
     try:
         process = subprocess.Popen([python_exe] + command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding='utf-8')
