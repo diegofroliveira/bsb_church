@@ -208,7 +208,20 @@ export const AdminUsers: React.FC = () => {
         setDynamicRoles(parsed);
       }
 
-      // Busca dados sincronizados na nuvem usando o ID especial
+      // 1. Tenta buscar na nova tabela dedicada (global_settings)
+      const { data: globalData } = await supabase
+        .from('global_settings')
+        .select('value')
+        .eq('id', 'rbac_roles')
+        .single();
+
+      if (globalData?.value) {
+        setDynamicRoles(globalData.value);
+        localStorage.setItem('church_dynamic_roles', JSON.stringify(globalData.value));
+        return;
+      }
+
+      // 2. Fallback para a lógica antiga (ID especial no profiles)
       const { data } = await supabase
         .from('profiles')
         .select('avatar')
@@ -219,7 +232,7 @@ export const AdminUsers: React.FC = () => {
         setDynamicRoles(parsed);
         localStorage.setItem('church_dynamic_roles', data[0].avatar);
       } else {
-        // Fallback: busca em admins caso a transição ainda não tenha ocorrido
+        // Fallback: busca em admins antigos
         const { data: adminData } = await supabase
           .from('profiles')
           .select('avatar')
@@ -276,14 +289,25 @@ export const AdminUsers: React.FC = () => {
     try {
       localStorage.setItem('church_dynamic_roles', JSON.stringify(updatedRoles));
       
-      const { error } = await supabase.from('profiles').upsert({
-        id: SPECIAL_CONFIG_ID,
-        avatar: JSON.stringify(updatedRoles),
-        email: 'config@system.internal',
-        name: 'Configuração Global de Perfis',
-        role: 'system',
+      // Salva na nova tabela global_settings (Mais robusto, sem FK)
+      const { error } = await supabase.from('global_settings').upsert({
+        id: 'rbac_roles',
+        value: updatedRoles,
         updated_at: new Date().toISOString()
       });
+
+      if (error) {
+        console.warn('Falha ao salvar em global_settings, tentando fallback no profiles...', error);
+        // Fallback para o método antigo (pode falhar se a constraint FK estiver ativa)
+        await supabase.from('profiles').upsert({
+          id: SPECIAL_CONFIG_ID,
+          avatar: JSON.stringify(updatedRoles),
+          email: 'config@system.internal',
+          name: 'Configuração Global de Perfis',
+          role: 'system',
+          updated_at: new Date().toISOString()
+        });
+      }
 
       if (error) throw error;
 

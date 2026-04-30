@@ -40,7 +40,20 @@ export const MainLayout: React.FC = () => {
           }
         }
 
-        // Busca a configuração global do Supabase para sincronia em tempo real
+        // 1. Tenta buscar na nova tabela dedicada (global_settings)
+        const { data: globalData } = await supabase
+          .from('global_settings')
+          .select('value')
+          .eq('id', 'rbac_roles')
+          .single();
+
+        if (globalData?.value && globalData.value[userRole]) {
+          setAllowedModules(globalData.value[userRole].modules);
+          localStorage.setItem('church_dynamic_roles', JSON.stringify(globalData.value));
+          return;
+        }
+
+        // 2. Busca a configuração global do Supabase para sincronia em tempo real (Antigo)
         const { data } = await supabase
           .from('profiles')
           .select('avatar')
