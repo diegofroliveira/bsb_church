@@ -40,7 +40,24 @@ export const MainLayout: React.FC = () => {
           }
         }
 
-        // 1. Tenta buscar na nova tabela dedicada (global_settings)
+        // 1. Tenta buscar no Storage do Supabase (Mais estável que tabela)
+        try {
+          const { data: storageData } = await supabase.storage
+            .from('avatars')
+            .download('config/rbac_roles.json');
+
+          if (storageData) {
+            const text = await storageData.text();
+            const parsed = JSON.parse(text);
+            if (parsed[userRole]) {
+              setAllowedModules(parsed[userRole].modules);
+              localStorage.setItem('church_dynamic_roles', text);
+              return;
+            }
+          }
+        } catch (_) {}
+
+        // 2. Tenta buscar na tabela dedicada (global_settings)
         try {
           const { data: globalData } = await supabase
             .from('global_settings')
@@ -53,11 +70,9 @@ export const MainLayout: React.FC = () => {
             localStorage.setItem('church_dynamic_roles', JSON.stringify(globalData.value));
             return;
           }
-        } catch (_) {
-          // Ignora erro de cache de schema e segue para fallback
-        }
+        } catch (_) {}
 
-        // 2. Busca a configuração global do Supabase para sincronia em tempo real (Antigo)
+        // 3. Fallback final (Profiles antigo)
         const { data } = await supabase
           .from('profiles')
           .select('avatar')

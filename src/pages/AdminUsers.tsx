@@ -208,7 +208,24 @@ export const AdminUsers: React.FC = () => {
         setDynamicRoles(parsed);
       }
 
-      // 1. Tenta buscar na nova tabela dedicada (global_settings)
+      // 1. Tenta buscar no Storage do Supabase (Mais estável que tabela para configurações)
+      try {
+        const { data: storageData } = await supabase.storage
+          .from('avatars')
+          .download('config/rbac_roles.json');
+
+        if (storageData) {
+          const text = await storageData.text();
+          const parsed = JSON.parse(text);
+          setDynamicRoles(parsed);
+          localStorage.setItem('church_dynamic_roles', text);
+          return;
+        }
+      } catch (err) {
+        console.log('Configuração no Storage não encontrada, tentando fallbacks...');
+      }
+
+      // 2. Fallback para a lógica antiga (global_settings ou profiles)
       try {
         const { data: globalData } = await supabase
           .from('global_settings')
@@ -221,11 +238,8 @@ export const AdminUsers: React.FC = () => {
           localStorage.setItem('church_dynamic_roles', JSON.stringify(globalData.value));
           return;
         }
-      } catch (err) {
-        console.log('Tabela global_settings ainda não detectada ou inacessível.');
-      }
+      } catch (err) {}
 
-      // 2. Fallback para a lógica antiga (ID especial no profiles)
       const { data } = await supabase
         .from('profiles')
         .select('avatar')
@@ -236,7 +250,7 @@ export const AdminUsers: React.FC = () => {
         setDynamicRoles(parsed);
         localStorage.setItem('church_dynamic_roles', data[0].avatar);
       } else {
-        // Fallback: busca em admins antigos
+        // Fallback final: busca em admins antigos
         const { data: adminData } = await supabase
           .from('profiles')
           .select('avatar')
@@ -293,32 +307,36 @@ export const AdminUsers: React.FC = () => {
     try {
       localStorage.setItem('church_dynamic_roles', JSON.stringify(updatedRoles));
       
-      // Salva na nova tabela global_settings (Mais robusto, sem FK)
-      const { error: globalError } = await supabase.from('global_settings').upsert({
-        id: 'rbac_roles',
-        value: updatedRoles,
-        updated_at: new Date().toISOString()
-      });
+      // Salva no Storage do Supabase (Evita problemas de cache de schema e FK)
+      const rolesBlob = new Blob([JSON.stringify(updatedRoles)], { type: 'application/json' });
+      const { error: storageError } = await supabase.storage
+        .from('avatars')
+        .upload('config/rbac_roles.json', rolesBlob, {
+          upsert: true,
+          contentType: 'application/json'
+        });
 
-      if (globalError) {
-        console.warn('Falha ao salvar em global_settings:', globalError);
+      if (storageError) {
+        console.warn('Falha ao salvar no Storage:', storageError);
         
-        // Se o erro for de tabela não encontrada, dá uma instrução clara
-        if (globalError.message?.includes('not find the table')) {
-           alert('O banco de dados ainda não reconheceu a nova tabela global_settings. Por favor, atualize (F5) a página e tente novamente em 30 segundos.');
-        }
-
-        // Tenta fallback para o método antigo (profiles) como última alternativa
-        const { error: fallbackError } = await supabase.from('profiles').upsert({
-          id: SPECIAL_CONFIG_ID,
-          avatar: JSON.stringify(updatedRoles),
-          email: 'config@system.internal',
-          name: 'Configuração Global de Perfis',
-          role: 'system',
+        // Se falhar no storage, tenta a tabela global_settings (que criamos antes)
+        const { error: globalError } = await supabase.from('global_settings').upsert({
+          id: 'rbac_roles',
+          value: updatedRoles,
           updated_at: new Date().toISOString()
         });
-        
-        if (fallbackError) throw globalError; // Joga o erro original se o fallback também falhar
+
+        if (globalError) {
+          // Se tudo falhar, tenta o fallback final no profiles (que pode dar erro de FK)
+          await supabase.from('profiles').upsert({
+            id: SPECIAL_CONFIG_ID,
+            avatar: JSON.stringify(updatedRoles),
+            email: 'config@system.internal',
+            name: 'Configuração Global de Perfis',
+            role: 'system',
+            updated_at: new Date().toISOString()
+          });
+        }
       }
 
       setDynamicRoles(updatedRoles);
