@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { useAuth } from '../context/AuthContext';
 import { CalendarHeart, Copy, Download, Upload, Image as ImageIcon, CheckCircle2, AlertCircle, Loader2, RefreshCw } from 'lucide-react';
 import html2canvas from 'html2canvas';
 
@@ -138,9 +137,6 @@ export default function Birthdays() {
     setUploadError(null);
 
     try {
-      // Remove foto anterior caso exista (pode ser .jpg, .png, etc, mas vamos padronizar chamando de .jpg)
-      // Upload/Sobrescrever usando o upsert
-      const fileExt = file.name.split('.').pop();
       // Padroniza como JPG no path para não acumular lixo
       const filePath = `${memberId}.jpg`;
 
@@ -185,7 +181,6 @@ export default function Birthdays() {
 
       // Regra de exibição
       if (isChild) {
-         const displayName = m.apelido || m.nome.split(' ')[0];
          text += `*${m.nome.toUpperCase()}/${age} anos* ${parentText}${gcText}\n`;
       } else {
          const displayName = m.apelido || m.nome.split(' ')[0];
