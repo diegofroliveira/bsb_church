@@ -180,7 +180,7 @@ export default function Birthdays() {
     if (filter === 'amanha') label = 'amanhã';
     else if (filter === 'mes') label = 'deste mês';
     else if (filter === 'especifico' && specificDate) {
-       const [y, m, d] = specificDate.split('-');
+       const [_, m, d] = specificDate.split('-');
        label = `do dia ${d}/${m}`;
     }
 
