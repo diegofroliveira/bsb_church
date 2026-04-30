@@ -210,7 +210,7 @@ export const AdminUsers: React.FC = () => {
 
       // 1. Tenta buscar na nova tabela dedicada (global_settings)
       try {
-        const { data: globalData, error: globalError } = await supabase
+        const { data: globalData } = await supabase
           .from('global_settings')
           .select('value')
           .eq('id', 'rbac_roles')
@@ -320,8 +320,6 @@ export const AdminUsers: React.FC = () => {
         
         if (fallbackError) throw globalError; // Joga o erro original se o fallback também falhar
       }
-
-      if (error) throw error;
 
       setDynamicRoles(updatedRoles);
       alert('Perfis e Permissões salvos com sucesso na nuvem!');
