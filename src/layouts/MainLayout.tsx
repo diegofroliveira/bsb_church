@@ -41,16 +41,20 @@ export const MainLayout: React.FC = () => {
         }
 
         // 1. Tenta buscar na nova tabela dedicada (global_settings)
-        const { data: globalData } = await supabase
-          .from('global_settings')
-          .select('value')
-          .eq('id', 'rbac_roles')
-          .single();
+        try {
+          const { data: globalData } = await supabase
+            .from('global_settings')
+            .select('value')
+            .eq('id', 'rbac_roles')
+            .maybeSingle();
 
-        if (globalData?.value && globalData.value[userRole]) {
-          setAllowedModules(globalData.value[userRole].modules);
-          localStorage.setItem('church_dynamic_roles', JSON.stringify(globalData.value));
-          return;
+          if (globalData?.value && globalData.value[userRole]) {
+            setAllowedModules(globalData.value[userRole].modules);
+            localStorage.setItem('church_dynamic_roles', JSON.stringify(globalData.value));
+            return;
+          }
+        } catch (_) {
+          // Ignora erro de cache de schema e segue para fallback
         }
 
         // 2. Busca a configuração global do Supabase para sincronia em tempo real (Antigo)

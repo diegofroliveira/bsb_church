@@ -209,16 +209,20 @@ export const AdminUsers: React.FC = () => {
       }
 
       // 1. Tenta buscar na nova tabela dedicada (global_settings)
-      const { data: globalData } = await supabase
-        .from('global_settings')
-        .select('value')
-        .eq('id', 'rbac_roles')
-        .single();
+      try {
+        const { data: globalData, error: globalError } = await supabase
+          .from('global_settings')
+          .select('value')
+          .eq('id', 'rbac_roles')
+          .maybeSingle();
 
-      if (globalData?.value) {
-        setDynamicRoles(globalData.value);
-        localStorage.setItem('church_dynamic_roles', JSON.stringify(globalData.value));
-        return;
+        if (globalData?.value) {
+          setDynamicRoles(globalData.value);
+          localStorage.setItem('church_dynamic_roles', JSON.stringify(globalData.value));
+          return;
+        }
+      } catch (err) {
+        console.log('Tabela global_settings ainda não detectada ou inacessível.');
       }
 
       // 2. Fallback para a lógica antiga (ID especial no profiles)
@@ -290,16 +294,22 @@ export const AdminUsers: React.FC = () => {
       localStorage.setItem('church_dynamic_roles', JSON.stringify(updatedRoles));
       
       // Salva na nova tabela global_settings (Mais robusto, sem FK)
-      const { error } = await supabase.from('global_settings').upsert({
+      const { error: globalError } = await supabase.from('global_settings').upsert({
         id: 'rbac_roles',
         value: updatedRoles,
         updated_at: new Date().toISOString()
       });
 
-      if (error) {
-        console.warn('Falha ao salvar em global_settings, tentando fallback no profiles...', error);
-        // Fallback para o método antigo (pode falhar se a constraint FK estiver ativa)
-        await supabase.from('profiles').upsert({
+      if (globalError) {
+        console.warn('Falha ao salvar em global_settings:', globalError);
+        
+        // Se o erro for de tabela não encontrada, dá uma instrução clara
+        if (globalError.message?.includes('not find the table')) {
+           alert('O banco de dados ainda não reconheceu a nova tabela global_settings. Por favor, atualize (F5) a página e tente novamente em 30 segundos.');
+        }
+
+        // Tenta fallback para o método antigo (profiles) como última alternativa
+        const { error: fallbackError } = await supabase.from('profiles').upsert({
           id: SPECIAL_CONFIG_ID,
           avatar: JSON.stringify(updatedRoles),
           email: 'config@system.internal',
@@ -307,6 +317,8 @@ export const AdminUsers: React.FC = () => {
           role: 'system',
           updated_at: new Date().toISOString()
         });
+        
+        if (fallbackError) throw globalError; // Joga o erro original se o fallback também falhar
       }
 
       if (error) throw error;
