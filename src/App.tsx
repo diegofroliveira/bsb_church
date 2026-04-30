@@ -19,6 +19,7 @@ import { AdminUsers } from './pages/AdminUsers';
 import Georeferencing from './pages/Georeferencing';
 import { AiConsultant } from './pages/AiConsultant';
 import { AiInsights } from './pages/AiInsights';
+import Birthdays from './pages/Birthdays';
 
 function App() {
   return (
@@ -49,6 +50,7 @@ function App() {
               <Route path="/my-group" element={<MyGroup />} />
               <Route path="/ai-consultant" element={<AiConsultant />} />
               <Route path="/ai-insights" element={<AiInsights />} />
+              <Route path="/birthdays" element={<Birthdays />} />
             </Route>
           </Route>
 

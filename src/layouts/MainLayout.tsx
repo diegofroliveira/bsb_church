@@ -3,16 +3,16 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, Users, Home, DollarSign, Settings, LogOut,
   Menu, BookOpen, FileText, Network, AlertTriangle, MapPin,
-  Brain
+  Brain, CalendarHeart
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import clsx from 'clsx';
 
 const DEFAULT_ROLES: Record<string, string[]> = {
-  admin: ['Dashboard', 'Mapa', 'Membros', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Financeiro', 'Consultor IA', 'Insights IA', 'Configurações'],
-  pastor: ['Dashboard', 'Mapa', 'Membros', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Financeiro', 'Consultor IA', 'Insights IA'],
-  secretaria: ['Dashboard', 'Membros', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Consultor IA'],
+  admin: ['Dashboard', 'Mapa', 'Membros', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Financeiro', 'Consultor IA', 'Insights IA', 'Configurações', 'Aniversariantes'],
+  pastor: ['Dashboard', 'Mapa', 'Membros', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Financeiro', 'Consultor IA', 'Insights IA', 'Aniversariantes'],
+  secretaria: ['Dashboard', 'Membros', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Consultor IA', 'Aniversariantes'],
   financeiro: ['Dashboard', 'Financeiro']
 };
 
@@ -96,6 +96,7 @@ export const MainLayout: React.FC = () => {
     { id: 'QA',              name: 'QA',              path: '/qa',           icon: AlertTriangle },
     { id: 'Financeiro',      name: 'Financeiro',      path: '/finance',      icon: DollarSign },
     { id: 'Consultor IA',    name: 'IA',              path: '/ai-consultant', icon: Brain },
+    { id: 'Aniversariantes', name: 'Aniversariantes', path: '/birthdays',    icon: CalendarHeart },
     { id: 'Configurações',   name: 'Configurações',   path: '/admin/users',  icon: Settings },
   ];
 
