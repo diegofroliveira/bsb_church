@@ -17,7 +17,9 @@ interface Member {
 export default function Birthdays() {
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'hoje' | 'amanha' | 'mes'>('hoje');
+  type FilterType = 'hoje' | 'amanha' | 'mes' | 'especifico';
+  const [filter, setFilter] = useState<FilterType>('hoje');
+  const [specificDate, setSpecificDate] = useState<string>('');
   const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -27,7 +29,7 @@ export default function Birthdays() {
 
   useEffect(() => {
     fetchBirthdays();
-  }, [filter]);
+  }, [filter, specificDate]);
 
   const fetchBirthdays = async () => {
     setLoading(true);
@@ -81,7 +83,17 @@ export default function Birthdays() {
           return bDay === currentDay && bMonth === currentMonth;
         } else if (filter === 'amanha') {
           return bDay === tomDay && bMonth === tomMonth;
+        } else if (filter === 'especifico' && specificDate) {
+          const specParts = specificDate.split('-');
+          if (specParts.length >= 3) {
+            const specDay = parseInt(specParts[2], 10);
+            const specMonth = parseInt(specParts[1], 10);
+            return bDay === specDay && bMonth === specMonth;
+          }
+          return false;
         } else {
+          // 'mes' or 'especifico' without date yet
+          if (filter === 'especifico' && !specificDate) return false;
           return bMonth === currentMonth;
         }
       }) || [];
@@ -164,7 +176,15 @@ export default function Birthdays() {
   const generateMessageText = () => {
     if (members.length === 0) return '';
 
-    let text = `Bom dia,\n\nOs aniversariantes de hoje são:\n`;
+    let label = 'hoje';
+    if (filter === 'amanha') label = 'amanhã';
+    else if (filter === 'mes') label = 'deste mês';
+    else if (filter === 'especifico' && specificDate) {
+       const [y, m, d] = specificDate.split('-');
+       label = `do dia ${d}/${m}`;
+    }
+
+    let text = `Bom dia,\n\nOs aniversariantes ${label} são:\n`;
 
     members.forEach(m => {
       const age = calculateAge(m.nascimento);
@@ -276,6 +296,22 @@ export default function Birthdays() {
         >
           Todo o Mês
         </button>
+        <div className="flex items-center gap-2 pb-4">
+           <button 
+             onClick={() => setFilter('especifico')}
+             className={`font-bold text-sm transition-all ${filter === 'especifico' ? "text-pink-600" : "text-gray-400 hover:text-gray-600"}`}
+           >
+             Data Específica:
+           </button>
+           {filter === 'especifico' && (
+              <input 
+                 type="date" 
+                 value={specificDate}
+                 onChange={(e) => setSpecificDate(e.target.value)}
+                 className="text-sm border border-gray-200 rounded-lg px-2 py-1 outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500"
+              />
+           )}
+        </div>
       </div>
 
       {loading ? (
