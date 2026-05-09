@@ -40,14 +40,14 @@ export const Reports: React.FC = () => {
         });
 
         const discipuladorMap: Record<string, string> = {};
-        allDisc.forEach(d => {
+        allDisc.forEach((d: any) => {
            if (d.discipulo && d.discipulador) {
                discipuladorMap[d.discipulo.trim().toLowerCase()] = d.discipulador;
            }
         });
 
         // Enrich members with relational data
-        const enrichedMembers = allMembros.map(m => {
+        const enrichedMembers = allMembros.map((m: any) => {
            const nomeLower = (m.nome || m.name || '').trim().toLowerCase();
            const gcLower = (m.grupos_caseiros || '').trim().toLowerCase();
            return {
