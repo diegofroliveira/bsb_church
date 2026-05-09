@@ -152,7 +152,7 @@ export const QA: React.FC = () => {
           const m = membrosMap.get(normalizeStr(c.lider));
           return !m || m.status !== 'Ativo';
         });
-        newReports.push({ id: 'celula_sem_lider', title: 'Grupos sem Líder Válido', description: 'Células cujo líder está vazio, não existe na base ou está inativo.', count: celulasSemLider.length, severity: 'high', data: celulasSemLider.map(c => ({ grupo: c.grupo_caseiro, lider: c.lider || '(vazio)', setor: c.setor })), columns: [{ key: 'grupo', label: 'Grupo' }, { key: 'lider', label: 'Líder Atual' }, { key: 'setor', label: 'Setor' }] });
+        newReports.push({ id: 'celula_sem_lider', title: 'Grupos sem Líder Válido', description: 'Células cujo líder está vazio, não existe na base ou está inativo.', count: celulasSemLider.length, severity: 'high', data: celulasSemLider.map((c: any) => ({ grupo: c.grupo_caseiro, lider: c.lider || '(vazio)', setor: c.setor })), columns: [{ key: 'grupo', label: 'Grupo' }, { key: 'lider', label: 'Líder Atual' }, { key: 'setor', label: 'Setor' }] });
 
         // 5. Loops no Discipulado
         const edges = discipulado.map((d: any) => ({ from: normalizeStr(d.discipulador), to: normalizeStr(d.discipulo) })).filter(e => e.from && e.to);
@@ -161,7 +161,7 @@ export const QA: React.FC = () => {
 
         // 6. Membros em Grupos Inexistentes
         const grupoFantasma = membros.filter((m: any) => m.grupos_caseiros && m.grupos_caseiros.trim() !== '' && !gruposNomes.has(normalizeStr(m.grupos_caseiros)));
-        newReports.push({ id: 'grupo_fantasma', title: 'Membros em Grupos Inexistentes', description: 'Membros associados a um Grupo Caseiro que não existe na tabela oficial de Células.', count: grupoFantasma.length, severity: 'medium', data: grupoFantasma.map(m => ({ nome: m.nome, grupo: m.grupos_caseiros })), columns: [{ key: 'nome', label: 'Nome' }, { key: 'grupo', label: 'Grupo Digitado' }] });
+        newReports.push({ id: 'grupo_fantasma', title: 'Membros em Grupos Inexistentes', description: 'Membros associados a um Grupo Caseiro que não existe na tabela oficial de Células.', count: grupoFantasma.length, severity: 'medium', data: grupoFantasma.map((m: any) => ({ nome: m.nome, grupo: m.grupos_caseiros })), columns: [{ key: 'nome', label: 'Nome' }, { key: 'grupo', label: 'Grupo Digitado' }] });
 
         // 7. Nomes Órfãos no Discipulado
         const typos = [...allDiscNames].filter(nome => nome && !membrosNomes.has(nome as string));
@@ -183,7 +183,7 @@ export const QA: React.FC = () => {
           const atual = grupoCount[normalizeStr(c.grupo_caseiro)] || 0;
           return limite > 0 && atual > limite;
         });
-        newReports.push({ id: 'superlotada', title: 'Células Acima da Capacidade', description: 'Grupos com mais membros cadastrados do que o limite definido — indicativo de necessidade de multiplicação.', count: superlotadas.length, severity: 'medium', data: superlotadas.map(c => ({ grupo: c.grupo_caseiro, atual: grupoCount[normalizeStr(c.grupo_caseiro)] || 0, limite: c.limite_de_pessoas, setor: c.setor })), columns: [{ key: 'grupo', label: 'Grupo' }, { key: 'atual', label: 'Membros Atuais' }, { key: 'limite', label: 'Limite' }, { key: 'setor', label: 'Setor' }] });
+        newReports.push({ id: 'superlotada', title: 'Células Acima da Capacidade', description: 'Grupos com mais membros cadastrados do que o limite definido — indicativo de necessidade de multiplicação.', count: superlotadas.length, severity: 'medium', data: superlotadas.map((c: any) => ({ grupo: c.grupo_caseiro, atual: grupoCount[normalizeStr(c.grupo_caseiro)] || 0, limite: c.limite_de_pessoas, setor: c.setor })), columns: [{ key: 'grupo', label: 'Grupo' }, { key: 'atual', label: 'Membros Atuais' }, { key: 'limite', label: 'Limite' }, { key: 'setor', label: 'Setor' }] });
 
         // 11. PossÃ­veis Duplicatas de Membros
         const nomesList = membros.map(m => normalizeStr(m.nome)).filter(Boolean);
