@@ -105,14 +105,14 @@ export const QA: React.FC = () => {
         const celulas = celulasRes.data || [];
         const discipulado = discRes.data || [];
 
-        const membrosNomes = new Set(membros.map(m => normalizeStr(m.nome)));
-        const membrosMap = new Map(membros.map(m => [normalizeStr(m.nome), m]));
-        const gruposNomes = new Set(celulas.map(c => normalizeStr(c.grupo_caseiro)));
-        const discipuladores = new Set(discipulado.map(d => normalizeStr(d.discipulador)));
-        const discipulos = new Set(discipulado.map(d => normalizeStr(d.discipulo)));
+        const membrosNomes = new Set(membros.map((m: any) => normalizeStr(m.nome)));
+        const membrosMap = new Map(membros.map((m: any) => [normalizeStr(m.nome), m] as [string, any]));
+        const gruposNomes = new Set(celulas.map((c: any) => normalizeStr(c.grupo_caseiro)));
+        const discipuladores = new Set(discipulado.map((d: any) => normalizeStr(d.discipulador)));
+        const discipulos = new Set(discipulado.map((d: any) => normalizeStr(d.discipulo)));
         const allDiscNames = new Set([...discipuladores, ...discipulos]);
         const discOriginalNames = new Map<string, string>();
-        discipulado.forEach(d => {
+        discipulado.forEach((d: any) => {
           if (d.discipulador) discOriginalNames.set(normalizeStr(d.discipulador), d.discipulador);
           if (d.discipulo) discOriginalNames.set(normalizeStr(d.discipulo), d.discipulo);
         });
@@ -120,7 +120,7 @@ export const QA: React.FC = () => {
         const newReports: QAReport[] = [];
 
         // 1. Membros sem Discipulador
-        const semDisc = membros.filter(m => {
+        const semDisc = membros.filter((m: any) => {
           if (m.status !== 'Ativo') return false;
           const tipo = (m.tipo_cadastro || '').toLowerCase();
           if (tipo.includes('pastor') || tipo.includes('ext') || tipo.includes('agregado') || tipo.includes('externo')) return false;
@@ -130,7 +130,7 @@ export const QA: React.FC = () => {
         newReports.push({ id: 'sem_disc', title: 'Membros sem Discipulador', description: 'Membros/Líderes/Diáconos ativos que não aparecem como discípulo de ninguém.', count: semDisc.length, severity: 'high', data: semDisc.map(m => ({ nome: m.nome, tipo: m.tipo_cadastro })), columns: [{ key: 'nome', label: 'Nome' }, { key: 'tipo', label: 'Tipo' }] });
 
         // 2. Ativos sem Grupo Caseiro
-        const semGrupo = membros.filter(m => {
+        const semGrupo = membros.filter((m: any) => {
           if (m.status !== 'Ativo') return false;
           if (m.grupos_caseiros && m.grupos_caseiros.trim() !== '') return false;
           const tipo = (m.tipo_cadastro || '').toLowerCase();
@@ -147,7 +147,7 @@ export const QA: React.FC = () => {
         newReports.push({ id: 'disc_inativo', title: 'Discipuladores Inativos', description: 'Pessoas inativas que ainda constam como líderes de alguém na rede de discipulado.', count: discInativos.length, severity: 'high', data: discInativos.map(nome => ({ nome, status: membrosMap.get(nome)?.status || 'Inativo' })), columns: [{ key: 'nome', label: 'Nome' }, { key: 'status', label: 'Status' }] });
 
         // 4. Grupos Caseiros sem LÃ­der VÃ¡lido
-        const celulasSemLider = celulas.filter(c => {
+        const celulasSemLider = celulas.filter((c: any) => {
           if (!c.lider) return true;
           const m = membrosMap.get(normalizeStr(c.lider));
           return !m || m.status !== 'Ativo';
@@ -155,30 +155,30 @@ export const QA: React.FC = () => {
         newReports.push({ id: 'celula_sem_lider', title: 'Grupos sem Líder Válido', description: 'Células cujo líder está vazio, não existe na base ou está inativo.', count: celulasSemLider.length, severity: 'high', data: celulasSemLider.map(c => ({ grupo: c.grupo_caseiro, lider: c.lider || '(vazio)', setor: c.setor })), columns: [{ key: 'grupo', label: 'Grupo' }, { key: 'lider', label: 'Líder Atual' }, { key: 'setor', label: 'Setor' }] });
 
         // 5. Loops no Discipulado
-        const edges = discipulado.map(d => ({ from: normalizeStr(d.discipulador), to: normalizeStr(d.discipulo) })).filter(e => e.from && e.to);
+        const edges = discipulado.map((d: any) => ({ from: normalizeStr(d.discipulador), to: normalizeStr(d.discipulo) })).filter(e => e.from && e.to);
         const cycles = findCycles(edges);
         newReports.push({ id: 'loop_rede', title: 'Loops no Discipulado', description: 'Discipulado circular (A → B → A), que quebra hierarquias lógicas.', count: cycles.length, severity: 'high', data: cycles.map((c, i) => ({ loop: c.join(' ➜ '), num: i + 1 })), columns: [{ key: 'num', label: '#' }, { key: 'loop', label: 'Ciclo Detectado' }] });
 
         // 6. Membros em Grupos Inexistentes
-        const grupoFantasma = membros.filter(m => m.grupos_caseiros && m.grupos_caseiros.trim() !== '' && !gruposNomes.has(normalizeStr(m.grupos_caseiros)));
+        const grupoFantasma = membros.filter((m: any) => m.grupos_caseiros && m.grupos_caseiros.trim() !== '' && !gruposNomes.has(normalizeStr(m.grupos_caseiros)));
         newReports.push({ id: 'grupo_fantasma', title: 'Membros em Grupos Inexistentes', description: 'Membros associados a um Grupo Caseiro que não existe na tabela oficial de Células.', count: grupoFantasma.length, severity: 'medium', data: grupoFantasma.map(m => ({ nome: m.nome, grupo: m.grupos_caseiros })), columns: [{ key: 'nome', label: 'Nome' }, { key: 'grupo', label: 'Grupo Digitado' }] });
 
         // 7. Nomes Órfãos no Discipulado
-        const typos = [...allDiscNames].filter(nome => nome && !membrosNomes.has(nome));
-        newReports.push({ id: 'typo_disc', title: 'Nomes Órfãos no Discipulado', description: 'Nomes na tabela de Discipulado que não têm cadastro correspondente na tabela de Membros.', count: typos.length, severity: 'medium', data: typos.map(nome => ({ nome: discOriginalNames.get(nome) || nome })), columns: [{ key: 'nome', label: 'Nome no Discipulado' }] });
+        const typos = [...allDiscNames].filter(nome => nome && !membrosNomes.has(nome as string));
+        newReports.push({ id: 'typo_disc', title: 'Nomes Órfãos no Discipulado', description: 'Nomes na tabela de Discipulado que não têm cadastro correspondente na tabela de Membros.', count: typos.length, severity: 'medium', data: typos.map(nome => ({ nome: (discOriginalNames.get(nome as string) || nome) as string })), columns: [{ key: 'nome', label: 'Nome no Discipulado' }] });
 
         // 8. Ativos sem Telefone
-        const semTel = membros.filter(m => m.status === 'Ativo' && (!m.celular_principal_sms || String(m.celular_principal_sms).trim().length < 8));
+        const semTel = membros.filter((m: any) => m.status === 'Ativo' && (!m.celular_principal_sms || String(m.celular_principal_sms).trim().length < 8));
         newReports.push({ id: 'sem_tel', title: 'Membros Ativos sem Telefone', description: 'Cadastros sem celular dificultam contato e comunicação pastoral.', count: semTel.length, severity: 'low', data: semTel.map(m => ({ nome: m.nome, tipo: m.tipo_cadastro })), columns: [{ key: 'nome', label: 'Nome' }, { key: 'tipo', label: 'Tipo' }] });
 
         // 9. Ativos sem Email
-        const semEmail = membros.filter(m => m.status === 'Ativo' && (!m.email || m.email.trim() === '' || !m.email.includes('@')));
+        const semEmail = membros.filter((m: any) => m.status === 'Ativo' && (!m.email || m.email.trim() === '' || !m.email.includes('@')));
         newReports.push({ id: 'sem_email', title: 'Membros Ativos sem Email', description: 'Cadastros sem e-mail válido limitam comunicação digital e convites.', count: semEmail.length, severity: 'low', data: semEmail.map(m => ({ nome: m.nome, tipo: m.tipo_cadastro })), columns: [{ key: 'nome', label: 'Nome' }, { key: 'tipo', label: 'Tipo' }] });
 
         // 10. Células Acima da Capacidade
         const grupoCount: Record<string, number> = {};
-        membros.forEach(m => { if (m.grupos_caseiros) grupoCount[normalizeStr(m.grupos_caseiros)] = (grupoCount[normalizeStr(m.grupos_caseiros)] || 0) + 1; });
-        const superlotadas = celulas.filter(c => {
+        membros.forEach((m: any) => { if (m.grupos_caseiros) grupoCount[normalizeStr(m.grupos_caseiros)] = (grupoCount[normalizeStr(m.grupos_caseiros)] || 0) + 1; });
+        const superlotadas = celulas.filter((c: any) => {
           const limite = parseFloat(c.limite_de_pessoas) || 0;
           const atual = grupoCount[normalizeStr(c.grupo_caseiro)] || 0;
           return limite > 0 && atual > limite;

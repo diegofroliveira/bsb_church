@@ -33,7 +33,7 @@ export const Reports: React.FC = () => {
 
         // Build mapping dictionaries for O(1) lookups
         const setorMap: Record<string, string> = {};
-        allCelulas.forEach(c => {
+        allCelulas.forEach((c: any) => {
            if (c.grupo_caseiro && c.setor) {
                setorMap[c.grupo_caseiro.toLowerCase()] = c.setor;
            }
