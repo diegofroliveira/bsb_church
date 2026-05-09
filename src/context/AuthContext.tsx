@@ -11,6 +11,7 @@ export interface User {
   role: Role;
   avatar?: string;
   groupId?: string; 
+  assigned_gc?: string;
 }
 
 interface AuthContextType {
@@ -36,6 +37,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       role: (sbUser.user_metadata?.role as Role) || 'pastor', // Default role if not set
       avatar: sbUser.user_metadata?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${sbUser.id}`,
       groupId: sbUser.user_metadata?.groupId,
+      assigned_gc: sbUser.user_metadata?.assigned_gc,
     };
   };
 
