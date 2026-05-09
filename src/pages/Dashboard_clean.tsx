@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { 
@@ -12,7 +12,7 @@ export const Dashboard: React.FC = () => {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState<any>({
-    totalMembros: 0,embrosAtivos: 0,totalVisitantes: 0,totalCelulas: 0,arrecadacaoMes: 0
+    totalMembros: 0, membrosAtivos: 0, totalVisitantes: 0, totalCelulas: 0, arrecadacaoMes: 0
   });
 
   const [charts, setCharts] = useState<any>({
