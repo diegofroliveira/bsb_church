@@ -24,7 +24,7 @@ export const Reports: React.FC = () => {
         const [membrosRes, celulasRes, discRes] = await Promise.all([
            supabase.from('membros').select('*').limit(10000),
            supabase.from('celulas').select('grupo_caseiro, setor'),
-           supabase.from('discipulado').select('mestre, discipulo, status')
+           supabase.from('discipulado').select('discipulador, mestre, discipulo, status')
         ]);
         
         const allMembros = membrosRes.data || [];
@@ -41,8 +41,9 @@ export const Reports: React.FC = () => {
 
         const mestreMap: Record<string, string> = {};
         allDisc.forEach(d => {
-           if (d.discipulo && d.mestre) {
-               mestreMap[d.discipulo.toLowerCase()] = d.mestre;
+           const discipulador = d.discipulador || d.mestre;
+           if (d.discipulo && discipulador) {
+               mestreMap[d.discipulo.toLowerCase()] = discipulador;
            }
         });
 

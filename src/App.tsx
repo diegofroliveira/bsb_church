@@ -4,6 +4,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { MainLayout } from './layouts/MainLayout';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
+import { Birthdays } from './pages/Birthdays';
 import { Members } from './pages/Members';
 import { MyGroup } from './pages/MyGroup';
 import { Discipleship } from './pages/Discipleship';
@@ -23,6 +24,7 @@ function App() {
               <Route path="/" element={<Dashboard />} />
               
               <Route path="/members" element={<Members />} />
+              <Route path="/birthdays" element={<Birthdays />} />
               
               <Route element={<ProtectedRoute allowedRoles={['admin', 'pastor', 'secretary']} />}>
                  <Route path="/reports" element={<Reports />} />
