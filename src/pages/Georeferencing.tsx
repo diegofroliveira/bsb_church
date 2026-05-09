@@ -506,7 +506,7 @@ const Georeferencing: React.FC = () => {
               draggable={editingId === loc.id}
               eventHandlers={{
                 click: () => setSelectedLocation(loc),
-                dragend: (e) => handleMarkerDragEnd(loc.id, e.target.getLatLng()),
+                dragend: (e: any) => handleMarkerDragEnd(loc.id, e.target.getLatLng()),
               }}
             >
               <Popup>

@@ -12,6 +12,7 @@ export interface User {
   avatar?: string;
   groupId?: string; 
   assigned_gc?: string;
+  forcePasswordReset?: boolean;
 }
 
 interface AuthContextType {
