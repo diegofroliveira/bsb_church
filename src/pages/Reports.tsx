@@ -40,7 +40,9 @@ export const Reports: React.FC = () => {
     { key: 'bairro', label: 'Bairro' },
     { key: 'cidade', label: 'Cidade' },
     { key: 'uf', label: 'UF' },
-    { key: 'status', label: 'Status' }
+    { key: 'status', label: 'Status' },
+    { key: 'tipo_de_pessoa', label: 'Tipo de Pessoa' },
+    { key: 'status_pessoa', label: 'Status Pessoa' }
   ];
 
   useEffect(() => {
