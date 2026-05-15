@@ -19,6 +19,28 @@ export const Reports: React.FC = () => {
   const [filterMaritalStatus, setFilterMaritalStatus] = useState('Todos');
   const [filterMinAge, setFilterMinAge] = useState<number>(0);
   const [filterMaxAge, setFilterMaxAge] = useState<number>(120);
+  
+  const [selectedColumns, setSelectedColumns] = useState<string[]>([
+    'nome', 'tipo_cadastro', 'grupos_caseiros', 'setor', 'discipulador', 'celular_principal_sms', 'email', 'nascimento', 'sexo', 'estado_civil'
+  ]);
+
+  const columnOptions = [
+    { key: 'nome', label: 'Nome' },
+    { key: 'tipo_cadastro', label: 'Vínculo' },
+    { key: 'grupos_caseiros', label: 'GC' },
+    { key: 'setor', label: 'Setor' },
+    { key: 'discipulador', label: 'Discipulador' },
+    { key: 'celular_principal_sms', label: 'Telefone' },
+    { key: 'email', label: 'E-mail' },
+    { key: 'nascimento', label: 'Nascimento' },
+    { key: 'sexo', label: 'Sexo' },
+    { key: 'estado_civil', label: 'Estado Civil' },
+    { key: 'cpf', label: 'CPF' },
+    { key: 'bairro', label: 'Bairro' },
+    { key: 'cidade', label: 'Cidade' },
+    { key: 'uf', label: 'UF' },
+    { key: 'status', label: 'Status' }
+  ];
 
   useEffect(() => {
     const fetchAllData = async () => {
@@ -127,15 +149,22 @@ export const Reports: React.FC = () => {
 
   const handleExportCSV = () => {
     if (filteredMembers.length === 0) return;
-    const headers = Object.keys(filteredMembers[0]);
+    
     const escapeCsv = (val: any) => {
         if (val == null) return '""';
         const str = String(val).replace(/"/g, '""');
         return `"${str}"`;
     };
+
+    const headers = selectedColumns.map(key => columnOptions.find(o => o.key === key)?.label || key);
     const csvContent = [
       headers.join(','),
-      ...filteredMembers.map(item => headers.map(header => escapeCsv(item[header])).join(','))
+      ...filteredMembers.map(item => selectedColumns.map(key => {
+        let val = item[key];
+        // Special case for age if requested (not in db but calculated)
+        if (key === 'idade') val = calculateAge(item.nascimento || item.data_nascimento);
+        return escapeCsv(val);
+      }).join(','))
     ].join('\n');
 
     const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -262,6 +291,39 @@ export const Reports: React.FC = () => {
              </div>
           </div>
 
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="bg-gray-50/50 px-6 py-3 border-b border-gray-100 flex items-center justify-between">
+           <h3 className="text-sm font-bold text-gray-700 flex items-center gap-2">
+             <Filter className="h-4 w-4 text-primary-500" /> Configurar Exportação
+           </h3>
+           <div className="flex gap-4">
+              <button onClick={() => setSelectedColumns(columnOptions.map(o => o.key))} className="text-[10px] font-bold text-primary-600 uppercase hover:underline">Selecionar Tudo</button>
+              <button onClick={() => setSelectedColumns(['nome'])} className="text-[10px] font-bold text-gray-400 uppercase hover:underline">Limpar</button>
+           </div>
+        </div>
+        <div className="p-6">
+           <p className="text-xs text-gray-500 mb-4 italic">Selecione abaixo as colunas que deseja incluir no arquivo final (XLSX/CSV). Deixe marcado apenas o que for essencial para a secretaria.</p>
+           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+              {columnOptions.map(opt => (
+                <label key={opt.key} className="flex items-center gap-2 cursor-pointer group">
+                   <input 
+                     type="checkbox" 
+                     checked={selectedColumns.includes(opt.key)}
+                     onChange={(e) => {
+                       if (e.target.checked) setSelectedColumns([...selectedColumns, opt.key]);
+                       else setSelectedColumns(selectedColumns.filter(c => c !== opt.key));
+                     }}
+                     className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 h-4 w-4"
+                   />
+                   <span className={clsx("text-xs font-medium transition-colors", selectedColumns.includes(opt.key) ? "text-gray-900" : "text-gray-400 group-hover:text-gray-600")}>
+                     {opt.label}
+                   </span>
+                </label>
+              ))}
+           </div>
         </div>
       </div>
 
