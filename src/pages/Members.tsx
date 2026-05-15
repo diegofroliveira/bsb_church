@@ -96,9 +96,6 @@ export const Members: React.FC = () => {
     return 'Idoso';
   };
 
-  const getAgeRange = (age: number) => {
-    return age; // Not used as a range string anymore
-  };
 
   // Unique Options
   const uniqueTypes = useMemo(() => Array.from(new Set(members.map(m => m.tipo_cadastro).filter(Boolean))).sort(), [members]);

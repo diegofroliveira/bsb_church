@@ -99,9 +99,6 @@ export const Reports: React.FC = () => {
     return 'Idoso';
   };
 
-  const getAgeRange = (age: number) => {
-    return age;
-  };
 
   const filteredMembers = useMemo(() => {
     return members.filter(m => {

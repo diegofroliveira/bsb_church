@@ -140,11 +140,11 @@ export const QA: React.FC = () => {
         newReports.push({ id: 'sem_grupo', title: 'Ativos sem Grupo Caseiro', description: 'Membros ativos que deveriam estar vinculados a uma célula, mas o campo está vazio.', count: semGrupo.length, severity: 'high', data: semGrupo.map(m => ({ nome: m.nome, tipo: m.tipo_cadastro })), columns: [{ key: 'nome', label: 'Nome' }, { key: 'tipo', label: 'Tipo' }] });
 
         // 3. Discipuladores Inativos
-        const discInativos = [...discipuladores].filter(nome => {
-          const m = membrosMap.get(nome);
+        const discInativos = [...discipuladores].filter((nome: any) => {
+          const m = membrosMap.get(nome as string);
           return m && m.status !== 'Ativo';
         });
-        newReports.push({ id: 'disc_inativo', title: 'Discipuladores Inativos', description: 'Pessoas inativas que ainda constam como líderes de alguém na rede de discipulado.', count: discInativos.length, severity: 'high', data: discInativos.map(nome => ({ nome, status: membrosMap.get(nome)?.status || 'Inativo' })), columns: [{ key: 'nome', label: 'Nome' }, { key: 'status', label: 'Status' }] });
+        newReports.push({ id: 'disc_inativo', title: 'Discipuladores Inativos', description: 'Pessoas inativas que ainda constam como líderes de alguém na rede de discipulado.', count: discInativos.length, severity: 'high', data: discInativos.map((nome: any) => ({ nome, status: membrosMap.get(nome as string)?.status || 'Inativo' })), columns: [{ key: 'nome', label: 'Nome' }, { key: 'status', label: 'Status' }] });
 
         // 4. Grupos Caseiros sem LÃ­der VÃ¡lido
         const celulasSemLider = celulas.filter((c: any) => {
@@ -155,7 +155,7 @@ export const QA: React.FC = () => {
         newReports.push({ id: 'celula_sem_lider', title: 'Grupos sem Líder Válido', description: 'Células cujo líder está vazio, não existe na base ou está inativo.', count: celulasSemLider.length, severity: 'high', data: celulasSemLider.map((c: any) => ({ grupo: c.grupo_caseiro, lider: c.lider || '(vazio)', setor: c.setor })), columns: [{ key: 'grupo', label: 'Grupo' }, { key: 'lider', label: 'Líder Atual' }, { key: 'setor', label: 'Setor' }] });
 
         // 5. Loops no Discipulado
-        const edges = discipulado.map((d: any) => ({ from: normalizeStr(d.discipulador), to: normalizeStr(d.discipulo) })).filter(e => e.from && e.to);
+        const edges = discipulado.map((d: any) => ({ from: normalizeStr(d.discipulador), to: normalizeStr(d.discipulo) })).filter((e: any) => e.from && e.to);
         const cycles = findCycles(edges);
         newReports.push({ id: 'loop_rede', title: 'Loops no Discipulado', description: 'Discipulado circular (A → B → A), que quebra hierarquias lógicas.', count: cycles.length, severity: 'high', data: cycles.map((c, i) => ({ loop: c.join(' ➜ '), num: i + 1 })), columns: [{ key: 'num', label: '#' }, { key: 'loop', label: 'Ciclo Detectado' }] });
 
