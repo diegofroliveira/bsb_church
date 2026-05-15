@@ -19,6 +19,8 @@ export const Reports: React.FC = () => {
   const [filterMaritalStatus, setFilterMaritalStatus] = useState('Todos');
   const [filterMinAge, setFilterMinAge] = useState<number>(0);
   const [filterMaxAge, setFilterMaxAge] = useState<number>(120);
+  const [filterPersonType, setFilterPersonType] = useState('Todos');
+  const [filterStatusPessoa, setFilterStatusPessoa] = useState('Todos');
   
   const [selectedColumns, setSelectedColumns] = useState<string[]>([
     'nome', 'tipo_cadastro', 'grupos_caseiros', 'setor', 'discipulador', 'celular_principal_sms', 'email', 'nascimento', 'idade', 'sexo', 'estado_civil'
@@ -103,6 +105,8 @@ export const Reports: React.FC = () => {
   const uniqueSetores = useMemo(() => Array.from(new Set(members.map(m => m.setor).filter(s => s !== 'Sem Setor'))).sort(), [members]);
   const uniqueMestres = useMemo(() => Array.from(new Set(members.map(m => m.discipulador).filter(d => d !== 'Sem Discipulador'))).sort(), [members]);
   const uniqueMaritalStatuses = useMemo(() => Array.from(new Set(members.map(m => m.estado_civil).filter(Boolean))).sort(), [members]);
+  const uniquePersonTypes = useMemo(() => Array.from(new Set(members.map(m => m.tipo_de_pessoa).filter(Boolean))).sort(), [members]);
+  const uniqueStatusPessoas = useMemo(() => Array.from(new Set(members.map(m => m.status_pessoa).filter(Boolean))).sort(), [members]);
 
   const calculateAge = (dob: string) => {
     if (!dob) return -1;
@@ -145,10 +149,12 @@ export const Reports: React.FC = () => {
       if (filterAgeCategory !== 'Todas' && getAgeCategory(age) !== filterAgeCategory) return false;
       if (age < filterMinAge || age > filterMaxAge) return false;
       if (filterMaritalStatus !== 'Todos' && m.estado_civil !== filterMaritalStatus) return false;
+      if (filterPersonType !== 'Todos' && m.tipo_de_pessoa !== filterPersonType) return false;
+      if (filterStatusPessoa !== 'Todos' && m.status_pessoa !== filterStatusPessoa) return false;
       
       return true;
     });
-  }, [members, filterQuery, filterType, filterGC, filterGender, filterAgeCategory, filterMinAge, filterMaxAge, filterMaritalStatus, filterState, filterSetor, filterMestre]);
+  }, [members, filterQuery, filterType, filterGC, filterGender, filterAgeCategory, filterMinAge, filterMaxAge, filterMaritalStatus, filterState, filterSetor, filterMestre, filterPersonType, filterStatusPessoa]);
 
   const handleExportCSV = () => {
     if (filteredMembers.length === 0) return;
@@ -282,6 +288,22 @@ export const Reports: React.FC = () => {
              <select value={filterMaritalStatus} onChange={e => setFilterMaritalStatus(e.target.value)} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none">
                  <option value="Todos">Todos</option>
                  {uniqueMaritalStatuses.map(t => <option key={t as string} value={t as string}>{t as string}</option>)}
+             </select>
+          </div>
+
+          <div className="xl:col-span-1">
+             <label className="block text-xs font-medium text-gray-500 mb-1">Status Pessoa</label>
+             <select value={filterStatusPessoa} onChange={e => setFilterStatusPessoa(e.target.value)} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none">
+                 <option value="Todos">Todos</option>
+                 {uniqueStatusPessoas.map(t => <option key={t as string} value={t as string}>{t as string}</option>)}
+             </select>
+          </div>
+
+          <div className="xl:col-span-1">
+             <label className="block text-xs font-medium text-gray-500 mb-1">Tipo de Pessoa</label>
+             <select value={filterPersonType} onChange={e => setFilterPersonType(e.target.value)} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none">
+                 <option value="Todos">Todos</option>
+                 {uniquePersonTypes.map(t => <option key={t as string} value={t as string}>{t as string}</option>)}
              </select>
           </div>
 
