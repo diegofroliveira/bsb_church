@@ -21,7 +21,7 @@ export const Reports: React.FC = () => {
   const [filterMaxAge, setFilterMaxAge] = useState<number>(120);
   
   const [selectedColumns, setSelectedColumns] = useState<string[]>([
-    'nome', 'tipo_cadastro', 'grupos_caseiros', 'setor', 'discipulador', 'celular_principal_sms', 'email', 'nascimento', 'sexo', 'estado_civil'
+    'nome', 'tipo_cadastro', 'grupos_caseiros', 'setor', 'discipulador', 'celular_principal_sms', 'email', 'nascimento', 'idade', 'sexo', 'estado_civil'
   ]);
 
   const columnOptions = [
@@ -33,6 +33,7 @@ export const Reports: React.FC = () => {
     { key: 'celular_principal_sms', label: 'Telefone' },
     { key: 'email', label: 'E-mail' },
     { key: 'nascimento', label: 'Nascimento' },
+    { key: 'idade', label: 'Idade' },
     { key: 'sexo', label: 'Sexo' },
     { key: 'estado_civil', label: 'Estado Civil' },
     { key: 'cpf', label: 'CPF' },
