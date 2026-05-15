@@ -16,6 +16,9 @@ export const Reports: React.FC = () => {
   const [filterState, setFilterState] = useState('Todos');
   const [filterSetor, setFilterSetor] = useState('Todos');
   const [filterMestre, setFilterMestre] = useState('Todos');
+  const [filterMaritalStatus, setFilterMaritalStatus] = useState('Todos');
+  const [filterMinAge, setFilterMinAge] = useState<number>(0);
+  const [filterMaxAge, setFilterMaxAge] = useState<number>(120);
 
   useEffect(() => {
     const fetchAllData = async () => {
@@ -74,6 +77,7 @@ export const Reports: React.FC = () => {
   const uniqueStates = useMemo(() => Array.from(new Set(members.map(m => m.uf || m.estado).filter(Boolean))).sort(), [members]);
   const uniqueSetores = useMemo(() => Array.from(new Set(members.map(m => m.setor).filter(s => s !== 'Sem Setor'))).sort(), [members]);
   const uniqueMestres = useMemo(() => Array.from(new Set(members.map(m => m.discipulador).filter(d => d !== 'Sem Discipulador'))).sort(), [members]);
+  const uniqueMaritalStatuses = useMemo(() => Array.from(new Set(members.map(m => m.estado_civil).filter(Boolean))).sort(), [members]);
 
   const calculateAge = (dob: string) => {
     if (!dob) return -1;
@@ -95,6 +99,10 @@ export const Reports: React.FC = () => {
     return 'Idoso';
   };
 
+  const getAgeRange = (age: number) => {
+    return age;
+  };
+
   const filteredMembers = useMemo(() => {
     return members.filter(m => {
       if (filterQuery) {
@@ -110,13 +118,15 @@ export const Reports: React.FC = () => {
       if (filterGender !== 'Todos' && gender !== filterGender) return false;
       const state = m.uf || m.estado || '';
       if (filterState !== 'Todos' && state !== filterState) return false;
-      if (filterAgeCategory !== 'Todas') {
-        const age = calculateAge(m.nascimento || m.data_nascimento || m.birth_date);
-        if (getAgeCategory(age) !== filterAgeCategory) return false;
-      }
+      
+      const age = calculateAge(m.nascimento || m.data_nascimento || m.birth_date);
+      if (filterAgeCategory !== 'Todas' && getAgeCategory(age) !== filterAgeCategory) return false;
+      if (age < filterMinAge || age > filterMaxAge) return false;
+      if (filterMaritalStatus !== 'Todos' && m.estado_civil !== filterMaritalStatus) return false;
+      
       return true;
     });
-  }, [members, filterQuery, filterType, filterGC, filterGender, filterAgeCategory, filterState, filterSetor, filterMestre]);
+  }, [members, filterQuery, filterType, filterGC, filterGender, filterAgeCategory, filterMinAge, filterMaxAge, filterMaritalStatus, filterState, filterSetor, filterMestre]);
 
   const handleExportCSV = () => {
     if (filteredMembers.length === 0) return;
@@ -236,6 +246,23 @@ export const Reports: React.FC = () => {
                  <option value="Todos">Todos</option>
                  {uniqueMestres.map(t => <option key={t as string} value={t as string}>{t as string}</option>)}
              </select>
+          </div>
+
+          <div className="xl:col-span-1">
+             <label className="block text-xs font-medium text-gray-500 mb-1">Estado Civil</label>
+             <select value={filterMaritalStatus} onChange={e => setFilterMaritalStatus(e.target.value)} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none">
+                 <option value="Todos">Todos</option>
+                 {uniqueMaritalStatuses.map(t => <option key={t as string} value={t as string}>{t as string}</option>)}
+             </select>
+          </div>
+
+          <div className="xl:col-span-1">
+             <label className="block text-xs font-medium text-gray-500 mb-1">Idade (Min / Max)</label>
+             <div className="flex items-center gap-2">
+                <input type="number" value={filterMinAge} onChange={e => setFilterMinAge(parseInt(e.target.value) || 0)} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" placeholder="Min" />
+                <span className="text-gray-400">/</span>
+                <input type="number" value={filterMaxAge} onChange={e => setFilterMaxAge(parseInt(e.target.value) || 120)} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" placeholder="Max" />
+             </div>
           </div>
 
         </div>

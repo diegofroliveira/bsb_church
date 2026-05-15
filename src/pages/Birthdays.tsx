@@ -18,6 +18,8 @@ interface Member {
   nascimento: string;
   grupos_caseiros?: string;
   avatar_url?: string;
+  sexo?: string;
+  estado_civil?: string;
 }
 
 export const Birthdays: React.FC = () => {
@@ -30,6 +32,12 @@ export const Birthdays: React.FC = () => {
 
   const [filterMode, setFilterMode] = useState<'today' | 'tomorrow' | 'month' | 'specific'>('today');
   const [specificDate, setSpecificDate] = useState(new Date().toISOString().split('T')[0]);
+  
+  const [filterGender, setFilterGender] = useState('Todos');
+  const [filterGC, setFilterGC] = useState('Todos');
+  const [filterMinAge, setFilterMinAge] = useState<number>(0);
+  const [filterMaxAge, setFilterMaxAge] = useState<number>(120);
+  const [filterMaritalStatus, setFilterMaritalStatus] = useState('Todos');
 
   useEffect(() => {
     fetchMembers();
@@ -41,7 +49,7 @@ export const Birthdays: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('membros')
-        .select('id, nome, nascimento, grupos_caseiros')
+        .select('id, nome, nascimento, grupos_caseiros, sexo, estado_civil')
         .limit(10000);
 
       if (error) throw error;
@@ -58,10 +66,33 @@ export const Birthdays: React.FC = () => {
       }
     } catch (err: any) {
       console.error('Error fetching members:', err);
-    } finally {
-      setIsLoading(false);
     }
   };
+
+  const calculateAge = (dob: string) => {
+    if (!dob) return -1;
+    let parts = dob.includes('/') ? dob.split('/') : dob.split('-');
+    const birth = dob.includes('/') ? new Date(Number(parts[2]), Number(parts[1])-1, Number(parts[0])) : new Date(dob);
+    if (isNaN(birth.getTime())) return -1;
+    const now = new Date();
+    let age = now.getFullYear() - birth.getFullYear();
+    if (now.getMonth() < birth.getMonth() || (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate())) age--;
+    return age;
+  };
+
+  const getAgeRange = (age: number) => {
+    if (age < 0) return 'Indefinida';
+    if (age <= 12) return '0-12';
+    if (age <= 17) return '13-17';
+    if (age <= 25) return '18-25';
+    if (age <= 35) return '26-35';
+    if (age <= 45) return '36-45';
+    if (age <= 60) return '46-60';
+    return '60+';
+  };
+
+  const uniqueGCs = useMemo(() => Array.from(new Set(members.map(m => m.grupos_caseiros).filter(Boolean))).sort(), [members]);
+  const uniqueMaritalStatuses = useMemo(() => Array.from(new Set(members.map(m => m.estado_civil).filter(Boolean))).sort(), [members]);
 
   const getBirthdays = useMemo(() => {
     const now = new Date();
@@ -80,17 +111,25 @@ export const Birthdays: React.FC = () => {
       const dayMonth = `${parts[0]}/${parts[1]}`;
       const month = parseInt(parts[1]);
 
-      if (filterMode === 'today') return dayMonth === todayStr;
-      if (filterMode === 'tomorrow') return dayMonth === tomorrowStr;
-      if (filterMode === 'month') return month === currentMonth;
-      if (filterMode === 'specific') {
+      if (filterGender !== 'Todos' && m.sexo !== filterGender) return false;
+      if (filterGC !== 'Todos' && m.grupos_caseiros !== filterGC) return false;
+      if (filterMaritalStatus !== 'Todos' && m.estado_civil !== filterMaritalStatus) return false;
+      
+      const age = calculateAge(m.nascimento);
+      if (age < filterMinAge || age > filterMaxAge) return false;
+
+      let matchDate = false;
+      if (filterMode === 'today') matchDate = dayMonth === todayStr;
+      else if (filterMode === 'tomorrow') matchDate = dayMonth === tomorrowStr;
+      else if (filterMode === 'month') matchDate = month === currentMonth;
+      else if (filterMode === 'specific') {
         const spec = new Date(specificDate);
         const specStr = `${String(spec.getDate()+1).padStart(2, '0')}/${String(spec.getMonth() + 1).padStart(2, '0')}`;
-        return dayMonth === specStr;
+        matchDate = dayMonth === specStr;
       }
-      return false;
+      return matchDate;
     }).sort((a, b) => a.nome.localeCompare(b.nome));
-  }, [members, filterMode, specificDate]);
+  }, [members, filterMode, specificDate, filterGender, filterGC, filterMinAge, filterMaxAge, filterMaritalStatus]);
 
   const generateMessage = () => {
     if (getBirthdays.length === 0) return "Nenhum aniversariante encontrado.";
@@ -211,6 +250,31 @@ export const Birthdays: React.FC = () => {
         )}
       </div>
 
+      <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-wrap gap-3 items-center">
+        <select value={filterGender} onChange={e => setFilterGender(e.target.value)} className="text-xs border-gray-200 rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-pink-500 bg-gray-50/50">
+          <option value="Todos">Todos os Sexos</option>
+          <option value="Masculino">Masculino</option>
+          <option value="Feminino">Feminino</option>
+        </select>
+        <select value={filterGC} onChange={e => setFilterGC(e.target.value)} className="text-xs border-gray-200 rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-pink-500 bg-gray-50/50 max-w-[150px]">
+          <option value="Todos">Todos os GCs</option>
+          {uniqueGCs.map(gc => <option key={gc} value={gc}>{gc}</option>)}
+        </select>
+        <select value={filterMaritalStatus} onChange={e => setFilterMaritalStatus(e.target.value)} className="text-xs border-gray-200 rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-pink-500 bg-gray-50/50">
+          <option value="Todos">Estado Civil</option>
+          {uniqueMaritalStatuses.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <div className="flex items-center gap-2 bg-gray-50/50 border border-gray-200 rounded-lg px-2 py-1">
+           <span className="text-[10px] font-bold text-gray-400 uppercase">Idade:</span>
+           <input type="number" value={filterMinAge} onChange={e => setFilterMinAge(parseInt(e.target.value) || 0)} className="w-10 bg-transparent text-xs font-semibold outline-none" placeholder="Min" />
+           <span className="text-gray-300">/</span>
+           <input type="number" value={filterMaxAge} onChange={e => setFilterMaxAge(parseInt(e.target.value) || 120)} className="w-10 bg-transparent text-xs font-semibold outline-none" placeholder="Max" />
+        </div>
+        {(filterGender !== 'Todos' || filterGC !== 'Todos' || filterMinAge !== 0 || filterMaxAge !== 120 || filterMaritalStatus !== 'Todos') && (
+          <button onClick={() => { setFilterGender('Todos'); setFilterGC('Todos'); setFilterMinAge(0); setFilterMaxAge(120); setFilterMaritalStatus('Todos'); }} className="text-[10px] text-red-600 font-bold uppercase hover:underline">Limpar</button>
+        )}
+      </div>
+
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
         {/* Left Column: Text Message */}
         <div className="xl:col-span-4 space-y-6">
@@ -312,9 +376,11 @@ export const Birthdays: React.FC = () => {
                        </label>
                        
                        <div className="text-center mt-3">
-                          <h4 className="font-black text-gray-900 text-sm uppercase truncate max-w-[150px]">{m.nome.split(' ')[0]}</h4>
-                          <p className="text-[10px] font-bold text-gray-400 uppercase">47 Anos</p>
-                       </div>
+                           <h4 className="font-black text-gray-900 text-sm uppercase truncate max-w-[150px]">{m.nome.split(' ')[0]}</h4>
+                           <p className="text-[10px] font-bold text-gray-400 uppercase">
+                             {calculateAge(m.nascimento)} Anos {m.estado_civil ? `• ${m.estado_civil}` : ''}
+                           </p>
+                        </div>
                     </div>
                   );
                 })}

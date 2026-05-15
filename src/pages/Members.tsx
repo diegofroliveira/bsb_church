@@ -20,6 +20,9 @@ export const Members: React.FC = () => {
   const [filterState, setFilterState] = useState('Todos');
   const [filterSetor, setFilterSetor] = useState('Todos');
   const [filterMestre, setFilterMestre] = useState('Todos');
+  const [filterMaritalStatus, setFilterMaritalStatus] = useState('Todos');
+  const [filterMinAge, setFilterMinAge] = useState<number>(0);
+  const [filterMaxAge, setFilterMaxAge] = useState<number>(120);
 
   useEffect(() => {
     const fetchAllData = async () => {
@@ -93,6 +96,10 @@ export const Members: React.FC = () => {
     return 'Idoso';
   };
 
+  const getAgeRange = (age: number) => {
+    return age; // Not used as a range string anymore
+  };
+
   // Unique Options
   const uniqueTypes = useMemo(() => Array.from(new Set(members.map(m => m.tipo_cadastro).filter(Boolean))).sort(), [members]);
   const uniqueGCs = useMemo(() => Array.from(new Set(members.map(m => m.grupos_caseiros).filter(Boolean))).sort(), [members]);
@@ -100,6 +107,7 @@ export const Members: React.FC = () => {
   const uniqueStates = useMemo(() => Array.from(new Set(members.map(m => m.uf || m.estado).filter(Boolean))).sort(), [members]);
   const uniqueSetores = useMemo(() => Array.from(new Set(members.map(m => m.setor).filter(s => s !== 'Sem Setor'))).sort(), [members]);
   const uniqueMestres = useMemo(() => Array.from(new Set(members.map(m => m.discipulador).filter(d => d !== 'Sem Discipulador'))).sort(), [members]);
+  const uniqueMaritalStatuses = useMemo(() => Array.from(new Set(members.map(m => m.estado_civil).filter(Boolean))).sort(), [members]);
 
   const filteredMembers = useMemo(() => {
     return members.filter(m => {
@@ -113,13 +121,15 @@ export const Members: React.FC = () => {
       if (filterMestre !== 'Todos' && m.discipulador !== filterMestre) return false;
       if (filterGender !== 'Todos' && (m.sexo || m.sex) !== filterGender) return false;
       if (filterState !== 'Todos' && (m.uf || m.estado) !== filterState) return false;
-      if (filterAgeCategory !== 'Todas') {
-        const age = calculateAge(m.nascimento || m.data_nascimento || m.birth_date);
-        if (getAgeCategory(age) !== filterAgeCategory) return false;
-      }
+      
+      const age = calculateAge(m.nascimento || m.data_nascimento || m.birth_date);
+      if (filterAgeCategory !== 'Todas' && getAgeCategory(age) !== filterAgeCategory) return false;
+      if (age < filterMinAge || age > filterMaxAge) return false;
+      if (filterMaritalStatus !== 'Todos' && m.estado_civil !== filterMaritalStatus) return false;
+      
       return true;
     });
-  }, [members, filterQuery, filterType, filterGC, filterGender, filterAgeCategory, filterState, filterSetor, filterMestre]);
+  }, [members, filterQuery, filterType, filterGC, filterGender, filterAgeCategory, filterMinAge, filterMaxAge, filterMaritalStatus, filterState, filterSetor, filterMestre]);
 
   const totalCount = filteredMembers.length;
   const paginatedMembers = filteredMembers.slice((page - 1) * pageSize, page * pageSize);
@@ -153,6 +163,7 @@ export const Members: React.FC = () => {
             onClick={() => {
               setFilterQuery(''); setFilterType('Todos'); setFilterGC('Todos'); setFilterGender('Todos');
               setFilterAgeCategory('Todas'); setFilterState('Todos'); setFilterSetor('Todos'); setFilterMestre('Todos');
+              setFilterMinAge(0); setFilterMaxAge(120); setFilterMaritalStatus('Todos');
             }}
             className="text-xs text-red-600 font-medium hover:underline"
           >
@@ -226,6 +237,23 @@ export const Members: React.FC = () => {
                  <option value="Todos">Todos</option>
                  {uniqueMestres.map(t => <option key={t as string} value={t as string}>{t as string}</option>)}
              </select>
+          </div>
+
+          <div>
+             <label className="block text-xs font-medium text-gray-500 mb-1">Estado Civil</label>
+             <select value={filterMaritalStatus} onChange={e => { setFilterMaritalStatus(e.target.value); setPage(1); }} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white">
+                 <option value="Todos">Todos</option>
+                 {uniqueMaritalStatuses.map(t => <option key={t as string} value={t as string}>{t as string}</option>)}
+             </select>
+          </div>
+
+          <div>
+             <label className="block text-xs font-medium text-gray-500 mb-1">Idade (Min / Max)</label>
+             <div className="flex items-center gap-2">
+                <input type="number" value={filterMinAge} onChange={e => { setFilterMinAge(parseInt(e.target.value) || 0); setPage(1); }} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white" placeholder="Min" />
+                <span className="text-gray-400">/</span>
+                <input type="number" value={filterMaxAge} onChange={e => { setFilterMaxAge(parseInt(e.target.value) || 120); setPage(1); }} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white" placeholder="Max" />
+             </div>
           </div>
         </div>
       </div>
