@@ -5,7 +5,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, Legend, PieChart, Pie, Cell
 } from 'recharts';
-import { Users, UserPlus, Home, TrendingUp, Loader2, X, Search, Layers, UserCheck, MapPin } from 'lucide-react';
+import { Users, UserPlus, Home, TrendingUp, Loader2, X, Search, Layers, UserCheck, MapPin, RefreshCw } from 'lucide-react';
 import clsx from 'clsx';
 
 export const Dashboard: React.FC = () => {
@@ -304,7 +304,7 @@ export const Dashboard: React.FC = () => {
                 <div className="h-full bg-primary-600 transition-all duration-300" style={{ width: `${syncProgress}%` }} />
               </div>
             )}
-            {currentUser?.role === 'admin' && (
+            {user?.role === 'admin' && (
             <button
               onClick={handleSync}
               disabled={isSyncing}
