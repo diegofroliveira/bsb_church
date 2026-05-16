@@ -87,6 +87,7 @@ export const Reports: React.FC = () => {
   const [filterMaxAge, setFilterMaxAge] = useState<number>(120);
   const [filterPersonType, setFilterPersonType] = useState<string[]>([]);
   const [filterStatusPessoa, setFilterStatusPessoa] = useState<string[]>([]);
+  const [filterNoChildren, setFilterNoChildren] = useState(false);
   
   const [selectedColumns, setSelectedColumns] = useState<string[]>([
     'nome', 'tipo_cadastro', 'grupos_caseiros', 'setor', 'discipulador', 'celular_principal_sms', 'email', 'nascimento', 'idade', 'sexo', 'estado_civil'
@@ -173,6 +174,15 @@ export const Reports: React.FC = () => {
   const uniqueMaritalStatuses = useMemo(() => Array.from(new Set(members.map(m => m.estado_civil).filter(Boolean))).sort(), [members]);
   const uniquePersonTypes = useMemo(() => Array.from(new Set(members.map(m => m.tipo_de_pessoa).filter(Boolean))).sort(), [members]);
   const uniqueStatusPessoas = useMemo(() => Array.from(new Set(members.map(m => m.status_pessoa || m.status).filter(Boolean))).sort(), [members]);
+  
+  const allParentsNames = useMemo(() => {
+    const names = new Set<string>();
+    members.forEach(m => {
+      if (m.pai) names.add(normalizeStr(m.pai));
+      if (m.mae) names.add(normalizeStr(m.mae));
+    });
+    return names;
+  }, [members]);
 
   const calculateAge = (dob: string) => {
     if (!dob) return -1;
@@ -223,9 +233,14 @@ export const Reports: React.FC = () => {
       const status = m.status_pessoa || m.status || '';
       if (filterStatusPessoa.length > 0 && !filterStatusPessoa.includes(status)) return false;
       
+      if (filterNoChildren) {
+        const nomeNorm = normalizeStr(m.nome);
+        if (allParentsNames.has(nomeNorm)) return false;
+      }
+      
       return true;
     });
-  }, [members, filterQuery, filterType, filterGC, filterGender, filterAgeCategory, filterMinAge, filterMaxAge, filterMaritalStatus, filterState, filterSetor, filterMestre, filterPersonType, filterStatusPessoa]);
+  }, [members, filterQuery, filterType, filterGC, filterGender, filterAgeCategory, filterMinAge, filterMaxAge, filterMaritalStatus, filterState, filterSetor, filterMestre, filterPersonType, filterStatusPessoa, filterNoChildren, allParentsNames]);
 
   const handleExportExcel = () => {
     if (filteredMembers.length === 0) return;
@@ -339,6 +354,18 @@ export const Reports: React.FC = () => {
                 <span className="text-gray-400">/</span>
                 <input type="number" value={filterMaxAge} onChange={e => setFilterMaxAge(parseInt(e.target.value) || 120)} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" placeholder="Max" />
              </div>
+          </div>
+
+          <div className="xl:col-span-1 flex items-end pb-1">
+             <label className="flex items-center gap-2 cursor-pointer group p-2 rounded-lg hover:bg-gray-50 transition-colors border border-dashed border-gray-200 w-full">
+                <input 
+                  type="checkbox" 
+                  checked={filterNoChildren}
+                  onChange={e => setFilterNoChildren(e.target.checked)}
+                  className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+                <span className="text-xs font-bold text-gray-700">Apenas sem filhos (Est.)</span>
+             </label>
           </div>
 
         </div>
