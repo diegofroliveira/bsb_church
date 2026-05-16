@@ -20,6 +20,7 @@ import Georeferencing from './pages/Georeferencing';
 import { AiConsultant } from './pages/AiConsultant';
 import { AiInsights } from './pages/AiInsights';
 import { Birthdays } from './pages/Birthdays';
+import { Simulations } from './pages/Simulations';
 
 function App() {
   return (
@@ -46,8 +47,9 @@ function App() {
               <Route path="/network" element={<Network />} />
                <Route path="/crm/:name" element={<MemberProfile />} />
               <Route path="/finance" element={<Finance />} />
-              <Route path="/admin/users" element={<AdminUsers />} />
+               <Route path="/admin/users" element={<AdminUsers />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/simulations" element={<Simulations />} />
               <Route path="/my-group" element={<MyGroup />} />
               <Route path="/ai-consultant" element={<AiConsultant />} />
               <Route path="/ai-insights" element={<AiInsights />} />
