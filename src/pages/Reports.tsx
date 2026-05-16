@@ -4,24 +4,89 @@ import { Filter, Download, Loader2, Search, FileText } from 'lucide-react';
 import clsx from 'clsx';
 import * as XLSX from 'xlsx';
 
+const MultiSelect: React.FC<{
+  label: string;
+  options: any[];
+  selected: string[];
+  onChange: (selected: string[]) => void;
+  placeholder?: string;
+}> = ({ label, options, selected, onChange, placeholder = "Todos" }) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="relative">
+      <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
+      <div 
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg bg-white cursor-pointer flex items-center justify-between min-h-[38px] group hover:border-primary-300 transition-colors"
+      >
+        <span className="truncate max-w-[180px] text-gray-700">
+          {selected.length === 0 ? placeholder : (
+            selected.length === 1 ? selected[0] : `${selected.length} selecionados`
+          )}
+        </span>
+        <Filter className={clsx("h-3 w-3 transition-colors", isOpen ? "text-primary-500" : "text-gray-400 group-hover:text-primary-400")} />
+      </div>
+      
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
+          <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-xl max-h-60 overflow-y-auto p-2 space-y-1 animate-in fade-in zoom-in-95 duration-200">
+             <div className="flex items-center justify-between px-2 py-1">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Opções</span>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); onChange([]); }}
+                  className="text-[10px] font-bold text-primary-600 uppercase hover:underline"
+                >
+                  Limpar
+                </button>
+             </div>
+             <div className="border-t border-gray-100 my-1" />
+             {options.map(opt => {
+               const val = String(opt);
+               return (
+                 <label key={val} className="flex items-center gap-2 px-2 py-1.5 hover:bg-primary-50 rounded-lg cursor-pointer group transition-colors">
+                    <input 
+                      type="checkbox" 
+                      checked={selected.includes(val)}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        if (selected.includes(val)) onChange(selected.filter(s => s !== val));
+                        else onChange([...selected, val]);
+                      }}
+                      className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 h-3.5 w-3.5"
+                    />
+                    <span className={clsx("text-xs transition-colors", selected.includes(val) ? "text-primary-700 font-semibold" : "text-gray-600 group-hover:text-primary-600")}>
+                      {val}
+                    </span>
+                 </label>
+               );
+             })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
 export const Reports: React.FC = () => {
   const [members, setMembers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Filters
   const [filterQuery, setFilterQuery] = useState('');
-  const [filterType, setFilterType] = useState('Todos');
-  const [filterGC, setFilterGC] = useState('Todos');
-  const [filterGender, setFilterGender] = useState('Todos');
+  const [filterType, setFilterType] = useState<string[]>([]);
+  const [filterGC, setFilterGC] = useState<string[]>([]);
+  const [filterGender, setFilterGender] = useState<string[]>([]);
   const [filterAgeCategory, setFilterAgeCategory] = useState('Todas');
-  const [filterState, setFilterState] = useState('Todos');
-  const [filterSetor, setFilterSetor] = useState('Todos');
-  const [filterMestre, setFilterMestre] = useState('Todos');
-  const [filterMaritalStatus, setFilterMaritalStatus] = useState('Todos');
+  const [filterState, setFilterState] = useState<string[]>([]);
+  const [filterSetor, setFilterSetor] = useState<string[]>([]);
+  const [filterMestre, setFilterMestre] = useState<string[]>([]);
+  const [filterMaritalStatus, setFilterMaritalStatus] = useState<string[]>([]);
   const [filterMinAge, setFilterMinAge] = useState<number>(0);
   const [filterMaxAge, setFilterMaxAge] = useState<number>(120);
-  const [filterPersonType, setFilterPersonType] = useState('Todos');
-  const [filterStatusPessoa, setFilterStatusPessoa] = useState('Todos');
+  const [filterPersonType, setFilterPersonType] = useState<string[]>([]);
+  const [filterStatusPessoa, setFilterStatusPessoa] = useState<string[]>([]);
   
   const [selectedColumns, setSelectedColumns] = useState<string[]>([
     'nome', 'tipo_cadastro', 'grupos_caseiros', 'setor', 'discipulador', 'celular_principal_sms', 'email', 'nascimento', 'idade', 'sexo', 'estado_civil'
@@ -137,22 +202,26 @@ export const Reports: React.FC = () => {
         const nome = (m.nome || m.name || '').toLowerCase();
         if (!nome.includes(queryLower)) return false;
       }
-      if (filterType !== 'Todos' && m.tipo_cadastro !== filterType) return false;
-      if (filterGC !== 'Todos' && m.grupos_caseiros !== filterGC) return false;
-      if (filterSetor !== 'Todos' && m.setor !== filterSetor) return false;
-      if (filterMestre !== 'Todos' && m.discipulador !== filterMestre) return false;
+      if (filterType.length > 0 && !filterType.includes(m.tipo_cadastro)) return false;
+      if (filterGC.length > 0 && !filterGC.includes(m.grupos_caseiros)) return false;
+      if (filterSetor.length > 0 && !filterSetor.includes(m.setor)) return false;
+      if (filterMestre.length > 0 && !filterMestre.includes(m.discipulador)) return false;
+      
       const gender = m.sexo || m.sex || '';
-      if (filterGender !== 'Todos' && gender !== filterGender) return false;
+      if (filterGender.length > 0 && !filterGender.includes(gender)) return false;
+      
       const state = m.uf || m.estado || '';
-      if (filterState !== 'Todos' && state !== filterState) return false;
+      if (filterState.length > 0 && !filterState.includes(state)) return false;
       
       const age = calculateAge(m.nascimento || m.data_nascimento || m.birth_date);
       if (filterAgeCategory !== 'Todas' && getAgeCategory(age) !== filterAgeCategory) return false;
       if (age < filterMinAge || age > filterMaxAge) return false;
-      if (filterMaritalStatus !== 'Todos' && m.estado_civil !== filterMaritalStatus) return false;
-      if (filterPersonType !== 'Todos' && m.tipo_de_pessoa !== filterPersonType) return false;
+      
+      if (filterMaritalStatus.length > 0 && !filterMaritalStatus.includes(m.estado_civil)) return false;
+      if (filterPersonType.length > 0 && !filterPersonType.includes(m.tipo_de_pessoa)) return false;
+      
       const status = m.status_pessoa || m.status || '';
-      if (filterStatusPessoa !== 'Todos' && status !== filterStatusPessoa) return false;
+      if (filterStatusPessoa.length > 0 && !filterStatusPessoa.includes(status)) return false;
       
       return true;
     });
@@ -221,11 +290,7 @@ export const Reports: React.FC = () => {
           </div>
           
           <div className="xl:col-span-1">
-             <label className="block text-xs font-medium text-gray-500 mb-1">Tipo / Vínculo</label>
-             <select value={filterType} onChange={e => setFilterType(e.target.value)} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none">
-                 <option value="Todos">Todos</option>
-                 {uniqueTypes.map(t => <option key={t as string} value={t as string}>{t as string}</option>)}
-             </select>
+             <MultiSelect label="Tipo / Vínculo" options={uniqueTypes} selected={filterType} onChange={setFilterType} />
           </div>
 
           <div className="xl:col-span-1">
@@ -236,67 +301,35 @@ export const Reports: React.FC = () => {
           </div>
 
           <div className="xl:col-span-1">
-             <label className="block text-xs font-medium text-gray-500 mb-1">Sexo / Gênero</label>
-             <select value={filterGender} onChange={e => setFilterGender(e.target.value)} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none">
-                 <option value="Todos">Todos</option>
-                 {uniqueGenders.map(t => <option key={t as string} value={t as string}>{t as string}</option>)}
-             </select>
+             <MultiSelect label="Sexo / Gênero" options={uniqueGenders} selected={filterGender} onChange={setFilterGender} />
           </div>
 
           <div className="xl:col-span-1">
-             <label className="block text-xs font-medium text-gray-500 mb-1">Setor</label>
-             <select value={filterSetor} onChange={e => setFilterSetor(e.target.value)} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none">
-                 <option value="Todos">Todos</option>
-                 {uniqueSetores.map(t => <option key={t as string} value={t as string}>{t as string}</option>)}
-             </select>
+             <MultiSelect label="Setor" options={uniqueSetores} selected={filterSetor} onChange={setFilterSetor} />
           </div>
 
           <div className="xl:col-span-1">
-             <label className="block text-xs font-medium text-gray-500 mb-1">Grupo Caseiro</label>
-             <select value={filterGC} onChange={e => setFilterGC(e.target.value)} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none">
-                 <option value="Todos">Todos</option>
-                 {uniqueGCs.map(t => <option key={t as string} value={t as string}>{t as string}</option>)}
-             </select>
+             <MultiSelect label="Grupo Caseiro" options={uniqueGCs} selected={filterGC} onChange={setFilterGC} />
           </div>
 
           <div className="xl:col-span-1">
-             <label className="block text-xs font-medium text-gray-500 mb-1">UF / Estado</label>
-             <select value={filterState} onChange={e => setFilterState(e.target.value)} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none">
-                 <option value="Todos">Todos</option>
-                 {uniqueStates.map(t => <option key={t as string} value={t as string}>{t as string}</option>)}
-             </select>
+             <MultiSelect label="UF / Estado" options={uniqueStates} selected={filterState} onChange={setFilterState} />
           </div>
 
           <div className="xl:col-span-1">
-             <label className="block text-xs font-medium text-gray-500 mb-1">Discipulador</label>
-             <select value={filterMestre} onChange={e => setFilterMestre(e.target.value)} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none">
-                 <option value="Todos">Todos</option>
-                 {uniqueMestres.map(t => <option key={t as string} value={t as string}>{t as string}</option>)}
-             </select>
+             <MultiSelect label="Discipulador" options={uniqueMestres} selected={filterMestre} onChange={setFilterMestre} />
           </div>
 
           <div className="xl:col-span-1">
-             <label className="block text-xs font-medium text-gray-500 mb-1">Estado Civil</label>
-             <select value={filterMaritalStatus} onChange={e => setFilterMaritalStatus(e.target.value)} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none">
-                 <option value="Todos">Todos</option>
-                 {uniqueMaritalStatuses.map(t => <option key={t as string} value={t as string}>{t as string}</option>)}
-             </select>
+             <MultiSelect label="Estado Civil" options={uniqueMaritalStatuses} selected={filterMaritalStatus} onChange={setFilterMaritalStatus} />
           </div>
 
           <div className="xl:col-span-1">
-             <label className="block text-xs font-medium text-gray-500 mb-1">Status Pessoa</label>
-             <select value={filterStatusPessoa} onChange={e => setFilterStatusPessoa(e.target.value)} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none">
-                 <option value="Todos">Todos</option>
-                 {uniqueStatusPessoas.map(t => <option key={t as string} value={t as string}>{t as string}</option>)}
-             </select>
+             <MultiSelect label="Status Pessoa" options={uniqueStatusPessoas} selected={filterStatusPessoa} onChange={setFilterStatusPessoa} />
           </div>
 
           <div className="xl:col-span-1">
-             <label className="block text-xs font-medium text-gray-500 mb-1">Tipo de Pessoa</label>
-             <select value={filterPersonType} onChange={e => setFilterPersonType(e.target.value)} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none">
-                 <option value="Todos">Todos</option>
-                 {uniquePersonTypes.map(t => <option key={t as string} value={t as string}>{t as string}</option>)}
-             </select>
+             <MultiSelect label="Tipo de Pessoa" options={uniquePersonTypes} selected={filterPersonType} onChange={setFilterPersonType} />
           </div>
 
           <div className="xl:col-span-1">
