@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { Filter, Download, Loader2, Search, FileText } from 'lucide-react';
 import clsx from 'clsx';
+import * as XLSX from 'xlsx';
 
 export const Reports: React.FC = () => {
   const [members, setMembers] = useState<any[]>([]);
@@ -157,34 +158,24 @@ export const Reports: React.FC = () => {
     });
   }, [members, filterQuery, filterType, filterGC, filterGender, filterAgeCategory, filterMinAge, filterMaxAge, filterMaritalStatus, filterState, filterSetor, filterMestre, filterPersonType, filterStatusPessoa]);
 
-  const handleExportCSV = () => {
+  const handleExportExcel = () => {
     if (filteredMembers.length === 0) return;
     
-    const escapeCsv = (val: any) => {
-        if (val == null) return '""';
-        const str = String(val).replace(/"/g, '""');
-        return `"${str}"`;
-    };
-
-    const headers = selectedColumns.map(key => columnOptions.find(o => o.key === key)?.label || key);
-    const csvContent = [
-      headers.join(','),
-      ...filteredMembers.map(item => selectedColumns.map(key => {
+    const data = filteredMembers.map(item => {
+      const row: any = {};
+      selectedColumns.forEach(key => {
+        const label = columnOptions.find(o => o.key === key)?.label || key;
         let val = item[key];
-        // Special case for age if requested (not in db but calculated)
-        if (key === 'idade') val = calculateAge(item.nascimento || item.data_nascimento);
-        return escapeCsv(val);
-      }).join(','))
-    ].join('\n');
+        if (key === 'idade') val = calculateAge(item.nascimento || item.data_nascimento || item.birth_date);
+        row[label] = val || '-';
+      });
+      return row;
+    });
 
-    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `relatorio_igrejapro_${new Date().getTime()}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Relatório");
+    XLSX.writeFile(workbook, `relatorio_igrejapro_${new Date().getTime()}.xlsx`);
   };
 
   return (
@@ -200,7 +191,7 @@ export const Reports: React.FC = () => {
           </p>
         </div>
         <button
-          onClick={handleExportCSV}
+          onClick={handleExportExcel}
           disabled={isLoading || filteredMembers.length === 0}
           className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors disabled:opacity-50"
         >
