@@ -256,102 +256,215 @@ export const Simulations: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-11 gap-4">
-            {/* Source Panel */}
-            <div className="md:col-span-5 bg-white rounded-3xl border border-gray-100 shadow-sm flex flex-col overflow-hidden min-h-[500px]">
-              <div className="p-6 border-b border-gray-50 bg-gray-50/30">
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Grupo de Origem</label>
-                <select 
-                  value={selectedSource} 
-                  onChange={e => setSelectedSource(e.target.value)}
-                  className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-semibold focus:ring-2 focus:ring-primary-500 outline-none"
-                >
-                  <option value="">Selecione um GC...</option>
-                  {draftCells.map(c => <option key={c.id} value={c.grupo_caseiro}>{c.grupo_caseiro} ({c.lider})</option>)}
-                </select>
-              </div>
-              
-              <div className="flex-1 p-4 overflow-y-auto max-h-[500px]">
-                {!selectedSource ? (
-                  <div className="h-full flex flex-col items-center justify-center text-center p-8">
-                    <div className="p-4 bg-gray-50 rounded-full mb-4"><Users className="w-8 h-8 text-gray-300" /></div>
-                    <p className="text-sm text-gray-500">Selecione o grupo para listar os membros.</p>
+            {activeTab === 'gc' ? (
+              <>
+                {/* Source Panel (GC) */}
+                <div className="md:col-span-5 bg-white rounded-3xl border border-gray-100 shadow-sm flex flex-col overflow-hidden min-h-[500px]">
+                  <div className="p-6 border-b border-gray-50 bg-gray-50/30">
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Grupo de Origem</label>
+                    <select 
+                      value={selectedSource} 
+                      onChange={e => setSelectedSource(e.target.value)}
+                      className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-semibold focus:ring-2 focus:ring-primary-500 outline-none"
+                    >
+                      <option value="">Selecione um GC...</option>
+                      {draftCells.map(c => <option key={c.id} value={c.grupo_caseiro}>{c.grupo_caseiro} ({c.lider})</option>)}
+                    </select>
                   </div>
-                ) : (
-                  <div className="space-y-2">
-                    {sourceMembers.map(m => (
-                      <div 
-                        key={m.id}
-                        onClick={() => toggleMemberSelection(m.id)}
-                        className={clsx(
-                          "flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer select-none",
-                          selectedMembers.includes(m.id) 
-                            ? "border-primary-500 bg-primary-50/50 ring-1 ring-primary-100" 
-                            : "border-gray-100 hover:border-gray-200"
-                        )}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className={clsx("h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold", m.sexo === 'Masculino' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700')}>
-                            {m.nome.charAt(0)}
+                  
+                  <div className="flex-1 p-4 overflow-y-auto max-h-[500px]">
+                    {!selectedSource ? (
+                      <div className="h-full flex flex-col items-center justify-center text-center p-8">
+                        <div className="p-4 bg-gray-50 rounded-full mb-4"><Users className="w-8 h-8 text-gray-300" /></div>
+                        <p className="text-sm text-gray-500">Selecione o grupo para listar os membros.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {sourceMembers.map(m => (
+                          <div 
+                            key={m.id}
+                            onClick={() => toggleMemberSelection(m.id)}
+                            className={clsx(
+                              "flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer select-none",
+                              selectedMembers.includes(m.id) 
+                                ? "border-primary-500 bg-primary-50/50 ring-1 ring-primary-100" 
+                                : "border-gray-100 hover:border-gray-200"
+                            )}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={clsx("h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold", m.sexo === 'Masculino' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700')}>
+                                {m.nome.charAt(0)}
+                              </div>
+                              <span className="text-sm font-medium text-gray-700">{m.nome}</span>
+                            </div>
+                            {selectedMembers.includes(m.id) && <CheckCircle2 className="w-4 h-4 text-primary-600" />}
                           </div>
-                          <span className="text-sm font-medium text-gray-700">{m.nome}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Action Column */}
+                <div className="md:col-span-1 flex flex-col items-center justify-center gap-4">
+                  <button 
+                    disabled={selectedMembers.length === 0 || !selectedTarget || selectedSource === selectedTarget}
+                    onClick={handleMoveMembers}
+                    className="w-12 h-12 bg-primary-600 text-white rounded-2xl shadow-xl flex items-center justify-center disabled:opacity-30 hover:scale-105 active:scale-95 transition-all"
+                  >
+                    <ArrowRight className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Target Panel (GC) */}
+                <div className="md:col-span-5 bg-white rounded-3xl border border-gray-100 shadow-sm flex flex-col overflow-hidden min-h-[500px]">
+                  <div className="p-6 border-b border-gray-50 bg-gray-50/30">
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Grupo de Destino</label>
+                    <select 
+                      value={selectedTarget} 
+                      onChange={e => setSelectedTarget(e.target.value)}
+                      className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-semibold focus:ring-2 focus:ring-primary-500 outline-none"
+                    >
+                      <option value="">Destino...</option>
+                      <option value="NOVO_GC">+ Criar Novo GC Simulado</option>
+                      {draftCells.map(c => <option key={c.id} value={c.grupo_caseiro}>{c.grupo_caseiro}</option>)}
+                    </select>
+                  </div>
+                  
+                  <div className="flex-1 p-4 overflow-y-auto max-h-[500px]">
+                    {selectedTarget === 'NOVO_GC' ? (
+                      <div className="bg-primary-50 border border-primary-100 rounded-2xl p-6 text-center h-full flex flex-col justify-center">
+                        <Home className="w-10 h-10 text-primary-400 mx-auto mb-3" />
+                        <h4 className="font-bold text-primary-900">Novo Grupo Draft</h4>
+                        <p className="text-xs text-primary-700 mt-2">Clique na seta para mover os selecionados para este novo grupo.</p>
+                        <div className="mt-6 pt-6 border-t border-primary-200 text-2xl font-bold text-primary-900">
+                          {draftMembers.filter(m => m.grupos_caseiros === 'NOVO_GC').length}
+                          <span className="text-xs font-normal ml-1">membros</span>
                         </div>
-                        {selectedMembers.includes(m.id) && <CheckCircle2 className="w-4 h-4 text-primary-600" />}
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Action Column */}
-            <div className="md:col-span-1 flex flex-col items-center justify-center gap-4">
-              <button 
-                disabled={selectedMembers.length === 0 || !selectedTarget || selectedSource === selectedTarget}
-                onClick={handleMoveMembers}
-                className="w-12 h-12 bg-primary-600 text-white rounded-2xl shadow-xl flex items-center justify-center disabled:opacity-30 hover:scale-105 active:scale-95 transition-all"
-              >
-                <ArrowRight className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Target Panel */}
-            <div className="md:col-span-5 bg-white rounded-3xl border border-gray-100 shadow-sm flex flex-col overflow-hidden min-h-[500px]">
-              <div className="p-6 border-b border-gray-50 bg-gray-50/30">
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Grupo de Destino</label>
-                <select 
-                  value={selectedTarget} 
-                  onChange={e => setSelectedTarget(e.target.value)}
-                  className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-semibold focus:ring-2 focus:ring-primary-500 outline-none"
-                >
-                  <option value="">Destino...</option>
-                  <option value="NOVO_GC">+ Criar Novo GC Simulado</option>
-                  {draftCells.map(c => <option key={c.id} value={c.grupo_caseiro}>{c.grupo_caseiro}</option>)}
-                </select>
-              </div>
-              
-              <div className="flex-1 p-4 overflow-y-auto max-h-[500px]">
-                {selectedTarget === 'NOVO_GC' ? (
-                  <div className="bg-primary-50 border border-primary-100 rounded-2xl p-6 text-center h-full flex flex-col justify-center">
-                    <Home className="w-10 h-10 text-primary-400 mx-auto mb-3" />
-                    <h4 className="font-bold text-primary-900">Novo Grupo Draft</h4>
-                    <p className="text-xs text-primary-700 mt-2">Clique na seta para mover os selecionados para este novo grupo.</p>
-                    <div className="mt-6 pt-6 border-t border-primary-200 text-2xl font-bold text-primary-900">
-                       {draftMembers.filter(m => m.grupos_caseiros === 'NOVO_GC').length}
-                       <span className="text-xs font-normal ml-1">membros</span>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {targetMembers.map(m => (
-                      <div key={m.id} className="flex items-center gap-3 p-2 border-b border-gray-50 opacity-60">
-                        <div className="h-6 w-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-bold">{m.nome.charAt(0)}</div>
-                        <span className="text-xs text-gray-600">{m.nome}</span>
+                    ) : (
+                      <div className="space-y-2">
+                        {targetMembers.map(m => (
+                          <div key={m.id} className="flex items-center gap-3 p-2 border-b border-gray-50 opacity-60">
+                            <div className="h-6 w-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-bold">{m.nome.charAt(0)}</div>
+                            <span className="text-xs text-gray-600">{m.nome}</span>
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    )}
                   </div>
-                )}
-              </div>
-            </div>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Source Panel (Discipleship) */}
+                <div className="md:col-span-5 bg-white rounded-3xl border border-gray-100 shadow-sm flex flex-col overflow-hidden min-h-[500px]">
+                  <div className="p-6 border-b border-gray-50 bg-gray-50/30">
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Discipulador de Origem</label>
+                    <select 
+                      value={selectedSource} 
+                      onChange={e => setSelectedSource(e.target.value)}
+                      className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-semibold focus:ring-2 focus:ring-primary-500 outline-none"
+                    >
+                      <option value="">Selecione um Discipulador...</option>
+                      {[...new Set(draftLinks.map(l => l.discipulador))].sort().map(name => (
+                        <option key={name} value={name}>{name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div className="flex-1 p-4 overflow-y-auto max-h-[500px]">
+                    {!selectedSource ? (
+                      <div className="h-full flex flex-col items-center justify-center text-center p-8">
+                        <div className="p-4 bg-gray-50 rounded-full mb-4"><Network className="w-8 h-8 text-gray-300" /></div>
+                        <p className="text-sm text-gray-500">Selecione o discipulador para listar os discípulos.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {draftLinks.filter(l => l.discipulador === selectedSource).map(link => {
+                          const m = draftMembers.find(dm => dm.nome === link.discipulo);
+                          return (
+                            <div 
+                              key={link.discipulo}
+                              onClick={() => toggleMemberSelection(link.discipulo)}
+                              className={clsx(
+                                "flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer select-none",
+                                selectedMembers.includes(link.discipulo) 
+                                  ? "border-primary-500 bg-primary-50/50 ring-1 ring-primary-100" 
+                                  : "border-gray-100 hover:border-gray-200"
+                              )}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className={clsx("h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold", m?.sexo === 'Masculino' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700')}>
+                                  {link.discipulo.charAt(0)}
+                                </div>
+                                <span className="text-sm font-medium text-gray-700">{link.discipulo}</span>
+                              </div>
+                              {selectedMembers.includes(link.discipulo) && <CheckCircle2 className="w-4 h-4 text-primary-600" />}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Action Column */}
+                <div className="md:col-span-1 flex flex-col items-center justify-center gap-4">
+                  <button 
+                    disabled={selectedMembers.length === 0 || !selectedTarget || selectedSource === selectedTarget}
+                    onClick={() => {
+                      setDraftLinks(prev => prev.map(l => 
+                        selectedMembers.includes(l.discipulo) 
+                          ? { ...l, discipulador: selectedTarget } 
+                          : l
+                      ));
+                      setSelectedMembers([]);
+                    }}
+                    className="w-12 h-12 bg-primary-600 text-white rounded-2xl shadow-xl flex items-center justify-center disabled:opacity-30 hover:scale-105 active:scale-95 transition-all"
+                  >
+                    <ArrowRight className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Target Panel (Discipleship) */}
+                <div className="md:col-span-5 bg-white rounded-3xl border border-gray-100 shadow-sm flex flex-col overflow-hidden min-h-[500px]">
+                  <div className="p-6 border-b border-gray-50 bg-gray-50/30">
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Novo Discipulador</label>
+                    <select 
+                      value={selectedTarget} 
+                      onChange={e => setSelectedTarget(e.target.value)}
+                      className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-semibold focus:ring-2 focus:ring-primary-500 outline-none"
+                    >
+                      <option value="">Destino...</option>
+                      {/* Potential disciplers are anyone active or already a discipler */}
+                      {draftMembers.filter(m => m.status === 'Ativo').sort((a,b) => a.nome.localeCompare(b.nome)).map(m => (
+                        <option key={m.id} value={m.nome}>{m.nome}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div className="flex-1 p-4 overflow-y-auto max-h-[500px]">
+                    {!selectedTarget ? (
+                      <div className="h-full flex flex-col items-center justify-center text-center opacity-40">
+                        <div className="p-4 bg-gray-50 rounded-full mb-4"><Users className="w-8 h-8 text-gray-300" /></div>
+                        <p className="text-xs text-gray-400">Escolha o novo discipulador para visualizar o impacto.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest px-2 mb-2">Discípulos Atuais</h4>
+                        {draftLinks.filter(l => l.discipulador === selectedTarget).map(l => (
+                          <div key={l.discipulo} className="flex items-center gap-3 p-2 border-b border-gray-50 opacity-60">
+                            <div className="h-6 w-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-bold">{l.discipulo.charAt(0)}</div>
+                            <span className="text-xs text-gray-600">{l.discipulo}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -394,15 +507,15 @@ export const Simulations: React.FC = () => {
               <div className="space-y-6">
                  <div>
                     <div className="flex justify-between text-sm mb-2">
-                       <span className="text-gray-500">Saúde do Grupo</span>
-                       <span className={clsx("font-bold", impactStats.targetCount > 12 ? "text-red-600" : "text-green-600")}>
-                          {impactStats.targetCount} / 12
+                       <span className="text-gray-500">{activeTab === 'gc' ? 'Saúde do Grupo' : 'Carga do Discipulador'}</span>
+                       <span className={clsx("font-bold", (activeTab === 'gc' ? impactStats.targetCount > 12 : draftLinks.filter(l => l.discipulador === selectedTarget).length > 5) ? "text-red-600" : "text-green-600")}>
+                          {activeTab === 'gc' ? impactStats.targetCount : draftLinks.filter(l => l.discipulador === selectedTarget).length} / {activeTab === 'gc' ? '12' : '5'}
                        </span>
                     </div>
                     <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                        <div 
-                         className={clsx("h-full transition-all duration-500", impactStats.targetCount > 12 ? "bg-red-500" : "bg-green-500")}
-                         style={{ width: `${Math.min((impactStats.targetCount / 12) * 100, 100)}%` }}
+                         className={clsx("h-full transition-all duration-500", (activeTab === 'gc' ? impactStats.targetCount > 12 : draftLinks.filter(l => l.discipulador === selectedTarget).length > 5) ? "bg-red-500" : "bg-green-500")}
+                         style={{ width: `${Math.min(((activeTab === 'gc' ? impactStats.targetCount / 12 : draftLinks.filter(l => l.discipulador === selectedTarget).length / 5)) * 100, 100)}%` }}
                        />
                     </div>
                  </div>

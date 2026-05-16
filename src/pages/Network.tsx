@@ -37,17 +37,23 @@ const buildTree = (data: DiscipleshipData[], pastores: Set<string>): TreeNodeDat
   const childrenSet = new Set<string>();
 
   data.forEach(item => {
-    if (!nodeMap.has(item.discipulador)) {
-      nodeMap.set(item.discipulador, { name: item.discipulador, status: '', children: [], totalDescendants: 0 });
+    const discipulador = item.discipulador || 'NÃO INFORMADO';
+    const discipulo = item.discipulo || 'NÃO INFORMADO';
+
+    if (!nodeMap.has(discipulador)) {
+      nodeMap.set(discipulador, { name: discipulador, status: '', children: [], totalDescendants: 0 });
     }
-    if (!nodeMap.has(item.discipulo)) {
-      nodeMap.set(item.discipulo, { name: item.discipulo, status: item.status, children: [], totalDescendants: 0 });
+    if (!nodeMap.has(discipulo)) {
+      nodeMap.set(discipulo, { name: discipulo, status: item.status || '', children: [], totalDescendants: 0 });
     }
   });
 
   data.forEach(item => {
-    const parent = nodeMap.get(item.discipulador);
-    const child = nodeMap.get(item.discipulo);
+    const discipulador = item.discipulador || 'NÃO INFORMADO';
+    const discipulo = item.discipulo || 'NÃO INFORMADO';
+    
+    const parent = nodeMap.get(discipulador);
+    const child = nodeMap.get(discipulo);
     if (parent && child) {
       if (!childrenSet.has(child.name)) {
         parent.children.push(child);
@@ -59,9 +65,11 @@ const buildTree = (data: DiscipleshipData[], pastores: Set<string>): TreeNodeDat
   const roots: TreeNodeData[] = [];
   nodeMap.forEach(node => {
     const isRoot = !childrenSet.has(node.name) && node.children.length > 0;
-    // Only show as root if they are a pastor/pastora OR if no pastors list available
-    const isPastor = pastores.size === 0 || pastores.has(node.name.trim().toUpperCase());
-    if (isRoot && isPastor) {
+    // If we have pastors, prioritize them, but if a root has many descendants, show it anyway
+    const isPastor = pastores.has(node.name.trim().toUpperCase());
+    const hasSignificantNetwork = node.totalDescendants > 2;
+
+    if (isRoot && (isPastor || pastores.size === 0 || hasSignificantNetwork)) {
       roots.push(node);
     }
   });
@@ -109,7 +117,7 @@ const TreeNode: React.FC<{ node: TreeNodeData; level?: number; searchTerm: strin
       >
         <div className="h-10 w-10 sm:h-12 sm:w-12 shrink-0 rounded-full bg-gradient-to-br from-primary-50 to-primary-100 flex items-center justify-center border border-primary-200">
            <span className="text-primary-700 font-bold text-sm sm:text-base">
-             {node.name.substring(0, 2).toUpperCase()}
+             {(node.name || '??').substring(0, 2).toUpperCase()}
            </span>
         </div>
         <div className="flex-1 min-w-0">
