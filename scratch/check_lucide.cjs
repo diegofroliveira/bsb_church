@@ -1,7 +1,5 @@
 const lucide = require('lucide-react');
-console.log('RefreshCw:', !!lucide.RefreshCw);
-console.log('Database:', !!lucide.Database);
-console.log('CloudLightning:', !!lucide.CloudLightning);
-console.log('Cloud:', !!lucide.Cloud);
-console.log('AlertCircle:', !!lucide.AlertCircle);
-console.log('CheckCircle2:', !!lucide.CheckCircle2);
+const icons = ['Brain', 'MapPin', 'TrendingUp', 'AlertTriangle', 'Play', 'RotateCcw', 'Save', 'ArrowRight', 'Search', 'ShieldAlert', 'CheckCircle2', 'Download', 'Filter', 'BookOpen', 'Network', 'Home', 'Users'];
+icons.forEach(icon => {
+  console.log(`${icon}:`, !!lucide[icon]);
+});

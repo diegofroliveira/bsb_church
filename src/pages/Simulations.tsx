@@ -110,6 +110,19 @@ export const Simulations: React.FC = () => {
   };
 
   // Impact Analysis
+  // Impact Analysis
+  const impactStats = useMemo(() => {
+    const changes = draftMembers.filter(m => {
+      const base = baselineMembers.find(bm => bm.id === m.id);
+      return base?.grupos_caseiros !== m.grupos_caseiros;
+    }).length;
+
+    const sourceCount = sourceMembers.length;
+    const targetCount = targetMembers.length;
+
+    return { changes, sourceCount, targetCount };
+  }, [draftMembers, baselineMembers, sourceMembers, targetMembers]);
+
   // --- TERRITORIAL INTELLIGENCE ENGINE ---
   const RA_RELATIONS: Record<string, string[]> = {
     'ARNIQUEIRA': ['AREAL', 'SHA', 'QS 6', 'QS 8', 'QS 10', 'QS 11', 'VEREDÃO', 'RIACHO FUNDO I'],
