@@ -244,7 +244,7 @@ export const Reports: React.FC = () => {
       }
       
       return true;
-    });
+    }).sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
   }, [members, filterQuery, filterType, filterGC, filterGender, filterAgeCategory, filterMinAge, filterMaxAge, filterMaritalStatus, filterState, filterSetor, filterMestre, filterPersonType, filterStatusPessoa, filterNoChildren, allParentsNames]);
 
   const handleExportExcel = () => {
