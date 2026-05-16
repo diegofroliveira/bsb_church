@@ -106,7 +106,7 @@ export const Reports: React.FC = () => {
   const uniqueMestres = useMemo(() => Array.from(new Set(members.map(m => m.discipulador).filter(d => d !== 'Sem Discipulador'))).sort(), [members]);
   const uniqueMaritalStatuses = useMemo(() => Array.from(new Set(members.map(m => m.estado_civil).filter(Boolean))).sort(), [members]);
   const uniquePersonTypes = useMemo(() => Array.from(new Set(members.map(m => m.tipo_de_pessoa).filter(Boolean))).sort(), [members]);
-  const uniqueStatusPessoas = useMemo(() => Array.from(new Set(members.map(m => m.status_pessoa).filter(Boolean))).sort(), [members]);
+  const uniqueStatusPessoas = useMemo(() => Array.from(new Set(members.map(m => m.status_pessoa || m.status).filter(Boolean))).sort(), [members]);
 
   const calculateAge = (dob: string) => {
     if (!dob) return -1;
@@ -150,7 +150,8 @@ export const Reports: React.FC = () => {
       if (age < filterMinAge || age > filterMaxAge) return false;
       if (filterMaritalStatus !== 'Todos' && m.estado_civil !== filterMaritalStatus) return false;
       if (filterPersonType !== 'Todos' && m.tipo_de_pessoa !== filterPersonType) return false;
-      if (filterStatusPessoa !== 'Todos' && m.status_pessoa !== filterStatusPessoa) return false;
+      const status = m.status_pessoa || m.status || '';
+      if (filterStatusPessoa !== 'Todos' && status !== filterStatusPessoa) return false;
       
       return true;
     });
