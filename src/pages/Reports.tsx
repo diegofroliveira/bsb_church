@@ -4,6 +4,11 @@ import { Filter, Download, Loader2, Search, FileText } from 'lucide-react';
 import clsx from 'clsx';
 import * as XLSX from 'xlsx';
 
+const normalizeStr = (s: string | null | undefined): string => {
+  if (!s) return '';
+  return s.trim().replace(/\s+/g, ' ').toUpperCase();
+};
+
 const MultiSelect: React.FC<{
   label: string;
   options: any[];
