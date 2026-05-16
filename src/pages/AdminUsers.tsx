@@ -625,7 +625,7 @@ export const AdminUsers: React.FC = () => {
             )}
           </div>
         </>
-      ) : (
+      ) : activeTab === 'roles' ? (
         /* RBAC Roles and Permissions Screen */
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-300">
           
