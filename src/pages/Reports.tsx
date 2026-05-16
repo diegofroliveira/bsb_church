@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
-import { Filter, Download, Loader2, Search, FileText } from 'lucide-react';
+import { Filter, Download, Loader2, Search, FileText, ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react';
 import clsx from 'clsx';
 import * as XLSX from 'xlsx';
 
@@ -93,6 +93,18 @@ export const Reports: React.FC = () => {
   const [filterPersonType, setFilterPersonType] = useState<string[]>([]);
   const [filterStatusPessoa, setFilterStatusPessoa] = useState<string[]>([]);
   const [filterNoChildren, setFilterNoChildren] = useState(false);
+  
+  const [sortField, setSortField] = useState<string>('nome');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  const toggleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
   
   const [selectedColumns, setSelectedColumns] = useState<string[]>([
     'nome', 'tipo_cadastro', 'grupos_caseiros', 'setor', 'discipulador', 'celular_principal_sms', 'email', 'nascimento', 'idade', 'sexo', 'estado_civil'
@@ -244,8 +256,32 @@ export const Reports: React.FC = () => {
       }
       
       return true;
-    }).sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
-  }, [members, filterQuery, filterType, filterGC, filterGender, filterAgeCategory, filterMinAge, filterMaxAge, filterMaritalStatus, filterState, filterSetor, filterMestre, filterPersonType, filterStatusPessoa, filterNoChildren, allParentsNames]);
+    }).sort((a, b) => {
+      let valA: any = '';
+      let valB: any = '';
+
+      if (sortField === 'nome') {
+        valA = a.nome || a.name || '';
+        valB = b.nome || b.name || '';
+      } else if (sortField === 'idade') {
+        valA = calculateAge(a.nascimento || a.data_nascimento || a.birth_date);
+        valB = calculateAge(b.nascimento || b.data_nascimento || b.birth_date);
+      } else if (sortField === 'grupos_caseiros') {
+        valA = a.grupos_caseiros || '';
+        valB = b.grupos_caseiros || '';
+      } else if (sortField === 'discipulador') {
+        valA = a.discipulador || '';
+        valB = b.discipulador || '';
+      } else {
+        valA = a[sortField] || '';
+        valB = b[sortField] || '';
+      }
+
+      if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
+      if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [members, filterQuery, filterType, filterGC, filterGender, filterAgeCategory, filterMinAge, filterMaxAge, filterMaritalStatus, filterState, filterSetor, filterMestre, filterPersonType, filterStatusPessoa, filterNoChildren, allParentsNames, sortField, sortDirection]);
 
   const handleExportExcel = () => {
     if (filteredMembers.length === 0) return;
@@ -425,10 +461,10 @@ export const Reports: React.FC = () => {
               <table className="min-w-full divide-y divide-gray-200">
                  <thead className="bg-gray-50/80 sticky top-0 backdrop-blur-sm z-10">
                    <tr>
-                     <th className="py-4 pl-6 pr-3 text-left text-xs font-semibold text-gray-600 uppercase">Nome</th>
-                     <th className="px-3 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Perfil / Idade</th>
-                     <th className="px-3 py-4 text-left text-xs font-semibold text-gray-600 uppercase">GC / Setor</th>
-                     <th className="px-3 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Discipulador</th>
+                     <th className="py-4 pl-6 pr-3 text-left text-xs font-bold text-gray-600 uppercase cursor-pointer hover:bg-gray-100 transition-colors group" onClick={() => toggleSort('nome')}><div className="flex items-center gap-1">Nome {sortField === 'nome' ? (sortDirection === 'asc' ? <ChevronUp className="h-3 w-3 text-primary-500" /> : <ChevronDown className="h-3 w-3 text-primary-500" />) : <ArrowUpDown className="h-3 w-3 text-gray-300 opacity-0 group-hover:opacity-100" />}</div></th>
+                     <th className="px-3 py-4 text-left text-xs font-bold text-gray-600 uppercase cursor-pointer hover:bg-gray-100 transition-colors group" onClick={() => toggleSort('idade')}><div className="flex items-center gap-1">Perfil / Idade {sortField === 'idade' ? (sortDirection === 'asc' ? <ChevronUp className="h-3 w-3 text-primary-500" /> : <ChevronDown className="h-3 w-3 text-primary-500" />) : <ArrowUpDown className="h-3 w-3 text-gray-300 opacity-0 group-hover:opacity-100" />}</div></th>
+                     <th className="px-3 py-4 text-left text-xs font-bold text-gray-600 uppercase cursor-pointer hover:bg-gray-100 transition-colors group" onClick={() => toggleSort('grupos_caseiros')}><div className="flex items-center gap-1">GC / Setor {sortField === 'grupos_caseiros' ? (sortDirection === 'asc' ? <ChevronUp className="h-3 w-3 text-primary-500" /> : <ChevronDown className="h-3 w-3 text-primary-500" />) : <ArrowUpDown className="h-3 w-3 text-gray-300 opacity-0 group-hover:opacity-100" />}</div></th>
+                     <th className="px-3 py-4 text-left text-xs font-bold text-gray-600 uppercase cursor-pointer hover:bg-gray-100 transition-colors group" onClick={() => toggleSort('discipulador')}><div className="flex items-center gap-1">Discipulador {sortField === 'discipulador' ? (sortDirection === 'asc' ? <ChevronUp className="h-3 w-3 text-primary-500" /> : <ChevronDown className="h-3 w-3 text-primary-500" />) : <ArrowUpDown className="h-3 w-3 text-gray-300 opacity-0 group-hover:opacity-100" />}</div></th>
                    </tr>
                  </thead>
                  <tbody className="divide-y divide-gray-100 bg-white">
