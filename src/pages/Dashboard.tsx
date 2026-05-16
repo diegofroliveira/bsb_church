@@ -304,13 +304,20 @@ export const Dashboard: React.FC = () => {
                 <div className="h-full bg-primary-600 transition-all duration-300" style={{ width: `${syncProgress}%` }} />
               </div>
             )}
+            {currentUser?.role === 'admin' && (
             <button
-              onClick={handleSync} disabled={isSyncing}
-              className={clsx("flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all", isSyncing ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-primary-600 text-white hover:bg-primary-700 shadow-lg shadow-primary-200")}
+              onClick={handleSync}
+              disabled={isSyncing}
+              className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors disabled:opacity-50"
             >
-              <TrendingUp className={clsx("w-4 h-4", isSyncing && "animate-bounce")} />
-              {isSyncing ? `Atualizando ${Math.round(syncProgress)}%` : "Forçar Atualização"}
+              {isSyncing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              {isSyncing ? `Sincronizando (${Math.round(syncProgress)}%)` : 'Atualizar Dados'}
             </button>
+          )}
           </div>
         )}
       </header>

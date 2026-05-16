@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { UserCog, Plus, Save, X, Loader2, Check, Shield, Eye, EyeOff, Trash2, Lock } from 'lucide-react';
+import { UserCog, Plus, Save, X, Loader2, Check, Shield, Eye, EyeOff, Trash2, Lock, Cloud, CloudLightning, AlertCircle, CheckCircle2, Database } from 'lucide-react';
 import clsx from 'clsx';
 
 // UUID especial para armazenar a configuração global de perfis
@@ -41,7 +41,7 @@ interface AppUser {
 
 export const AdminUsers: React.FC = () => {
   const { user: currentUser } = useAuth();
-  const [activeTab, setActiveTab] = useState<'users' | 'roles'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'roles' | 'system'>('users');
   const [users, setUsers] = useState<AppUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
@@ -71,6 +71,11 @@ export const AdminUsers: React.FC = () => {
   const [newAssignedGC, setNewAssignedGC] = useState('');
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
+
+  // Cloud Sync State
+  const [isSyncingCloud, setIsSyncingCloud] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [syncMessage, setSyncMessage] = useState('');
 
   const generateRandomPassword = () => {
     const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#";
@@ -335,6 +340,36 @@ export const AdminUsers: React.FC = () => {
     } finally { setCreating(false); }
   };
 
+  const handleTriggerSync = async () => {
+    setIsSyncingCloud(true);
+    setSyncStatus('idle');
+    setSyncMessage('');
+    
+    try {
+      const response = await fetch('/api/trigger-sync', {
+        method: 'POST',
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        setSyncStatus('success');
+        setSyncMessage('Automação iniciada! Os dados serão atualizados em 1-2 minutos.');
+      } else {
+        setSyncStatus('error');
+        setSyncMessage(data.error || 'Erro ao acionar a nuvem.');
+      }
+    } catch (error) {
+      setSyncStatus('error');
+      setSyncMessage('Erro de conexão com o servidor.');
+    } finally {
+      setIsSyncingCloud(false);
+      if (syncStatus === 'success') {
+         setTimeout(() => setSyncStatus('idle'), 8000);
+      }
+    }
+  };
+
   const handleToggleModule = (roleKey: string, moduleId: string) => {
     const currentModules = dynamicRoles[roleKey]?.modules || [];
     const updatedModules = currentModules.includes(moduleId)
@@ -411,6 +446,12 @@ export const AdminUsers: React.FC = () => {
           className={clsx("pb-4 font-bold text-sm border-b-2 transition-all", activeTab === 'roles' ? "border-primary-600 text-primary-600" : "border-transparent text-gray-400 hover:text-gray-600")}
         >
           Gerenciamento de Perfis (RBAC)
+        </button>
+        <button 
+          onClick={() => setActiveTab('system')}
+          className={clsx("pb-4 font-bold text-sm border-b-2 transition-all", activeTab === 'system' ? "border-primary-600 text-primary-600" : "border-transparent text-gray-400 hover:text-gray-600")}
+        >
+          Sistema & Sincronização
         </button>
       </div>
 
@@ -695,6 +736,78 @@ export const AdminUsers: React.FC = () => {
               </button>
             </div>
           </div>
+        </div>
+      ) : (
+        /* System tab */
+        <div className="space-y-6 animate-in fade-in duration-300">
+           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+              <div className="flex flex-col md:flex-row justify-between items-start gap-8">
+                 <div className="flex gap-5">
+                    <div className="p-4 bg-blue-50 text-blue-600 rounded-2xl h-max shadow-inner">
+                       <CloudLightning className="w-8 h-8"/>
+                    </div>
+                    <div>
+                       <h3 className="text-xl font-bold text-gray-900">Automação de Dados (Nuvem)</h3>
+                       <p className="text-sm text-gray-500 max-w-2xl mt-2 leading-relaxed">
+                          Este processo aciona os robôs de sincronização na nuvem para buscar os dados mais recentes do sistema de gestão externa (CIGAM). 
+                          <br/><br/>
+                          <span className="font-semibold text-gray-700">Atenção:</span> Use este recurso apenas quando houver mudanças urgentes que não podem esperar pela sincronização automática programada (Domingos às 03:00).
+                       </p>
+                       
+                       {syncStatus !== 'idle' && (
+                          <div className={clsx(
+                             "mt-6 flex items-center gap-3 p-4 rounded-xl border animate-in zoom-in-95 duration-300",
+                             syncStatus === 'success' ? 'bg-green-50 border-green-100 text-green-700' : 'bg-red-50 border-red-100 text-red-700'
+                          )}>
+                             {syncStatus === 'success' ? <CheckCircle2 className="w-5 h-5"/> : <AlertCircle className="w-5 h-5"/>}
+                             <span className="font-semibold text-sm">{syncMessage}</span>
+                          </div>
+                       )}
+                    </div>
+                 </div>
+                 <button 
+                    onClick={handleTriggerSync}
+                    disabled={isSyncingCloud}
+                    className="w-full md:w-auto flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed text-white px-8 py-4 rounded-2xl font-bold transition-all shadow-xl shadow-blue-100 group"
+                 >
+                    {isSyncingCloud ? <Loader2 className="w-5 h-5 animate-spin"/> : <Cloud className="w-5 h-5 group-hover:scale-110 transition-transform"/>}
+                    {isSyncingCloud ? 'Processando...' : 'Forçar Atualização na Nuvem'}
+                 </button>
+              </div>
+           </div>
+
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
+                 <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-purple-50 text-purple-600 rounded-lg"><Database className="w-5 h-5"/></div>
+                    <h4 className="font-bold text-gray-900">Status da Base</h4>
+                 </div>
+                 <div className="space-y-3">
+                    <div className="flex justify-between text-sm">
+                       <span className="text-gray-500">Última Sincronia</span>
+                       <span className="font-medium text-gray-900">Hoje, há 2 horas</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                       <span className="text-gray-500">Próxima Agendada</span>
+                       <span className="font-medium text-gray-900">Domingo, 03:00</span>
+                    </div>
+                    <div className="w-full bg-gray-100 rounded-full h-2 mt-4">
+                       <div className="bg-green-500 h-2 rounded-full w-full"></div>
+                    </div>
+                    <p className="text-[10px] text-gray-400 text-center uppercase font-bold tracking-widest mt-2">Sistema Operante</p>
+                 </div>
+              </div>
+              
+              <div className="bg-indigo-600 rounded-2xl p-6 text-white shadow-xl shadow-indigo-100 relative overflow-hidden">
+                 <div className="relative z-10">
+                    <h4 className="font-bold text-lg mb-2">Dica de Segurança</h4>
+                    <p className="text-indigo-100 text-sm leading-relaxed">
+                       A atualização forçada consome créditos de processamento em nuvem. Evite clicar várias vezes seguidas. Após o comando, aguarde alguns minutos para os dados aparecerem no Dashboard.
+                    </p>
+                 </div>
+                 <Cloud className="absolute -right-4 -bottom-4 w-24 h-24 text-indigo-500 opacity-20" />
+              </div>
+           </div>
         </div>
       )}
 
