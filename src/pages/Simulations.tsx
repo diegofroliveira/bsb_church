@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { 
   Users, Home, Play, RotateCcw, Save, ArrowRight, 
   Search, ShieldAlert, CheckCircle2, Download, Filter,
-  BookOpen, Network, TrendingUp, AlertTriangle
+  BookOpen, Network, TrendingUp, AlertTriangle, Brain, MapPin
 } from 'lucide-react';
 import clsx from 'clsx';
 
