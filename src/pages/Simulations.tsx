@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, Circle } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, Circle, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -181,6 +181,14 @@ const getGCRegion = (gcName: string): string => {
   return 'OUTRO';
 };
 
+// Componente auxiliar para alterar dinamicamente o centro e zoom do mapa Leaflet
+const ChangeMapView: React.FC<{ center: [number, number]; zoom: number }> = ({ center, zoom }) => {
+  const map = useMap();
+  useEffect(() => {
+    map.setView(center, zoom);
+  }, [center, zoom, map]);
+  return null;
+};
 
 export const Simulations: React.FC = () => {
   const { user } = useAuth();
@@ -201,6 +209,34 @@ export const Simulations: React.FC = () => {
   const [selectedTarget, setSelectedTarget] = useState<string>('');
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   const [selectedTargetMembers, setSelectedTargetMembers] = useState<string[]>([]);
+
+  // Map Navigation and Highlight States
+  const [mapCenter, setMapCenter] = useState<[number, number]>([-15.82, -47.95]);
+  const [mapZoom, setMapZoom] = useState<number>(11);
+
+  const handleLocalizeGC = (cellName: string) => {
+    const cell = draftCells.find(c => c.grupo_caseiro === cellName);
+    if (cell && cell.latitude && cell.longitude) {
+      setIsMapExpanded(true);
+      setMapCenter([cell.latitude, cell.longitude]);
+      setMapZoom(14);
+      setTimeout(() => {
+        document.getElementById('radar-sandbox-container')?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    }
+  };
+
+  const handleLocalizeMember = (memberId: string) => {
+    const member = draftMembers.find(m => m.id === memberId);
+    if (member && member.latitude && member.longitude) {
+      setIsMapExpanded(true);
+      setMapCenter([member.latitude, member.longitude]);
+      setMapZoom(15);
+      setTimeout(() => {
+        document.getElementById('radar-sandbox-container')?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    }
+  };
   
   // Selection Mode: individual vs family
   const [moveMode, setMoveMode] = useState<'individual' | 'family'>('family');
@@ -1361,7 +1397,7 @@ export const Simulations: React.FC = () => {
       </div>
 
       {/* Visual Map Radar Widget */}
-      <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm space-y-4">
+      <div id="radar-sandbox-container" className="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm space-y-4">
         <button
           onClick={() => setIsMapExpanded(!isMapExpanded)}
           className="w-full flex items-center justify-between text-left cursor-pointer focus:outline-none"
@@ -1386,10 +1422,11 @@ export const Simulations: React.FC = () => {
         {isMapExpanded && (
           <div className="h-[380px] rounded-2xl overflow-hidden border border-gray-100 relative mt-4 z-10">
             <MapContainer 
-              center={[-15.82, -47.95]} 
-              zoom={11} 
+              center={mapCenter} 
+              zoom={mapZoom} 
               className="h-full w-full z-10"
             >
+              <ChangeMapView center={mapCenter} zoom={mapZoom} />
               <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -1586,15 +1623,23 @@ export const Simulations: React.FC = () => {
                     </div>
 
                     {sourceCell && (
-                      <div className="flex justify-between items-center bg-white/70 border border-gray-100 rounded-xl p-2.5 text-xs">
-                        <div>
-                          <span className="text-gray-400 font-medium">Líder: </span>
-                          <span className="font-bold text-gray-700">{sourceCell.lider}</span>
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center bg-white/70 border border-gray-100 rounded-xl p-2.5 text-xs">
+                          <div>
+                            <span className="text-gray-400 font-medium">Líder: </span>
+                            <span className="font-bold text-gray-700">{sourceCell.lider}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-400 font-medium">Setor: </span>
+                            <span className="font-bold text-indigo-600">{sourceCell.setor}</span>
+                          </div>
                         </div>
-                        <div>
-                          <span className="text-gray-400 font-medium">Setor: </span>
-                          <span className="font-bold text-indigo-600">{sourceCell.setor}</span>
-                        </div>
+                        <button
+                          onClick={() => handleLocalizeGC(selectedSource)}
+                          className="w-full py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-100 hover:border-indigo-200 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                        >
+                          <MapPin className="w-3.5 h-3.5 animate-bounce" /> Localizar Membros no Mapa
+                        </button>
                       </div>
                     )}
 
@@ -1799,15 +1844,23 @@ export const Simulations: React.FC = () => {
                     </div>
 
                     {targetCell && (
-                      <div className="flex justify-between items-center bg-white/70 border border-gray-100 rounded-xl p-2.5 text-xs">
-                        <div>
-                          <span className="text-gray-400 font-medium">Líder: </span>
-                          <span className="font-bold text-gray-700">{targetCell.lider}</span>
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center bg-white/70 border border-gray-100 rounded-xl p-2.5 text-xs">
+                          <div>
+                            <span className="text-gray-400 font-medium">Líder: </span>
+                            <span className="font-bold text-gray-700">{targetCell.lider}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-400 font-medium">Setor: </span>
+                            <span className="font-bold text-indigo-600">{targetCell.setor}</span>
+                          </div>
                         </div>
-                        <div>
-                          <span className="text-gray-400 font-medium">Setor: </span>
-                          <span className="font-bold text-indigo-600">{targetCell.setor}</span>
-                        </div>
+                        <button
+                          onClick={() => handleLocalizeGC(selectedTarget)}
+                          className="w-full py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-100 hover:border-indigo-200 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                        >
+                          <MapPin className="w-3.5 h-3.5 animate-bounce" /> Localizar Membros no Mapa
+                        </button>
                       </div>
                     )}
 
@@ -2300,7 +2353,16 @@ export const Simulations: React.FC = () => {
                         auditData.allocationMismatches.map((mismatch: any) => (
                           <div key={mismatch.memberId} className="pt-2 first:pt-0 space-y-1">
                             <div className="flex justify-between items-start gap-2">
-                              <span className="text-xs font-black text-gray-800">{mismatch.memberName}</span>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-black text-gray-800">{mismatch.memberName}</span>
+                                <button
+                                  onClick={() => handleLocalizeMember(mismatch.memberId)}
+                                  className="text-[9px] font-semibold text-indigo-600 hover:text-indigo-850 hover:underline cursor-pointer flex items-center gap-0.5"
+                                  title="Localizar este membro no mapa"
+                                >
+                                  📍 Localizar
+                                </button>
+                              </div>
                               <span className="text-[9px] bg-gray-100 text-gray-600 px-1.5 py-0.2 rounded font-bold uppercase shrink-0">
                                 {mismatch.memberRA}
                               </span>
@@ -2359,6 +2421,12 @@ export const Simulations: React.FC = () => {
                             <div className="flex items-center gap-1.5">
                               <span className="font-black text-rose-600">{gc.count} membros</span>
                               <button
+                                onClick={() => handleLocalizeGC(gc.gc)}
+                                className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline cursor-pointer"
+                              >
+                                📍 Localizar
+                              </button>
+                              <button
                                 onClick={() => {
                                   setSelectedSource(gc.gc);
                                   window.scrollTo({ top: 300, behavior: 'smooth' });
@@ -2415,6 +2483,12 @@ export const Simulations: React.FC = () => {
                             <span className="font-semibold text-gray-700">{gc.gc}</span>
                             <div className="flex items-center gap-1.5">
                               <span className="font-black text-amber-600">{gc.count} membros</span>
+                              <button
+                                onClick={() => handleLocalizeGC(gc.gc)}
+                                className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline cursor-pointer"
+                              >
+                                📍 Localizar
+                              </button>
                               <button
                                 onClick={() => {
                                   setSelectedTarget(gc.gc);
