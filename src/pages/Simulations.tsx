@@ -39,6 +39,21 @@ import {
 } from 'lucide-react';
 import clsx from 'clsx';
 
+// Função de Haversine para calcular distância entre duas coordenadas em km
+const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return null;
+  const R = 6371; // Raio da Terra em km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const d = R * c;
+  return d.toFixed(2);
+};
+
 const regionCoordinates: Record<string, [number, number]> = {
   'VICENTE PIRES': [-15.805, -47.965],
   'ARNIQUEIRA': [-15.855, -48.015],
@@ -213,6 +228,7 @@ export const Simulations: React.FC = () => {
   // Map Navigation and Highlight States
   const [mapCenter, setMapCenter] = useState<[number, number]>([-15.82, -47.95]);
   const [mapZoom, setMapZoom] = useState<number>(11);
+  const [showPopupMembersGC, setShowPopupMembersGC] = useState<string | null>(null);
 
   const handleLocalizeGC = (cellName: string) => {
     const cell = draftCells.find(c => c.grupo_caseiro === cellName);
@@ -1440,7 +1456,7 @@ export const Simulations: React.FC = () => {
                   icon={cellIcon}
                 >
                   <Popup>
-                    <div className="p-2 text-xs">
+                    <div className="p-2 text-xs w-64 max-h-[300px] overflow-y-auto scrollbar-thin">
                       <div className="font-black text-gray-900 border-b pb-1 mb-1 flex items-center gap-1.5">
                         <Home className="w-3.5 h-3.5 text-rose-500" />
                         {c.grupo_caseiro}
@@ -1450,6 +1466,50 @@ export const Simulations: React.FC = () => {
                       <p className="text-[10px] text-indigo-500 font-bold mt-1">
                         👥 Membros Simulados: {draftMembers.filter(m => m.grupos_caseiros === c.grupo_caseiro && m.status === 'Ativo').length}
                       </p>
+
+                      <div className="mt-2 border-t pt-2">
+                        <button
+                          onClick={() => {
+                            setShowPopupMembersGC(showPopupMembersGC === c.grupo_caseiro ? null : c.grupo_caseiro);
+                          }}
+                          className="w-full py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-100 rounded-xl text-[10px] font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+                        >
+                          {showPopupMembersGC === c.grupo_caseiro ? '✕ Ocultar Membros' : '👥 Listar Membros & Distâncias'}
+                        </button>
+                      </div>
+
+                      {showPopupMembersGC === c.grupo_caseiro && (
+                        <div className="mt-2 space-y-1 max-h-36 overflow-y-auto divide-y divide-gray-50 pt-1">
+                          {draftMembers
+                            .filter(m => m.grupos_caseiros === c.grupo_caseiro && m.status === 'Ativo')
+                            .map(m => {
+                              const dist = (m.latitude && m.longitude && c.latitude && c.longitude)
+                                ? calculateDistance(c.latitude, c.longitude, m.latitude, m.longitude)
+                                : null;
+                              
+                              const distNum = dist ? parseFloat(dist) : 0;
+                              const distColor = distNum > 5 
+                                ? 'text-rose-600 font-black' 
+                                : distNum > 3 
+                                ? 'text-amber-600 font-bold' 
+                                : 'text-emerald-600 font-bold';
+
+                              return (
+                                <div key={m.id} className="py-1 flex items-center justify-between text-[10px] first:pt-0">
+                                  <span className="font-medium text-gray-700 truncate max-w-[140px]" title={m.nome}>
+                                    {m.nome}
+                                  </span>
+                                  <span className={clsx("shrink-0", distColor)}>
+                                    {dist ? `${dist} km` : 'Sem coord.'}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          {draftMembers.filter(m => m.grupos_caseiros === c.grupo_caseiro && m.status === 'Ativo').length === 0 && (
+                            <p className="text-[9px] text-gray-400 text-center py-1">Nenhum membro neste GC.</p>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </Popup>
                 </Marker>
