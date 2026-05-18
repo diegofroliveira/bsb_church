@@ -32,6 +32,8 @@ export const Birthdays: React.FC = () => {
   const collageRef = useRef<HTMLDivElement>(null);
 
   const [filterMode, setFilterMode] = useState<'today' | 'tomorrow' | 'month' | 'specific'>('today');
+  const [draggedOverMemberId, setDraggedOverMemberId] = useState<any>(null);
+  const [avatarCacheBuster, setAvatarCacheBuster] = useState<number>(Date.now());
   const [specificDate, setSpecificDate] = useState(new Date().toISOString().split('T')[0]);
   
   const [filterGender, setFilterGender] = useState('Todos');
@@ -202,25 +204,22 @@ export const Birthdays: React.FC = () => {
     }
   };
 
-  const handleUploadPhoto = async (memberId: any, e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const handleUploadFile = async (memberId: any, file: File) => {
     setUploadStatus({ id: memberId, status: 'uploading' });
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${memberId}.${fileExt}`;
-      const filePath = `avatars/${fileName}`;
+      // Force all uploaded photos to be stored as .jpg to align with public URL expectations
+      const filePath = `avatars/${memberId}.jpg`;
 
-      // Upload to Supabase Storage
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(filePath, file, { upsert: true });
+        .upload(filePath, file, { 
+          upsert: true,
+          contentType: file.type
+        });
 
       if (uploadError) throw uploadError;
 
-      // Force refresh for this member (in a real app you'd update the DB record too)
-      // Here we just refresh the UI
+      setAvatarCacheBuster(Date.now());
       fetchMembers();
       setUploadStatus({ id: memberId, status: 'success' });
       setTimeout(() => setUploadStatus({ id: null, status: 'idle' }), 3000);
@@ -229,6 +228,12 @@ export const Birthdays: React.FC = () => {
       setUploadStatus({ id: memberId, status: 'error' });
       alert(`Erro no upload: ${err.message}`);
     }
+  };
+
+  const handleUploadPhoto = async (memberId: any, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    handleUploadFile(memberId, file);
   };
 
   return (
@@ -365,19 +370,40 @@ export const Birthdays: React.FC = () => {
                 "grid-cols-2 md:grid-cols-3"
               )}>
                 {getBirthdays.map((m) => {
-                  const avatarUrl = `${supabase.storage.from('avatars').getPublicUrl(`avatars/${m.id}.jpg`).data.publicUrl}?t=${new Date().getTime()}`;
+                  const avatarUrl = `${supabase.storage.from('avatars').getPublicUrl(`avatars/${m.id}.jpg`).data.publicUrl}?t=${avatarCacheBuster}`;
                   const isUploading = uploadStatus.id === m.id && uploadStatus.status === 'uploading';
                   
                   return (
                     <div key={m.id} className="flex flex-col items-center group relative">
-                       <label className="cursor-pointer block w-full">
+                       <label 
+                          className="cursor-pointer block w-full"
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            setDraggedOverMemberId(m.id);
+                          }}
+                          onDragLeave={(e) => {
+                            e.preventDefault();
+                            setDraggedOverMemberId(null);
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            setDraggedOverMemberId(null);
+                            const file = e.dataTransfer.files?.[0];
+                            if (file && file.type.startsWith('image/')) {
+                              handleUploadFile(m.id, file);
+                            }
+                          }}
+                       >
                           <input 
                             type="file" 
                             accept="image/*" 
                             className="hidden" 
                             onChange={(e) => handleUploadPhoto(m.id, e)}
                           />
-                          <div className="aspect-square w-full rounded-2xl bg-gray-50 border-2 border-dashed border-gray-200 flex items-center justify-center overflow-hidden relative group-hover:border-pink-300 transition-colors">
+                          <div className={clsx(
+                            "aspect-square w-full rounded-2xl bg-gray-50 border-2 border-dashed flex items-center justify-center overflow-hidden relative group-hover:border-pink-300 transition-colors",
+                            draggedOverMemberId === m.id ? "border-pink-500 bg-pink-50/30" : "border-gray-200"
+                          )}>
                              {/* Tenta carregar a imagem, se falhar mostra placeholder */}
                              <img 
                                 src={avatarUrl} 
