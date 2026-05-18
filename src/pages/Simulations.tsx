@@ -269,7 +269,7 @@ export const Simulations: React.FC = () => {
 
   // States for creating a custom draft cell
   const [isCreateCellOpen, setIsCreateCellOpen] = useState(false);
-  // Auditoria collapsible states (Steve Jobs Audit)
+  // Auditoria collapsible states (Auditoria de Alocação)
   const [isAuditMismatchesExpanded, setIsAuditMismatchesExpanded] = useState(true);
   const [isAuditOvercrowdedExpanded, setIsAuditOvercrowdedExpanded] = useState(false);
   const [isAuditCriticalExpanded, setIsAuditCriticalExpanded] = useState(false);
@@ -632,7 +632,7 @@ export const Simulations: React.FC = () => {
   const [proverLoadingStep, setProverLoadingStep] = useState(0);
   const [proverComplete, setProverComplete] = useState(false);
 
-  // Conselheiro Preditivo de Expansão (Steve AI) Calculations
+  // Conselheiro de Expansão (IA de Expansão) Calculations
   const expansionRecommendations = useMemo(() => {
     const alerts: { type: 'danger' | 'warning' | 'info'; text: string }[] = [];
     const suggestions: string[] = [];
@@ -1284,7 +1284,7 @@ export const Simulations: React.FC = () => {
 
     return { insights, minMembersInAnyGC, activeGCsCount };
   }, [isLoading, draftMembers, draftCells]);
-  // --- STEVE JOBS STRUCTURAL & ALLOCATION AUDIT ENGINE ---
+  // --- MECANISMO DE AUDITORIA ESTRUTURAL & ALOCAÇÃO ---
   // Extract unique sectors from baseline GCs today
   const uniqueSectors = useMemo(() => {
     const sectors = new Set<string>();
@@ -2378,9 +2378,10 @@ export const Simulations: React.FC = () => {
                <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-primary-600/20 rounded-full blur-3xl"></div>
             </div>
 
-
-            {/* Steve Jobs Audit Hub */}
-            <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm space-y-4">
+            {/* Coluna Direita: Auditoria & Diagnósticos de Expansão */}
+            <div className="lg:col-span-4 space-y-6">
+              {/* Painel de Auditoria de Alocação */}
+              <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm space-y-4">
               <div className="flex items-center justify-between">
                 <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
                   <UserCheck className="w-4 h-4 text-amber-500" /> Auditoria de Saúde & Alocação
