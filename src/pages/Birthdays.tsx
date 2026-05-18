@@ -354,10 +354,11 @@ export const Birthdays: React.FC = () => {
         {/* Right Column: Visual Collage */}
         <div className="xl:col-span-8">
           <div className="bg-gray-100/50 rounded-3xl p-8 border border-gray-200">
-            <div 
-              ref={collageRef}
-              className="bg-white rounded-2xl shadow-xl p-10 max-w-3xl mx-auto"
-            >
+            <div className="max-w-3xl mx-auto">
+              <div 
+                ref={collageRef}
+                className="bg-white rounded-2xl shadow-xl p-10 w-full"
+              >
               <div className="text-center mb-10">
                 <h2 className="text-4xl font-black text-gray-900 tracking-tight">Aniversariantes</h2>
                 <p className="text-pink-500 font-bold tracking-widest text-sm mt-2 uppercase">Parabéns!</p>
@@ -452,9 +453,11 @@ export const Birthdays: React.FC = () => {
                 )}
               </div>
 
-              <div className="mt-12 pt-6 border-t border-gray-100 text-center">
-                 <p className="text-[9px] text-gray-300 font-bold tracking-widest uppercase flex items-center justify-center gap-2">
-                    <RefreshCw className="h-3 w-3 animate-spin-slow" /> Esta área será capturada e convertida em imagem
+              </div>
+
+              <div className="mt-4 text-center">
+                 <p className="text-[10px] text-gray-400 font-bold tracking-widest uppercase flex items-center justify-center gap-2">
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin-slow text-gray-400" /> A área branca acima será capturada e convertida em imagem
                  </p>
               </div>
             </div>
