@@ -22,6 +22,6 @@ run('vercel env add VITE_SUPABASE_URL production', url);
 run('vercel env add VITE_SUPABASE_ANON_KEY production', key);
 
 console.log('📦 Gerando deploy final de produção...');
-run('vercel deploy --prod --yes');
+run('vercel deploy --prod --yes --force');
 
 console.log('\n✨ PROCESSO CONCLUÍDO!');

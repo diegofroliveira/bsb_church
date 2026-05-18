@@ -38,45 +38,19 @@ import {
   ChevronDown, ChevronUp, UserCheck, Eye, Heart, Plus, X, PlusCircle, Zap
 } from 'lucide-react';
 import clsx from 'clsx';
+import { 
+  calculateDistance, 
+  regionCoordinates, 
+  calculateAge, 
+  normalizeName, 
+  normalizePhone, 
+  normalizeAddress, 
+  getAdministrativeRegion, 
+  getGCRegion 
+} from '../lib/geoUtils';
+import { useFamilyEngine } from '../hooks/useFamilyEngine';
 
-// Função de Haversine para calcular distância entre duas coordenadas em km
-const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-  if (!lat1 || !lon1 || !lat2 || !lon2) return null;
-  const R = 6371; // Raio da Terra em km
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = 
-    Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-    Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  const d = R * c;
-  return d.toFixed(2);
-};
-
-const regionCoordinates: Record<string, [number, number]> = {
-  'VICENTE PIRES': [-15.805, -47.965],
-  'ARNIQUEIRA': [-15.855, -48.015],
-  'SAMAMBAIA': [-15.885, -48.085],
-  'AGUAS CLARAS': [-15.842, -48.025],
-  'TAGUATINGA': [-15.815, -48.065],
-  'SOBRADINHO': [-15.655, -47.795],
-  'GUARA': [-15.825, -47.985],
-  'CEILANDIA': [-15.822, -48.115],
-  'SUDOESTE': [-15.795, -47.925],
-  'ASA SUL': [-15.812, -47.902],
-  'ASA NORTE': [-15.762, -47.882],
-  'RECANTO DAS EMAS': [-15.905, -48.075],
-  'RIACHO FUNDO': [-15.872, -48.012],
-  'NUCLEO BANDEIRANTE': [-15.862, -47.962],
-  'LAGO NORTE': [-15.735, -47.865],
-  'NOROESTE': [-15.768, -47.935],
-  'JARDIM BOTANICO': [-15.888, -47.835],
-};
-
-
-
-interface Member {
+export interface Member {
   id: number;
   nome: string;
   grupos_caseiros: string | null;
@@ -94,7 +68,7 @@ interface Member {
   longitude?: number | null;
 }
 
-interface Cell {
+export interface Cell {
   id: string;
   grupo_caseiro: string;
   lider: string;
@@ -103,98 +77,17 @@ interface Cell {
   longitude?: number | null;
 }
 
-interface DiscipleshipLink {
+export interface DiscipleshipLink {
   discipulador: string;
   discipulo: string;
 }
 
-interface Family {
+export interface Family {
   id: string;
   name: string;
   headId: string;
   memberIds: string[];
 }
-
-const calculateAge = (dob: string | null): number => {
-  if (!dob) return -1;
-  let parts = dob.includes('/') ? dob.split('/') : dob.split('-');
-  const birth = dob.includes('/') ? new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0])) : new Date(dob);
-  if (isNaN(birth.getTime())) return -1;
-  const now = new Date();
-  let age = now.getFullYear() - birth.getFullYear();
-  if (now.getMonth() < birth.getMonth() || (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate())) age--;
-  return age;
-};
-
-const normalizeName = (name: string | null | undefined): string => {
-  if (!name) return '';
-  return name.trim().toUpperCase().replace(/\s+/g, ' ');
-};
-
-const normalizePhone = (phone: string | null | undefined): string => {
-  if (!phone) return '';
-  return phone.replace(/\D/g, '');
-};
-
-const normalizeAddress = (addr: string | null | undefined): string => {
-  if (!addr) return '';
-  return addr.trim().toLowerCase()
-    .replace(/\s+/g, ' ')
-    .replace(/[^a-z0-9]/g, '');
-};
-
-const getAdministrativeRegion = (bairro: string | null | undefined): string => {
-  if (!bairro) return 'NÃO INFORMADO';
-  const norm = bairro.trim().toUpperCase()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  
-  if (norm.includes('VICENTE PIRES') || norm.includes('JOQUEI')) return 'VICENTE PIRES';
-  if (norm.includes('TAGUATINGA') || norm.includes('TAGUA')) return 'TAGUATINGA';
-  if (norm.includes('ARNIQUEIRA') || norm.includes('AREAL')) return 'ARNIQUEIRA';
-  if (norm.includes('AGUAS CLARAS')) return 'ÁGUAS CLARAS';
-  if (norm.includes('GUARA') || norm.includes('LUCIO COSTA')) return 'GUARÁ';
-  if (norm.includes('ASA SUL')) return 'ASA SUL';
-  if (norm.includes('ASA NORTE') || norm.includes('HABITACOES INDIVIDUAIS NORTE')) return 'ASA NORTE';
-  if (norm.includes('CEILANDIA')) return 'CEILÂNDIA';
-  if (norm.includes('SAMAMBAIA')) return 'SAMAMBAIA';
-  if (norm.includes('RECANTO DAS EMAS')) return 'RECANTO DAS EMAS';
-  if (norm.includes('SOBRADINHO')) return 'SOBRADINHO';
-  if (norm.includes('NUCLEO BANDEIRANTE')) return 'NÚCLEO BANDEIRANTE';
-  if (norm.includes('RIACHO FUNDO')) return 'RIACHO FUNDO';
-  if (norm.includes('GAMA')) return 'GAMA';
-  if (norm.includes('SANTA MARIA')) return 'SANTA MARIA';
-  if (norm.includes('LAGO NORTE') || norm.includes('SHIN')) return 'LAGO NORTE';
-  if (norm.includes('NOROESTE')) return 'NOROESTE';
-  if (norm.includes('JARDIM BOTANICO') || norm.includes('MANGUEIRAL')) return 'JARDIM BOTÂNICO';
-  
-  return bairro.trim();
-};
-
-const getGCRegion = (gcName: string): string => {
-  const norm = gcName.trim().toUpperCase()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  
-  if (norm.includes('VICENTE PIRES') || norm.includes('JOQUEI')) return 'VICENTE PIRES';
-  if (norm.includes('TAGUATINGA') || norm.includes('TAGUA')) return 'TAGUATINGA';
-  if (norm.includes('ARNIQUEIRA') || norm.includes('AREAL')) return 'ARNIQUEIRA';
-  if (norm.includes('AGUAS CLARAS')) return 'ÁGUAS CLARAS';
-  if (norm.includes('GUARA')) return 'GUARÁ';
-  if (norm.includes('ASA SUL')) return 'ASA SUL';
-  if (norm.includes('ASA NORTE')) return 'ASA NORTE';
-  if (norm.includes('CEILANDIA')) return 'CEILÂNDIA';
-  if (norm.includes('SAMAMBAIA')) return 'SAMAMBAIA';
-  if (norm.includes('RECANTO DAS EMAS')) return 'RECANTO DAS EMAS';
-  if (norm.includes('SOBRADINHO')) return 'SOBRADINHO';
-  if (norm.includes('NUCLEO BANDEIRANTE')) return 'NÚCLEO BANDEIRANTE';
-  if (norm.includes('RIACHO FUNDO')) return 'RIACHO FUNDO';
-  if (norm.includes('GAMA')) return 'GAMA';
-  if (norm.includes('SANTA MARIA')) return 'SANTA MARIA';
-  if (norm.includes('LAGO NORTE')) return 'LAGO NORTE';
-  if (norm.includes('NOROESTE')) return 'NOROESTE';
-  if (norm.includes('JARDIM BOTANICO')) return 'JARDIM BOTÂNICO';
-  
-  return 'OUTRO';
-};
 
 // Componente auxiliar para alterar dinamicamente o centro e zoom do mapa Leaflet
 const ChangeMapView: React.FC<{ center: [number, number]; zoom: number }> = ({ center, zoom }) => {
@@ -790,178 +683,7 @@ export const Simulations: React.FC = () => {
   };
 
   // --- FAMILY GROUPING ENGINE ---
-  const families = useMemo((): Record<string, Family> => {
-    if (draftMembers.length === 0) return {};
-    
-    const memberById = new Map<string, Member>();
-    const memberByName = new Map<string, Member>();
-    
-    draftMembers.forEach(m => {
-      const idStr = m.id.toString();
-      memberById.set(idStr, m);
-      const normName = normalizeName(m.nome);
-      if (normName) memberByName.set(normName, m);
-    });
-
-    // DSU logic
-    const parentDSU = new Map<string, string>();
-    const find = (i: string): string => {
-      let root = i;
-      while (parentDSU.get(root) !== undefined) {
-        root = parentDSU.get(root)!;
-      }
-      let curr = i;
-      while (curr !== root) {
-        let nxt = parentDSU.get(curr)!;
-        parentDSU.set(curr, root);
-        curr = nxt;
-      }
-      return root;
-    };
-    
-    const union = (i: string, j: string) => {
-      const rootI = find(i);
-      const rootJ = find(j);
-      if (rootI !== rootJ) {
-        parentDSU.set(rootI, rootJ);
-      }
-    };
-
-    // Rule 1: Parent-child connection
-    draftMembers.forEach(m => {
-      const idStr = m.id.toString();
-      const p1 = normalizeName(m.pai);
-      const p2 = normalizeName(m.mae);
-      
-      if (p1 && memberByName.has(p1)) {
-        union(idStr, memberByName.get(p1)!.id.toString());
-      }
-      if (p2 && memberByName.has(p2)) {
-        union(idStr, memberByName.get(p2)!.id.toString());
-      }
-    });
-
-    // Rule 2: Share the same parent string (siblings)
-    const byParents = new Map<string, string[]>();
-    draftMembers.forEach(m => {
-      const idStr = m.id.toString();
-      const p1 = normalizeName(m.pai);
-      const p2 = normalizeName(m.mae);
-      if (p1) {
-        if (!byParents.has(p1)) byParents.set(p1, []);
-        byParents.get(p1)!.push(idStr);
-      }
-      if (p2) {
-        if (!byParents.has(p2)) byParents.set(p2, []);
-        byParents.get(p2)!.push(idStr);
-      }
-    });
-    byParents.forEach(ids => {
-      for (let k = 1; k < ids.length; k++) {
-        union(ids[0], ids[k]);
-      }
-    });
-
-    // Rule 3: Share the same phone number (>= 8 digits)
-    const byPhone = new Map<string, string[]>();
-    draftMembers.forEach(m => {
-      const idStr = m.id.toString();
-      const ph1 = normalizePhone(m.celular_principal_sms);
-      const ph2 = normalizePhone(m.telefone_fixo);
-      [ph1, ph2].forEach(ph => {
-        if (ph && ph.length >= 8) {
-          if (!byPhone.has(ph)) byPhone.set(ph, []);
-          byPhone.get(ph)!.push(idStr);
-        }
-      });
-    });
-    byPhone.forEach(ids => {
-      for (let k = 1; k < ids.length; k++) {
-        union(ids[0], ids[k]);
-      }
-    });
-
-    // Rule 4: Share the exact same address
-    const byAddress = new Map<string, string[]>();
-    draftMembers.forEach(m => {
-      const idStr = m.id.toString();
-      const addr = normalizeAddress(m.logradouro);
-      if (addr && addr.length > 6) {
-        if (!byAddress.has(addr)) byAddress.set(addr, []);
-        byAddress.get(addr)!.push(idStr);
-      }
-    });
-    byAddress.forEach(ids => {
-      for (let k = 1; k < ids.length; k++) {
-        union(ids[0], ids[k]);
-      }
-    });
-
-    // Collect components
-    const components: Record<string, string[]> = {};
-    draftMembers.forEach(m => {
-      const idStr = m.id.toString();
-      const root = find(idStr);
-      if (!components[root]) components[root] = [];
-      components[root].push(idStr);
-    });
-
-    // Build Family definitions
-    const result: Record<string, Family> = {};
-    Object.entries(components).forEach(([rootId, mIds]) => {
-      const familyMembers = mIds.map(id => memberById.get(id)!);
-      
-      // Determine Head
-      let head = familyMembers[0];
-      
-      const marriedMale = familyMembers.find(m => 
-        m.sexo === 'Masculino' && 
-        m.estado_civil && 
-        m.estado_civil.toUpperCase().includes('CASADO')
-      );
-      if (marriedMale) {
-        head = marriedMale;
-      } else {
-        const parent = familyMembers.find(m => {
-          const normName = normalizeName(m.nome);
-          return familyMembers.some(c => 
-            normalizeName(c.pai) === normName || 
-            normalizeName(c.mae) === normName
-          );
-        });
-        if (parent) {
-          head = parent;
-        } else {
-          let oldest = head;
-          let oldestAge = -1;
-          familyMembers.forEach(m => {
-            const age = calculateAge(m.nascimento);
-            if (age > oldestAge) {
-              oldestAge = age;
-              oldest = m;
-            }
-          });
-          head = oldest;
-        }
-      }
-
-      const headIdStr = head.id.toString();
-      const nameParts = head.nome.trim().split(' ');
-      const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
-      const familyName = lastName 
-        ? `Família ${lastName} (${head.nome.split(' ')[0]})`
-        : `Família de ${head.nome}`;
-
-      result[rootId] = {
-        id: rootId,
-        name: familyName,
-        headId: headIdStr,
-        memberIds: mIds
-      };
-    });
-
-    return result;
-  }, [draftMembers]);
+  const families = useFamilyEngine(draftMembers);
 
   // Expand families by default if they are in source
   useEffect(() => {
