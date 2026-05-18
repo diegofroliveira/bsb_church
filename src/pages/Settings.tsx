@@ -16,31 +16,14 @@ export const Settings: React.FC = () => {
     setSyncStatus('idle');
     setSyncMessage('');
     
-    try {
-      const response = await fetch('/api/trigger-sync', {
-        method: 'POST',
-      });
-      
-      const data = await response.json();
-      
-      if (response.ok) {
-        setSyncStatus('success');
-        setSyncMessage('Automação iniciada! Os dados serão atualizados em 1-2 minutos.');
-      } else {
-        setSyncStatus('error');
-        setSyncMessage(data.error || 'Erro ao acionar a nuvem.');
-      }
-    } catch (error) {
-      setSyncStatus('error');
-      setSyncMessage('Erro de conexão com o servidor.');
-    } finally {
-      setIsSyncing(false);
-      
-      // Limpar a mensagem de sucesso depois de um tempo
-      if (syncStatus === 'success') {
-         setTimeout(() => setSyncStatus('idle'), 8000);
-      }
-    }
+    // Simulação rápida para feedback visual
+    await new Promise(resolve => setTimeout(resolve, 800));
+    
+    setSyncStatus('error');
+    setSyncMessage(
+      'A sincronização automática do Sistema Prover está configurada para rodar de forma agendada no servidor local da igreja (para preservar as credenciais e evitar limites de tempo da Vercel Hobby). Para forçar a execução manual agora, por favor execute o script "python run_sync.py" no terminal do seu computador/servidor local.'
+    );
+    setIsSyncing(false);
   };
 
   useEffect(() => {
@@ -86,16 +69,16 @@ export const Settings: React.FC = () => {
                   <CloudLightning className="w-6 h-6"/>
                </div>
                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Automação de Dados (Nuvem)</h3>
+                  <h3 className="text-lg font-semibold text-gray-900">Automação de Dados</h3>
                   <p className="text-sm text-gray-500 max-w-xl mt-1">
-                     A base de dados é atualizada automaticamente todo Domingo às 03:00. 
-                     Caso você precise forçar uma atualização agora mesmo, clique no botão ao lado.
+                     A base de dados é atualizada automaticamente de forma agendada no Sistema Prover. 
+                     Caso precise forçar uma atualização manual, clique no botão ao lado.
                   </p>
                   
                   {syncStatus !== 'idle' && (
                      <div className={`mt-3 flex items-center gap-2 text-sm font-medium ${syncStatus === 'success' ? 'text-green-600' : 'text-red-600'}`}>
                         {syncStatus === 'success' ? <CheckCircle2 className="w-4 h-4"/> : <AlertCircle className="w-4 h-4"/>}
-                        {syncMessage}
+                        <span className="leading-relaxed">{syncMessage}</span>
                      </div>
                   )}
                </div>
@@ -103,10 +86,10 @@ export const Settings: React.FC = () => {
             <button 
                onClick={handleTriggerSync}
                disabled={isSyncing}
-               className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed text-white px-5 py-2.5 rounded-xl text-sm font-medium transition-colors shadow-sm"
+               className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed text-white px-5 py-2.5 rounded-xl text-sm font-medium transition-colors shadow-sm shrink-0"
             >
                {isSyncing ? <Loader2 className="w-4 h-4 animate-spin"/> : <Cloud className="w-4 h-4"/>}
-               {isSyncing ? 'Conectando...' : 'Forçar Atualização'}
+               {isSyncing ? 'Conectando...' : 'Como Forçar Sincronização'}
             </button>
          </div>
       </div>

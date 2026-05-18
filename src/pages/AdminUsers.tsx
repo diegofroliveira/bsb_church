@@ -345,29 +345,14 @@ export const AdminUsers: React.FC = () => {
     setSyncStatus('idle');
     setSyncMessage('');
     
-    try {
-      const response = await fetch('/api/trigger-sync', {
-        method: 'POST',
-      });
-      
-      const data = await response.json();
-      
-      if (response.ok) {
-        setSyncStatus('success');
-        setSyncMessage('Automação iniciada! Os dados serão atualizados em 1-2 minutos.');
-      } else {
-        setSyncStatus('error');
-        setSyncMessage(data.error || 'Erro ao acionar a nuvem.');
-      }
-    } catch (error) {
-      setSyncStatus('error');
-      setSyncMessage('Erro de conexão com o servidor.');
-    } finally {
-      setIsSyncingCloud(false);
-      if (syncStatus === 'success') {
-         setTimeout(() => setSyncStatus('idle'), 8000);
-      }
-    }
+    // Simulação rápida para feedback visual
+    await new Promise(resolve => setTimeout(resolve, 800));
+    
+    setSyncStatus('error');
+    setSyncMessage(
+      'A sincronização automática do Sistema Prover está configurada para rodar de forma agendada no servidor local da igreja (para preservar as credenciais e evitar limites de tempo da Vercel Hobby). Para forçar a execução manual agora, por favor execute o script "python run_sync.py" no terminal do seu computador/servidor local.'
+    );
+    setIsSyncingCloud(false);
   };
 
   const handleToggleModule = (roleKey: string, moduleId: string) => {
@@ -747,11 +732,11 @@ export const AdminUsers: React.FC = () => {
                        <CloudLightning className="w-8 h-8"/>
                     </div>
                     <div>
-                       <h3 className="text-xl font-bold text-gray-900">Automação de Dados (Nuvem)</h3>
+                       <h3 className="text-xl font-bold text-gray-900">Automação de Dados</h3>
                        <p className="text-sm text-gray-500 max-w-2xl mt-2 leading-relaxed">
-                          Este processo aciona os robôs de sincronização na nuvem para buscar os dados mais recentes do sistema de gestão externa (CIGAM). 
+                          Este processo descreve a rotina de sincronização para buscar os dados mais recentes do sistema de gestão externa (Sistema Prover). 
                           <br/><br/>
-                          <span className="font-semibold text-gray-700">Atenção:</span> Use este recurso apenas quando houver mudanças urgentes que não podem esperar pela sincronização automática programada (Domingos às 03:00).
+                          <span className="font-semibold text-gray-700">Atenção:</span> O script é executado localmente de forma agendada. Caso precise forçar uma atualização manual, siga as instruções ao clicar no botão ao lado.
                        </p>
                        
                        {syncStatus !== 'idle' && (
@@ -771,7 +756,7 @@ export const AdminUsers: React.FC = () => {
                     className="w-full md:w-auto flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed text-white px-8 py-4 rounded-2xl font-bold transition-all shadow-xl shadow-blue-100 group"
                  >
                     {isSyncingCloud ? <Loader2 className="w-5 h-5 animate-spin"/> : <Cloud className="w-5 h-5 group-hover:scale-110 transition-transform"/>}
-                    {isSyncingCloud ? 'Processando...' : 'Forçar Atualização na Nuvem'}
+                    {isSyncingCloud ? 'Processando...' : 'Como Forçar Sincronização'}
                  </button>
               </div>
            </div>
