@@ -10,6 +10,47 @@ export const Settings: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [syncMessage, setSyncMessage] = useState('');
+  const [syncProgress, setSyncProgress] = useState(0);
+  const [currentStepText, setCurrentStepText] = useState('');
+
+  useEffect(() => {
+    let interval;
+    if (syncStatus === 'success') {
+      setSyncProgress(0);
+      setCurrentStepText('Iniciando servidores na nuvem...');
+      
+      const startTime = Date.now();
+      const duration = 90000; // 90 seconds
+      
+      interval = setInterval(() => {
+        const elapsed = Date.now() - startTime;
+        const currentProgress = Math.min((elapsed / duration) * 100, 100);
+        setSyncProgress(currentProgress);
+        
+        if (currentProgress >= 100) {
+          setCurrentStepText('Banco de dados atualizado com sucesso!');
+          clearInterval(interval);
+        } else if (currentProgress < 15) {
+          setCurrentStepText('Iniciando servidores na nuvem...');
+        } else if (currentProgress < 40) {
+          setCurrentStepText('Efetuando login seguro no Sistema Prover...');
+        } else if (currentProgress < 70) {
+          setCurrentStepText('Extraindo relatórios atualizados de membros...');
+        } else if (currentProgress < 90) {
+          setCurrentStepText('Sincronizando registros no banco Supabase...');
+        } else {
+          setCurrentStepText('Limpando cache e finalizando processo...');
+        }
+      }, 1000);
+    } else {
+      setSyncProgress(0);
+      setCurrentStepText('');
+    }
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [syncStatus]);
 
   const handleTriggerSync = async () => {
     setIsSyncing(true);
@@ -94,6 +135,26 @@ export const Settings: React.FC = () => {
                      <div className={`mt-3 flex items-center gap-2 text-sm font-medium ${syncStatus === 'success' ? 'text-green-600' : 'text-red-600'}`}>
                         {syncStatus === 'success' ? <CheckCircle2 className="w-4 h-4"/> : <AlertCircle className="w-4 h-4"/>}
                         <span className="leading-relaxed">{syncMessage}</span>
+                     </div>
+                  )}
+
+                  {syncStatus === 'success' && (
+                     <div className="mt-4 p-5 bg-gray-50 border border-gray-100 rounded-2xl animate-in fade-in slide-in-from-top-2 duration-300">
+                        <div className="flex justify-between items-center mb-2">
+                           <span className="text-sm font-semibold text-gray-700 animate-pulse">{currentStepText}</span>
+                           <span className="text-sm font-bold text-blue-600">{Math.round(syncProgress)}%</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden shadow-inner animate-pulse">
+                           <div 
+                              className="bg-gradient-to-r from-blue-500 to-green-500 h-full rounded-full transition-all duration-1000 ease-out"
+                              style={{ width: `${syncProgress}%` }}
+                           />
+                        </div>
+                        <div className="flex justify-between text-xs text-gray-400 mt-2">
+                           <span>Início</span>
+                           <span>Tempo estimado: ~90s</span>
+                           <span>Concluído</span>
+                        </div>
                      </div>
                   )}
                </div>
