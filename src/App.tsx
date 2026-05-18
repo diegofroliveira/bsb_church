@@ -21,6 +21,7 @@ import { AiConsultant } from './pages/AiConsultant';
 import { AiInsights } from './pages/AiInsights';
 import { Birthdays } from './pages/Birthdays';
 import { Simulations } from './pages/Simulations';
+import { Families } from './pages/Families';
 
 function App() {
   return (
@@ -39,6 +40,7 @@ function App() {
               {/* Dynamic accessible routes */}
               <Route path="/georeferencing" element={<Georeferencing />} />
               <Route path="/members" element={<Members />} />
+              <Route path="/families" element={<Families />} />
               <Route path="/birthdays" element={<Birthdays />} />
               <Route path="/cells" element={<Cells />} />
               <Route path="/reports" element={<Reports />} />

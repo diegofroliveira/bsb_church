@@ -46,7 +46,8 @@ import {
   normalizePhone, 
   normalizeAddress, 
   getAdministrativeRegion, 
-  getGCRegion 
+  getGCRegion,
+  getFallbackRegion
 } from '../lib/geoUtils';
 import { useFamilyEngine } from '../hooks/useFamilyEngine';
 import type { Member, Cell, DiscipleshipLink, Family } from '../hooks/useFamilyEngine';
@@ -60,23 +61,32 @@ const ChangeMapView: React.FC<{ center: [number, number]; zoom: number }> = ({ c
   return null;
 };
 
-const renderBairroTag = (m: Member, activeCell: Cell | undefined) => {
+const renderBairroTag = (m: Member, activeCell: Cell | undefined, allCells?: Cell[]) => {
   if (!m.bairro) return null;
   const mRegion = getAdministrativeRegion(m.bairro);
   const cellRegion = activeCell ? getGCRegion(activeCell.grupo_caseiro) : '';
-  const isDifferentRegion = cellRegion && mRegion !== 'NÃO INFORMADO' && mRegion !== cellRegion;
+  
+  if (!cellRegion) return (
+    <span className="text-[9px] text-indigo-500 bg-indigo-50/50 font-bold block mt-0.5">
+      📍 {m.bairro}
+    </span>
+  );
+
+  const hasLocalGC = allCells ? allCells.some(c => getGCRegion(c.grupo_caseiro) === mRegion) : true;
+  const fallbackRegion = getFallbackRegion(mRegion);
+  const isCorrect = (mRegion === cellRegion) || (!hasLocalGC && cellRegion === fallbackRegion);
   
   return (
     <span 
       className={clsx(
         "text-[9px] font-bold block mt-0.5 w-fit px-1 rounded transition-all",
-        isDifferentRegion 
+        !isCorrect 
           ? "text-rose-600 bg-rose-50 border border-rose-100 animate-pulse font-extrabold" 
           : "text-indigo-500 bg-indigo-50/50"
       )} 
-      title={isDifferentRegion ? `${m.bairro} (Fora do Setor do GC: ${cellRegion})` : m.bairro + (m.logradouro ? ` - ${m.logradouro}` : '')}
+      title={!isCorrect ? `${m.bairro} (Fora do Setor do GC: ${cellRegion})` : m.bairro + (m.logradouro ? ` - ${m.logradouro}` : '')}
     >
-      📍 {m.bairro} {isDifferentRegion && "⚠️ Fora do Setor"}
+      📍 {m.bairro} {!isCorrect && "⚠️ Fora do Setor"}
     </span>
   );
 };
@@ -1007,6 +1017,25 @@ export const Simulations: React.FC = () => {
       return { allocationMismatches: [], overcrowdedGCs: [], criticalGCs: [] };
     }
 
+    // Build normalized set of leader names to ignore leaders and their family members (e.g. spouses)
+    const leaderNamesNormalized = new Set(draftCells.map(c => normalizeName(c.lider)));
+
+    const isLeaderOrFamilyOfLeader = (memberId: string, memberName: string) => {
+      const normName = normalizeName(memberName);
+      if (leaderNamesNormalized.has(normName)) return true;
+      
+      // Find family containing this member
+      const memberFam = Object.values(families).find(f => f.memberIds.includes(memberId));
+      if (memberFam) {
+        // Check if any member of this family is a leader
+        return memberFam.memberIds.some(idStr => {
+          const famMem = draftMembers.find(dm => dm.id.toString() === idStr);
+          return famMem && leaderNamesNormalized.has(normalizeName(famMem.nome));
+        });
+      }
+      return false;
+    };
+
     // 1. Group draft cells by their normalized region
     const gcsByRA: Record<string, string[]> = {};
     draftCells.forEach(c => {
@@ -1014,6 +1043,53 @@ export const Simulations: React.FC = () => {
       if (!gcsByRA[ra]) gcsByRA[ra] = [];
       gcsByRA[ra].push(c.grupo_caseiro);
     });
+
+    const getRecommendedGCsForRegion = (memberRA: string) => {
+      // 1. If we have GCs in this region, return them
+      if (gcsByRA[memberRA] && gcsByRA[memberRA].length > 0) {
+        return { gcs: gcsByRA[memberRA], isLocal: true, recommendedRegion: memberRA };
+      }
+      
+      // 2. Predefined high-quality fallback mappings
+      const mappedTarget = getFallbackRegion(memberRA);
+      if (mappedTarget && gcsByRA[mappedTarget] && gcsByRA[mappedTarget].length > 0) {
+        return { gcs: gcsByRA[mappedTarget], isLocal: false, recommendedRegion: mappedTarget };
+      }
+      
+      // 3. Mathematical geographic closest region calculation
+      const memberCoords = regionCoordinates[memberRA];
+      if (memberCoords) {
+        let closestRegion = '';
+        let minDistance = Infinity;
+        
+        Object.entries(gcsByRA).forEach(([otherRA, otherGCs]) => {
+          if (otherGCs.length === 0) return;
+          const otherCoords = regionCoordinates[otherRA];
+          if (otherCoords) {
+            const distStr = calculateDistance(memberCoords[0], memberCoords[1], otherCoords[0], otherCoords[1]);
+            if (distStr) {
+              const dist = parseFloat(distStr);
+              if (dist < minDistance) {
+                minDistance = dist;
+                closestRegion = otherRA;
+              }
+            }
+          }
+        });
+        
+        if (closestRegion && gcsByRA[closestRegion] && gcsByRA[closestRegion].length > 0) {
+          return { gcs: gcsByRA[closestRegion], isLocal: false, recommendedRegion: closestRegion };
+        }
+      }
+      
+      // 4. Ultimate fallback: list GCs from any region that has them
+      const anyRA = Object.keys(gcsByRA).find(ra => gcsByRA[ra] && gcsByRA[ra].length > 0);
+      if (anyRA) {
+        return { gcs: gcsByRA[anyRA], isLocal: false, recommendedRegion: anyRA };
+      }
+      
+      return { gcs: [], isLocal: false, recommendedRegion: '' };
+    };
 
     // 2. Count members per GC
     const membersCountByGC: Record<string, number> = {};
@@ -1025,22 +1101,34 @@ export const Simulations: React.FC = () => {
     // 3. Find territorial mismatches
     const allocationMismatches: any[] = [];
     draftMembers.filter(m => m.status === 'Ativo' && m.grupos_caseiros).forEach(m => {
+      const memberIdStr = m.id.toString();
+      if (isLeaderOrFamilyOfLeader(memberIdStr, m.nome)) return;
+
       const memberRA = getAdministrativeRegion(m.bairro);
       const gcName = m.grupos_caseiros!;
       const gcRA = getGCRegion(gcName);
 
-      if (memberRA !== 'NÃO INFORMADO' && gcRA !== 'OUTRO' && memberRA !== gcRA) {
-        const localGCs = gcsByRA[memberRA] || [];
-        allocationMismatches.push({
-          memberId: m.id,
-          memberName: m.nome,
-          memberBairro: m.bairro || 'Não informado',
-          memberRA: memberRA,
-          currentGC: gcName,
-          currentGCRA: gcRA,
-          hasLocalGCs: localGCs.length > 0,
-          localGCs: localGCs
-        });
+      if (memberRA !== 'NÃO INFORMADO' && gcRA !== 'OUTRO') {
+        const rec = getRecommendedGCsForRegion(memberRA);
+        
+        // A mismatch exists if:
+        // They are in a region different from their own, AND they are NOT in their recommended fallback region!
+        const isCorrectAllocation = (gcRA === memberRA) || (!rec.isLocal && gcRA === rec.recommendedRegion);
+        
+        if (!isCorrectAllocation) {
+          allocationMismatches.push({
+            memberId: m.id,
+            memberName: m.nome,
+            memberBairro: m.bairro || 'Não informado',
+            memberRA: memberRA,
+            currentGC: gcName,
+            currentGCRA: gcRA,
+            hasLocalGCs: rec.gcs.length > 0,
+            isLocalRecommendation: rec.isLocal,
+            recommendedRegion: rec.recommendedRegion,
+            localGCs: rec.gcs
+          });
+        }
       }
     });
 
@@ -1064,7 +1152,7 @@ export const Simulations: React.FC = () => {
       .sort((a, b) => a.count - b.count);
 
     return { allocationMismatches, overcrowdedGCs, criticalGCs };
-  }, [isLoading, draftMembers, draftCells]);
+  }, [isLoading, draftMembers, draftCells, families]);
 
 
 
@@ -1533,7 +1621,7 @@ export const Simulations: React.FC = () => {
                                             <span className="text-[10px] text-gray-400">
                                               {age >= 0 ? `${age} anos` : 'Idade indefinida'} • {m.sexo === 'Masculino' ? 'M' : 'F'}
                                             </span>
-                                            {renderBairroTag(m, sourceCell)}
+                                            {renderBairroTag(m, sourceCell, draftCells)}
                                           </div>
                                         </div>
                                         {selectedMembers.includes(idStr) && <CheckCircle2 className="w-3.5 h-3.5 text-primary-600" />}
@@ -1573,7 +1661,7 @@ export const Simulations: React.FC = () => {
                                       <span className="text-[10px] text-gray-400">
                                         {age >= 0 ? `${age} anos` : 'Idade indefinida'} • {m.sexo === 'Masculino' ? 'M' : 'F'}
                                       </span>
-                                      {renderBairroTag(m, sourceCell)}
+                                      {renderBairroTag(m, sourceCell, draftCells)}
                                     </div>
                                   </div>
                                   {selectedMembers.includes(idStr) && <CheckCircle2 className="w-3.5 h-3.5 text-primary-600" />}
@@ -1715,7 +1803,7 @@ export const Simulations: React.FC = () => {
                                         <span className="text-[9px] text-gray-500">
                                           {age >= 0 ? `${age} anos` : ''} • {m.sexo === 'Masculino' ? 'M' : 'F'}
                                         </span>
-                                        {renderBairroTag(m, targetCell)}
+                                        {renderBairroTag(m, targetCell, draftCells)}
                                       </div>
                                     </div>
                                     <div className="flex items-center gap-1.5">
@@ -1806,7 +1894,7 @@ export const Simulations: React.FC = () => {
                                                 <span className="text-[9px] text-gray-400">
                                                   {age >= 0 ? `${age} anos` : ''} • {m.sexo === 'Masculino' ? 'M' : 'F'}
                                                 </span>
-                                                {renderBairroTag(m, targetCell)}
+                                                {renderBairroTag(m, targetCell, draftCells)}
                                               </div>
                                             </div>
                                             {selectedTargetMembers.includes(idStr) && <CheckCircle2 className="w-3.5 h-3.5 text-primary-600" />}
@@ -1843,7 +1931,7 @@ export const Simulations: React.FC = () => {
                                       <span className="text-[9px] text-gray-400">
                                         {age >= 0 ? `${age} anos` : ''} • {m.sexo === 'Masculino' ? 'M' : 'F'}
                                       </span>
-                                      {renderBairroTag(m, targetCell)}
+                                      {renderBairroTag(m, targetCell, draftCells)}
                                     </div>
                                   </div>
                                   {selectedTargetMembers.includes(idStr) && <CheckCircle2 className="w-3.5 h-3.5 text-primary-600" />}

@@ -12,6 +12,7 @@ export const regionCoordinates: Record<string, [number, number]> = {
   'SUDOESTE': [-15.795, -47.925],
   'ASA SUL': [-15.812, -47.902],
   'ASA NORTE': [-15.762, -47.882],
+  'RECANTO-ENTORNO': [-15.905, -48.075],
   'RECANTO DAS EMAS': [-15.905, -48.075],
   'RIACHO FUNDO': [-15.872, -48.012],
   'NUCLEO BANDEIRANTE': [-15.862, -47.962],
@@ -68,6 +69,7 @@ export const getAdministrativeRegion = (bairro: string | null | undefined): stri
   const norm = bairro.trim().toUpperCase()
     .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   
+  if (norm.includes('NUCLEO BANDEIRANTE') || norm.includes('NB')) return 'NÚCLEO BANDEIRANTE';
   if (norm.includes('VICENTE PIRES') || norm.includes('JOQUEI')) return 'VICENTE PIRES';
   if (norm.includes('TAGUATINGA') || norm.includes('TAGUA')) return 'TAGUATINGA';
   if (norm.includes('ARNIQUEIRA') || norm.includes('AREAL')) return 'ARNIQUEIRA';
@@ -77,9 +79,8 @@ export const getAdministrativeRegion = (bairro: string | null | undefined): stri
   if (norm.includes('ASA NORTE') || norm.includes('HABITACOES INDIVIDUAIS NORTE')) return 'ASA NORTE';
   if (norm.includes('CEILANDIA')) return 'CEILÂNDIA';
   if (norm.includes('SAMAMBAIA')) return 'SAMAMBAIA';
-  if (norm.includes('RECANTO DAS EMAS')) return 'RECANTO DAS EMAS';
+  if (norm.includes('RECANTO DAS EMAS') || norm.includes('RECANTO') || norm.includes('ENTORNO')) return 'RECANTO-ENTORNO';
   if (norm.includes('SOBRADINHO')) return 'SOBRADINHO';
-  if (norm.includes('NUCLEO BANDEIRANTE')) return 'NÚCLEO BANDEIRANTE';
   if (norm.includes('RIACHO FUNDO')) return 'RIACHO FUNDO';
   if (norm.includes('GAMA')) return 'GAMA';
   if (norm.includes('SANTA MARIA')) return 'SANTA MARIA';
@@ -94,6 +95,7 @@ export const getGCRegion = (gcName: string): string => {
   const norm = gcName.trim().toUpperCase()
     .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   
+  if (norm.includes('NUCLEO BANDEIRANTE') || norm.includes('NB')) return 'NÚCLEO BANDEIRANTE';
   if (norm.includes('VICENTE PIRES') || norm.includes('JOQUEI')) return 'VICENTE PIRES';
   if (norm.includes('TAGUATINGA') || norm.includes('TAGUA')) return 'TAGUATINGA';
   if (norm.includes('ARNIQUEIRA') || norm.includes('AREAL')) return 'ARNIQUEIRA';
@@ -103,9 +105,8 @@ export const getGCRegion = (gcName: string): string => {
   if (norm.includes('ASA NORTE')) return 'ASA NORTE';
   if (norm.includes('CEILANDIA')) return 'CEILÂNDIA';
   if (norm.includes('SAMAMBAIA')) return 'SAMAMBAIA';
-  if (norm.includes('RECANTO DAS EMAS')) return 'RECANTO DAS EMAS';
+  if (norm.includes('RECANTO DAS EMAS') || norm.includes('RECANTO') || norm.includes('ENTORNO')) return 'RECANTO-ENTORNO';
   if (norm.includes('SOBRADINHO')) return 'SOBRADINHO';
-  if (norm.includes('NUCLEO BANDEIRANTE')) return 'NÚCLEO BANDEIRANTE';
   if (norm.includes('RIACHO FUNDO')) return 'RIACHO FUNDO';
   if (norm.includes('GAMA')) return 'GAMA';
   if (norm.includes('SANTA MARIA')) return 'SANTA MARIA';
@@ -114,4 +115,22 @@ export const getGCRegion = (gcName: string): string => {
   if (norm.includes('JARDIM BOTANICO')) return 'JARDIM BOTÂNICO';
   
   return 'OUTRO';
+};
+
+export const getFallbackRegion = (memberRA: string): string => {
+  const fallbackRules: Record<string, string> = {
+    'LAGO NORTE': 'ASA NORTE',
+    'NOROESTE': 'ASA NORTE',
+    'ITAPOÃ': 'ASA NORTE',
+    'ITAPOA': 'ASA NORTE',
+    'SUDOESTE': 'ASA SUL',
+    'CRUZEIRO': 'SUDOESTE',
+    'PARANOÁ': 'ASA NORTE',
+    'PARANOA': 'ASA NORTE',
+    'SOBRADINHO': 'ASA NORTE',
+    'PLANALTINA': 'SOBRADINHO',
+    'GAMA': 'RECANTO-ENTORNO',
+    'SANTA MARIA': 'GAMA',
+  };
+  return fallbackRules[memberRA] || '';
 };

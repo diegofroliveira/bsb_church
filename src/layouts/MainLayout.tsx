@@ -3,16 +3,16 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, Users, Home, DollarSign, Settings, LogOut,
   Menu, BookOpen, FileText, Network, AlertTriangle, MapPin,
-  Brain, Calendar, Play
+  Brain, Calendar, Play, Heart
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import clsx from 'clsx';
 
 const DEFAULT_ROLES: Record<string, string[]> = {
-  admin: ['Dashboard', 'Aniversariantes', 'Mapa', 'Membros', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Financeiro', 'Consultor IA', 'Insights IA', 'Configurações', 'Simulações'],
-  pastor: ['Dashboard', 'Aniversariantes', 'Mapa', 'Membros', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Financeiro', 'Consultor IA', 'Insights IA', 'Simulações'],
-  secretaria: ['Dashboard', 'Aniversariantes', 'Membros', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Consultor IA'],
+  admin: ['Dashboard', 'Aniversariantes', 'Mapa', 'Membros', 'Famílias', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Financeiro', 'Consultor IA', 'Insights IA', 'Configurações', 'Simulações'],
+  pastor: ['Dashboard', 'Aniversariantes', 'Mapa', 'Membros', 'Famílias', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Financeiro', 'Consultor IA', 'Insights IA', 'Simulações'],
+  secretaria: ['Dashboard', 'Aniversariantes', 'Membros', 'Famílias', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Consultor IA'],
   financeiro: ['Dashboard', 'Financeiro']
 };
 
@@ -81,6 +81,7 @@ export const MainLayout: React.FC = () => {
     { id: 'Aniversariantes', name: 'Aniversariantes', path: '/birthdays',    icon: Calendar },
     { id: 'Mapa',            name: 'Mapa',            path: '/georeferencing', icon: MapPin },
     { id: 'Membros',         name: 'Membros',         path: '/members',      icon: Users },
+    { id: 'Famílias',        name: 'Famílias',        path: '/families',     icon: Heart },
     { id: 'GCs/Localidades', name: 'GCs/Localidades', path: '/cells',        icon: Home },
     { id: 'Discipulado',     name: 'Discipulado',     path: '/discipleship', icon: BookOpen },
     { id: 'Rede',            name: 'Rede',            path: '/network',      icon: Network },
