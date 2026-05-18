@@ -847,16 +847,19 @@ export const AdminUsers: React.FC = () => {
                  <div className="space-y-3">
                     <div className="flex justify-between text-sm">
                        <span className="text-gray-500">Última Sincronia</span>
-                       <span className="font-medium text-gray-900">Hoje, há 2 horas</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                       <span className="text-gray-500">Próxima Agendada</span>
-                       <span className="font-medium text-gray-900">Domingo, 03:00</span>
-                    </div>
-                    <div className="w-full bg-gray-100 rounded-full h-2 mt-4">
-                       <div className="bg-green-500 h-2 rounded-full w-full"></div>
-                    </div>
-                    <p className="text-[10px] text-gray-400 text-center uppercase font-bold tracking-widest mt-2">Sistema Operante</p>
+                        <span className={clsx("font-medium transition-colors duration-500", syncProgress === 100 ? "text-green-600 font-bold" : "text-gray-900")}>
+                           {syncProgress === 100 ? 'Agora mesmo' : 'Hoje, há 2 horas'}
+                        </span>
+                     </div>
+                     <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Próxima Agendada</span>
+                        <span className="font-medium text-gray-900">Domingo, 03:00</span>
+                     </div>
+                     <div className="w-full bg-gray-100 rounded-full h-2 mt-4 overflow-hidden">
+                        <div className={clsx("h-full rounded-full transition-all duration-500", syncProgress === 100 ? "bg-green-500 w-full animate-pulse" : "bg-green-500 w-full")}></div>
+                     </div>
+                     <p className={clsx("text-[10px] text-center uppercase font-black tracking-widest mt-2 transition-all duration-500", syncProgress === 100 ? "text-green-600 animate-bounce" : "text-gray-400")}>
+                        {syncProgress === 100 ? 'Base Atualizada' : 'Sistema Operante'}</p>
                  </div>
               </div>
               
