@@ -74,7 +74,9 @@ const renderBairroTag = (m: Member, activeCell: Cell | undefined, allCells?: Cel
 
   const hasLocalGC = allCells ? allCells.some(c => getGCRegion(c.grupo_caseiro) === mRegion) : true;
   const fallbackRegion = getFallbackRegion(mRegion);
-  const isCorrect = (mRegion === cellRegion) || (!hasLocalGC && cellRegion === fallbackRegion);
+  const isCorrect = (mRegion === cellRegion) || 
+                    (cellRegion === 'GUARÁ-NB' && (mRegion === 'GUARÁ' || mRegion === 'NÚCLEO BANDEIRANTE')) ||
+                    (!hasLocalGC && cellRegion === fallbackRegion);
   
   return (
     <span 
@@ -1113,7 +1115,9 @@ export const Simulations: React.FC = () => {
         
         // A mismatch exists if:
         // They are in a region different from their own, AND they are NOT in their recommended fallback region!
-        const isCorrectAllocation = (gcRA === memberRA) || (!rec.isLocal && gcRA === rec.recommendedRegion);
+        const isCorrectAllocation = (gcRA === memberRA) || 
+                                    (gcRA === 'GUARÁ-NB' && (memberRA === 'GUARÁ' || memberRA === 'NÚCLEO BANDEIRANTE')) ||
+                                    (!rec.isLocal && gcRA === rec.recommendedRegion);
         
         if (!isCorrectAllocation) {
           allocationMismatches.push({

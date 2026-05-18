@@ -95,6 +95,7 @@ export const getGCRegion = (gcName: string): string => {
   const norm = gcName.trim().toUpperCase()
     .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   
+  if (norm.includes('GUARA') && (norm.includes('NUCLEO BANDEIRANTE') || norm.includes('NB'))) return 'GUARÁ-NB';
   if (norm.includes('NUCLEO BANDEIRANTE') || norm.includes('NB')) return 'NÚCLEO BANDEIRANTE';
   if (norm.includes('VICENTE PIRES') || norm.includes('JOQUEI')) return 'VICENTE PIRES';
   if (norm.includes('TAGUATINGA') || norm.includes('TAGUA')) return 'TAGUATINGA';
