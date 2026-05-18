@@ -346,7 +346,11 @@ export const AdminUsers: React.FC = () => {
     setSyncMessage('');
     
     try {
-      const response = await fetch('/api/trigger-sync', {
+      const apiUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? 'https://bsb-church.vercel.app/api/trigger-sync'
+        : '/api/trigger-sync';
+
+      const response = await fetch(apiUrl, {
         method: 'POST',
       });
       
