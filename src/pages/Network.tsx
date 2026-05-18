@@ -78,7 +78,12 @@ const buildTree = (data: DiscipleshipData[], pastores: Set<string>): TreeNodeDat
   return roots.sort((a, b) => b.totalDescendants - a.totalDescendants);
 };
 
-const TreeNode: React.FC<{ node: TreeNodeData; level?: number; searchTerm: string }> = ({ node, level = 0, searchTerm }) => {
+const TreeNode: React.FC<{ 
+  node: TreeNodeData; 
+  level?: number; 
+  searchTerm: string; 
+  isAncestorMatched?: boolean; 
+}> = ({ node, level = 0, searchTerm, isAncestorMatched = false }) => {
   const matchesSearch = searchTerm && node.name.toLowerCase().includes(searchTerm.toLowerCase());
   const hasMatchingDescendant = useMemo(() => {
     if (!searchTerm) return false;
@@ -91,16 +96,17 @@ const TreeNode: React.FC<{ node: TreeNodeData; level?: number; searchTerm: strin
 
   const [isOpen, setIsOpen] = useState(level < 1);
 
-  // Auto expand if search matches descendants
+  // Auto expand if search matches descendants OR matches the node itself
   useEffect(() => {
-    if (searchTerm && hasMatchingDescendant) {
+    if (searchTerm && (hasMatchingDescendant || matchesSearch)) {
       setIsOpen(true);
     } else if (!searchTerm && level >= 1) {
       setIsOpen(false);
     }
-  }, [searchTerm, hasMatchingDescendant, level]);
+  }, [searchTerm, hasMatchingDescendant, matchesSearch, level]);
 
-  if (searchTerm && !matchesSearch && !hasMatchingDescendant) {
+  // Hide node only if search is active and it doesn't match, doesn't have matching descendants, AND no ancestor matched
+  if (searchTerm && !matchesSearch && !hasMatchingDescendant && !isAncestorMatched) {
     return null;
   }
 
@@ -153,7 +159,12 @@ const TreeNode: React.FC<{ node: TreeNodeData; level?: number; searchTerm: strin
             <div key={`${child.name}-${idx}`} className="relative">
                {/* Horizontal Connector */}
                <div className="absolute -left-5 sm:-left-6 top-8 w-5 sm:w-6 h-[2px] bg-gray-100 rounded-r-full" />
-               <TreeNode node={child} level={level + 1} searchTerm={searchTerm} />
+               <TreeNode 
+                 node={child} 
+                 level={level + 1} 
+                 searchTerm={searchTerm} 
+                 isAncestorMatched={isAncestorMatched || matchesSearch} 
+               />
             </div>
           ))}
         </div>
