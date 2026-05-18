@@ -20,6 +20,7 @@ interface Member {
   avatar_url?: string;
   sexo?: string;
   estado_civil?: string;
+  status?: string;
 }
 
 export const Birthdays: React.FC = () => {
@@ -49,7 +50,7 @@ export const Birthdays: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('membros')
-        .select('id, nome, nascimento, grupos_caseiros, sexo, estado_civil')
+        .select('id, nome, nascimento, grupos_caseiros, sexo, estado_civil, status')
         .limit(10000);
 
       if (error) throw error;
@@ -107,6 +108,7 @@ export const Birthdays: React.FC = () => {
     const currentMonth = now.getMonth() + 1;
 
     return members.filter(m => {
+      if (m.status !== 'Ativo') return false;
       if (!m.nascimento) return false;
       
       let day: number, month: number;
