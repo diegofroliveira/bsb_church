@@ -35,7 +35,7 @@ import {
   Users, Home, Play, RotateCcw, Save, ArrowRight, ArrowLeft,
   Search, ShieldAlert, CheckCircle2, Download, Filter,
   BookOpen, Network, TrendingUp, AlertTriangle, Brain, MapPin,
-  ChevronDown, ChevronUp, UserCheck, Eye, Heart, Plus, X, PlusCircle, Zap
+  ChevronDown, ChevronUp, UserCheck, Eye, Heart, Plus, X, PlusCircle, Zap, Lightbulb
 } from 'lucide-react';
 import clsx from 'clsx';
 import { 
@@ -162,6 +162,7 @@ export const Simulations: React.FC = () => {
   const [isAuditMismatchesExpanded, setIsAuditMismatchesExpanded] = useState(true);
   const [isAuditOvercrowdedExpanded, setIsAuditOvercrowdedExpanded] = useState(false);
   const [isAuditCriticalExpanded, setIsAuditCriticalExpanded] = useState(false);
+  const [isAuditSuggestionsExpanded, setIsAuditSuggestionsExpanded] = useState(true);
   // Modal hybrid custom states
   const [isCustomLeader, setIsCustomLeader] = useState(false);
   const [isCustomSector, setIsCustomSector] = useState(false);
@@ -2383,6 +2384,60 @@ export const Simulations: React.FC = () => {
                       ) : (
                         <p className="text-[11px] text-gray-400 text-center py-2">Nenhum GC abaixo de 5 membros.</p>
                       )}
+                    </div>
+                  )}
+                </div>
+
+                {/* 4. Collapsible: Strategic Suggestions */}
+                <div className="border border-indigo-100 rounded-2xl overflow-hidden bg-indigo-50/20">
+                  <button 
+                    onClick={() => setIsAuditSuggestionsExpanded(!isAuditSuggestionsExpanded)}
+                    className="w-full flex items-center justify-between p-3.5 bg-indigo-50/40 hover:bg-indigo-50 text-left transition-all cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Lightbulb className="w-4 h-4 text-indigo-600 animate-pulse" />
+                      <span className="text-xs font-bold text-indigo-900">Recomendações e Nomenclatura</span>
+                      <span className="text-[10px] bg-indigo-100 text-indigo-800 font-bold px-1.5 py-0.5 rounded-full">
+                        💡 Diretrizes
+                      </span>
+                    </div>
+                    <ChevronDown className={clsx("w-4 h-4 text-indigo-400 transition-transform", isAuditSuggestionsExpanded && "rotate-180")} />
+                  </button>
+                  
+                  {isAuditSuggestionsExpanded && (
+                    <div className="p-4 bg-white space-y-3 divide-y divide-gray-50 text-xs animate-in fade-in duration-300">
+                      {/* Suggestion 1: Rename Recanto to Recanto-Entorno */}
+                      <div className="pt-2 first:pt-0 space-y-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-extrabold text-gray-800">Renomear GCs do Recanto</span>
+                          <span className="text-[8px] bg-amber-50 text-amber-700 border border-amber-100 px-1.5 py-0.2 rounded font-black uppercase">Recomendado</span>
+                        </div>
+                        <p className="text-[10px] text-gray-500 leading-relaxed">
+                          Membros residentes no <span className="font-semibold text-gray-700">Entorno</span> estão alocados em GCs do <span className="font-semibold text-gray-700">Recanto</span>. Recomendamos renomear esses GCs para <span className="font-bold text-indigo-600">"[Nome] Recanto-Entorno"</span> para integrá-los e oficializar a cobertura territorial híbrida.
+                        </p>
+                      </div>
+
+                      {/* Suggestion 2: Lago Norte / Noroeste / Itapoã in Asa Norte */}
+                      <div className="pt-3 space-y-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-extrabold text-gray-800">Alocação de Regiões Sem Quórum</span>
+                          <span className="text-[8px] bg-indigo-50 text-indigo-700 border border-indigo-100 px-1.5 py-0.2 rounded font-black uppercase">Diretriz</span>
+                        </div>
+                        <p className="text-[10px] text-gray-500 leading-relaxed">
+                          As regiões de <span className="font-semibold text-gray-700">Lago Norte, Noroeste, Itapoã e Sobradinho</span> não possuem quórum ou GCs locais ativos. A diretriz estratégica é alocar esses membros nos GCs ativos da <span className="font-bold text-indigo-600">Asa Norte</span>.
+                        </p>
+                      </div>
+
+                      {/* Suggestion 3: Sudoeste and Cruzeiro in Asa Sul */}
+                      <div className="pt-3 space-y-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-extrabold text-gray-800">Sudoeste & Cruzeiro ➔ Asa Sul</span>
+                          <span className="text-[8px] bg-indigo-50 text-indigo-700 border border-indigo-100 px-1.5 py-0.2 rounded font-black uppercase">Diretriz</span>
+                        </div>
+                        <p className="text-[10px] text-gray-500 leading-relaxed">
+                          Membros do <span className="font-semibold text-gray-700">Sudoeste e Cruzeiro</span> devem ser idealmente acolhidos nos GCs ativos da <span className="font-bold text-indigo-600">Asa Sul</span> para melhor acompanhamento geográfico.
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>
