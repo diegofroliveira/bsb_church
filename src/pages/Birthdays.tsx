@@ -96,20 +96,40 @@ export const Birthdays: React.FC = () => {
 
   const getBirthdays = useMemo(() => {
     const now = new Date();
-    const todayStr = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const todayDay = now.getDate();
+    const todayMonth = now.getMonth() + 1;
     
     const tomorrow = new Date();
     tomorrow.setDate(now.getDate() + 1);
-    const tomorrowStr = `${String(tomorrow.getDate()).padStart(2, '0')}/${String(tomorrow.getMonth() + 1).padStart(2, '0')}`;
+    const tomorrowDay = tomorrow.getDate();
+    const tomorrowMonth = tomorrow.getMonth() + 1;
     
     const currentMonth = now.getMonth() + 1;
 
     return members.filter(m => {
       if (!m.nascimento) return false;
-      const parts = m.nascimento.split('/');
-      if (parts.length < 2) return false;
-      const dayMonth = `${parts[0]}/${parts[1]}`;
-      const month = parseInt(parts[1]);
+      
+      let day: number, month: number;
+      if (m.nascimento.includes('/')) {
+        const parts = m.nascimento.split('/');
+        if (parts.length < 2) return false;
+        day = parseInt(parts[0]);
+        month = parseInt(parts[1]);
+      } else if (m.nascimento.includes('-')) {
+        const parts = m.nascimento.split('-');
+        if (parts.length < 2) return false;
+        if (parts[0].length === 4) {
+          day = parseInt(parts[2]);
+          month = parseInt(parts[1]);
+        } else {
+          month = parseInt(parts[0]);
+          day = parseInt(parts[1]);
+        }
+      } else {
+        return false;
+      }
+
+      if (isNaN(day) || isNaN(month)) return false;
 
       if (filterGender !== 'Todos' && m.sexo !== filterGender) return false;
       if (filterGC !== 'Todos' && m.grupos_caseiros !== filterGC) return false;
@@ -119,13 +139,24 @@ export const Birthdays: React.FC = () => {
       if (age < filterMinAge || age > filterMaxAge) return false;
 
       let matchDate = false;
-      if (filterMode === 'today') matchDate = dayMonth === todayStr;
-      else if (filterMode === 'tomorrow') matchDate = dayMonth === tomorrowStr;
-      else if (filterMode === 'month') matchDate = month === currentMonth;
-      else if (filterMode === 'specific') {
-        const spec = new Date(specificDate);
-        const specStr = `${String(spec.getDate()+1).padStart(2, '0')}/${String(spec.getMonth() + 1).padStart(2, '0')}`;
-        matchDate = dayMonth === specStr;
+      if (filterMode === 'today') {
+        matchDate = day === todayDay && month === todayMonth;
+      } else if (filterMode === 'tomorrow') {
+        matchDate = day === tomorrowDay && month === tomorrowMonth;
+      } else if (filterMode === 'month') {
+        matchDate = month === currentMonth;
+      } else if (filterMode === 'specific') {
+        const specParts = specificDate.split('-');
+        if (specParts.length >= 3) {
+          const specDay = parseInt(specParts[2]);
+          const specMonth = parseInt(specParts[1]);
+          matchDate = day === specDay && month === specMonth;
+        } else {
+          const spec = new Date(specificDate);
+          const specDay = spec.getDate() + 1;
+          const specMonth = spec.getMonth() + 1;
+          matchDate = day === specDay && month === specMonth;
+        }
       }
       return matchDate;
     }).sort((a, b) => a.nome.localeCompare(b.nome));
