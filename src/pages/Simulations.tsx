@@ -2654,60 +2654,6 @@ export const Simulations: React.FC = () => {
                </div>
             </div>
 
-            {/* 4. Diagnóstico de Saúde e Planejamento de Expansão */}
-            <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm space-y-4">
-              <h4 className="text-xs font-bold text-indigo-600 uppercase tracking-widest flex items-center gap-2">
-                 <TrendingUp className="w-4 h-4 text-indigo-500" /> Diagnóstico de Saúde e Expansão
-              </h4>
-              <p className="text-[11px] text-gray-400 font-semibold leading-relaxed">
-                Analisa a distribuição geográfica e a densidade populacional das células para apoiar o planejamento estratégico de multiplicação e novas plantações.
-              </p>
-              
-              <div className="space-y-3 pt-2">
-                {/* Projeções */}
-                <div className="space-y-1.5">
-                  <span className="text-[9px] font-black text-gray-400 uppercase tracking-wider block">
-                    Projeção de Saúde do Corpo
-                  </span>
-                  {expansionRecommendations.alerts.map((al, idx) => (
-                    <div 
-                      key={idx} 
-                      className={clsx(
-                        "p-2.5 rounded-xl text-[11px] leading-relaxed font-bold border",
-                        al.type === 'danger' && "bg-red-50 border-red-100 text-red-700",
-                        al.type === 'warning' && "bg-amber-50 border-amber-100 text-amber-700",
-                        al.type === 'info' && "bg-emerald-50 border-emerald-100 text-emerald-700"
-                      )}
-                    >
-                      {al.type === 'danger' && '🚨 '}
-                      {al.type === 'warning' && '⚠️ '}
-                      {al.type === 'info' && '✨ '}
-                      {al.text}
-                    </div>
-                  ))}
-                </div>
-
-                {/* Recomendações de Ação */}
-                <div className="space-y-1.5 pt-2 border-t border-gray-50">
-                  <span className="text-[9px] font-black text-indigo-500 uppercase tracking-wider block">
-                    Ações Estratégicas Recomendadas
-                  </span>
-                  {expansionRecommendations.suggestions.length === 0 ? (
-                    <div className="p-3 bg-gray-50/50 border border-dashed border-gray-100 rounded-xl text-center text-[10px] text-gray-400 font-semibold">
-                      Tudo sob controle! Nenhum vácuo territorial grave ou desvio de membros crítico detectado no rascunho atual.
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {expansionRecommendations.suggestions.map((sug, idx) => (
-                        <div key={idx} className="p-2.5 bg-indigo-50/40 border border-indigo-100 text-indigo-900 rounded-xl text-[11px] leading-relaxed font-bold">
-                          💡 {sug}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
           </div>
       
       {/* 4. Overlay Modal: Create Custom Sandbox GC */}
