@@ -2379,7 +2379,7 @@ export const Simulations: React.FC = () => {
             </div>
 
             {/* Coluna Direita: Auditoria & Diagnósticos de Expansão */}
-            <div className="lg:col-span-4 space-y-6">
+            
               {/* Painel de Auditoria de Alocação */}
               <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm space-y-4">
               <div className="flex items-center justify-between">
@@ -3199,6 +3199,7 @@ export const Simulations: React.FC = () => {
 
 
 
+    </div>
     </div>
   );
 };
