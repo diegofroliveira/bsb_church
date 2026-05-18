@@ -11,6 +11,18 @@ import clsx from 'clsx';
 export const Dashboard: React.FC = () => {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
+  const [isModalLoading, setIsModalLoading] = useState(false);
+  const [modalType, setModalType] = useState<any>(null);
+  const [modalTitle, setModalTitle] = useState('');
+  const [modalItems, setModalItems] = useState<any[]>([]);
+
+  
+  const [filterGender, setFilterGender] = useState('Todos');
+  const [filterGroup, setFilterGroup] = useState('Todos');
+  const [filterDisc, setFilterDisc] = useState('Todos');
+  const [filterMinAge, setFilterMinAge] = useState<number>(0);
+  const [filterMaxAge, setFilterMaxAge] = useState<number>(120);
+  const [filterMaritalStatus, setFilterMaritalStatus] = useState('Todos');
   const [filterStatus, setFilterStatus] = useState('Todos');
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [isTypesOpen, setIsTypesOpen] = useState(false);
@@ -25,18 +37,6 @@ export const Dashboard: React.FC = () => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-  const [isModalLoading, setIsModalLoading] = useState(false);
-  const [modalType, setModalType] = useState<any>(null);
-  const [modalTitle, setModalTitle] = useState('');
-  const [modalItems, setModalItems] = useState<any[]>([]);
-
-  
-  const [filterGender, setFilterGender] = useState('Todos');
-  const [filterGroup, setFilterGroup] = useState('Todos');
-  const [filterDisc, setFilterDisc] = useState('Todos');
-  const [filterMinAge, setFilterMinAge] = useState<number>(0);
-  const [filterMaxAge, setFilterMaxAge] = useState<number>(120);
-  const [filterMaritalStatus, setFilterMaritalStatus] = useState('Todos');
 
   const [rawMembros, setRawMembros] = useState<any[]>([]);
   const [rawCelulas, setRawCelulas] = useState<any[]>([]);
@@ -72,12 +72,12 @@ export const Dashboard: React.FC = () => {
     fetchDashboardData();
   }, [user]);
 
-
-
   const uniqueTypes = useMemo(() => {
     const types = rawMembros.map(m => m.tipo_de_pessoa?.trim()).filter(Boolean);
     return Array.from(new Set(types)).sort() as string[];
   }, [rawMembros]);
+
+
 
   const dashboardData = useMemo(() => {
     if (isLoading || rawMembros.length === 0) return null;
@@ -138,7 +138,7 @@ export const Dashboard: React.FC = () => {
         const matchAge = (age >= filterMinAge && age <= filterMaxAge);
         const matchMarital = filterMaritalStatus === 'Todos' || m.estado_civil === filterMaritalStatus;
         const matchStatus = filterStatus === 'Todos' || m.status === filterStatus;
-        const matchType = selectedTypes.length === 0 || selectedTypes.includes(m.tipo_de_pessoa?.trim());
+        const matchType = selectedTypes.length === 0 || selectedTypes.includes(m.tipo_de_pessoa?.trim() || '');
         return matchGender && matchGroup && matchDisc && matchAge && matchMarital && matchStatus && matchType;
     });
 
@@ -232,7 +232,7 @@ export const Dashboard: React.FC = () => {
             discipuladores: discList
         }
     };
-  }, [isLoading, rawMembros, rawCelulas, rawDiscipulado, filterGender, filterGroup, filterDisc, filterMaritalStatus, filterMinAge, filterMaxAge, filterStatus, selectedTypes]);
+  }, [isLoading, rawMembros, rawCelulas, rawDiscipulado, filterGender, filterGroup, filterDisc, filterMinAge, filterMaxAge, filterMaritalStatus, filterStatus, selectedTypes]);
 
   const handleOpenModal = async (type: 'grupo' | 'setor' | 'discipulador', title: string) => {
     setModalType(type); setModalTitle(title); setIsModalLoading(true);
@@ -351,36 +351,22 @@ export const Dashboard: React.FC = () => {
         </div>
 
         {(filterGender !== 'Todos' || filterGroup !== 'Todos' || filterDisc !== 'Todos' || filterMinAge !== 0 || filterMaxAge !== 120 || filterMaritalStatus !== 'Todos' || filterStatus !== 'Todos' || selectedTypes.length > 0) && (
-           <button 
-              onClick={() => { 
-                 setFilterGender('Todos'); 
-                 setFilterGroup('Todos'); 
-                 setFilterDisc('Todos'); 
-                 setFilterMinAge(0); 
-                 setFilterMaxAge(120); 
-                 setFilterMaritalStatus('Todos'); 
-                 setFilterStatus('Todos'); 
-                 setSelectedTypes([]); 
-              }} 
-              className="text-xs text-red-600 font-semibold hover:underline"
-           >
-              Limpar Filtros
-           </button>
+          <button 
+            onClick={() => { 
+              setFilterGender('Todos'); 
+              setFilterGroup('Todos'); 
+              setFilterDisc('Todos'); 
+              setFilterMinAge(0); 
+              setFilterMaxAge(120); 
+              setFilterMaritalStatus('Todos'); 
+              setFilterStatus('Todos'); 
+              setSelectedTypes([]); 
+            }} 
+            className="text-xs text-red-600 font-medium hover:underline"
+          >
+            Limpar Filtros
+          </button>
         )}
-      </div>
-        <select value={filterGender} onChange={e => setFilterGender(e.target.value)} className="text-sm border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50"><option value="Todos">Todos os Sexos</option><option value="Masculino">Masculino</option><option value="Feminino">Feminino</option></select>
-        <select value={filterGroup} onChange={e => setFilterGroup(e.target.value)} className="text-sm border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50 max-w-[200px]"><option value="Todos">Todos os Grupos</option>{rawCelulas.map(c => <option key={c.grupo_caseiro} value={c.grupo_caseiro}>{c.grupo_caseiro}</option>)}</select>
-        <select value={filterDisc} onChange={e => setFilterDisc(e.target.value)} className="text-sm border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50 max-w-[200px]"><option value="Todos">Todos os Discipuladores</option>{Array.from(new Set(rawDiscipulado.map(d => d.discipulador))).sort().map(d => <option key={d} value={d}>{d}</option>)}</select>
-        <select value={filterMaritalStatus} onChange={e => setFilterMaritalStatus(e.target.value)} className="text-sm border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50 max-w-[150px]"><option value="Todos">Estado Civil</option>{Array.from(new Set(rawMembros.map(m => m.estado_civil).filter(Boolean))).sort().map(s => <option key={s} value={s}>{s}</option>)}</select>
-        
-        <div className="flex items-center gap-2 bg-gray-50/50 border border-gray-200 rounded-lg px-3 py-1">
-           <span className="text-[10px] font-bold text-gray-400 uppercase">Idade:</span>
-           <input type="number" value={filterMinAge} onChange={e => setFilterMinAge(parseInt(e.target.value) || 0)} className="w-12 bg-transparent text-sm font-semibold outline-none border-b border-transparent focus:border-primary-500" placeholder="Min" />
-           <span className="text-gray-300">/</span>
-           <input type="number" value={filterMaxAge} onChange={e => setFilterMaxAge(parseInt(e.target.value) || 120)} className="w-12 bg-transparent text-sm font-semibold outline-none border-b border-transparent focus:border-primary-500" placeholder="Max" />
-        </div>
-
-        {(filterGender !== 'Todos' || filterGroup !== 'Todos' || filterDisc !== 'Todos' || filterMinAge !== 0 || filterMaxAge !== 120 || filterMaritalStatus !== 'Todos') && (<button onClick={() => { setFilterGender('Todos'); setFilterGroup('Todos'); setFilterDisc('Todos'); setFilterMinAge(0); setFilterMaxAge(120); setFilterMaritalStatus('Todos'); }} className="text-xs text-red-600 font-medium hover:underline">Limpar Filtros</button>)}
       </div>
 
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
