@@ -48,46 +48,7 @@ import {
   getAdministrativeRegion, 
   getGCRegion 
 } from '../lib/geoUtils';
-import { useFamilyEngine } from '../hooks/useFamilyEngine';
-
-export interface Member {
-  id: number;
-  nome: string;
-  grupos_caseiros: string | null;
-  status: string;
-  sexo: string;
-  bairro: string | null;
-  pai: string | null;
-  mae: string | null;
-  logradouro: string | null;
-  celular_principal_sms: string | null;
-  telefone_fixo: string | null;
-  estado_civil: string | null;
-  nascimento: string | null;
-  latitude?: number | null;
-  longitude?: number | null;
-}
-
-export interface Cell {
-  id: string;
-  grupo_caseiro: string;
-  lider: string;
-  setor: string;
-  latitude?: number | null;
-  longitude?: number | null;
-}
-
-export interface DiscipleshipLink {
-  discipulador: string;
-  discipulo: string;
-}
-
-export interface Family {
-  id: string;
-  name: string;
-  headId: string;
-  memberIds: string[];
-}
+import { Member, Cell, DiscipleshipLink, Family, useFamilyEngine } from '../hooks/useFamilyEngine';
 
 // Componente auxiliar para alterar dinamicamente o centro e zoom do mapa Leaflet
 const ChangeMapView: React.FC<{ center: [number, number]; zoom: number }> = ({ center, zoom }) => {

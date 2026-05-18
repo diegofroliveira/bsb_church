@@ -1,11 +1,49 @@
 import { useMemo } from 'react';
-import { Member, Family } from '../pages/Simulations';
 import { 
   normalizeName, 
   normalizePhone, 
   normalizeAddress, 
   calculateAge 
 } from '../lib/geoUtils';
+
+export interface Member {
+  id: number;
+  nome: string;
+  grupos_caseiros: string | null;
+  status: string;
+  sexo: string;
+  bairro: string | null;
+  pai: string | null;
+  mae: string | null;
+  logradouro: string | null;
+  celular_principal_sms: string | null;
+  telefone_fixo: string | null;
+  estado_civil: string | null;
+  nascimento: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+}
+
+export interface Cell {
+  id: string;
+  grupo_caseiro: string;
+  lider: string;
+  setor: string;
+  latitude?: number | null;
+  longitude?: number | null;
+}
+
+export interface DiscipleshipLink {
+  discipulador: string;
+  discipulo: string;
+}
+
+export interface Family {
+  id: string;
+  name: string;
+  headId: string;
+  memberIds: string[];
+}
 
 export const useFamilyEngine = (draftMembers: Member[]): Record<string, Family> => {
   return useMemo((): Record<string, Family> => {
