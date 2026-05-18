@@ -60,6 +60,28 @@ const ChangeMapView: React.FC<{ center: [number, number]; zoom: number }> = ({ c
   return null;
 };
 
+const renderBairroTag = (m: Member, activeCell: Cell | undefined) => {
+  if (!m.bairro) return null;
+  const mRegion = getAdministrativeRegion(m.bairro);
+  const cellRegion = activeCell ? getGCRegion(activeCell.grupo_caseiro) : '';
+  const isDifferentRegion = cellRegion && mRegion !== 'NÃO INFORMADO' && mRegion !== cellRegion;
+  
+  return (
+    <span 
+      className={clsx(
+        "text-[9px] font-bold block mt-0.5 w-fit px-1 rounded transition-all",
+        isDifferentRegion 
+          ? "text-rose-600 bg-rose-50 border border-rose-100 animate-pulse font-extrabold" 
+          : "text-indigo-500 bg-indigo-50/50"
+      )} 
+      title={isDifferentRegion ? `${m.bairro} (Fora do Setor do GC: ${cellRegion})` : m.bairro + (m.logradouro ? ` - ${m.logradouro}` : '')}
+    >
+      📍 {m.bairro} {isDifferentRegion && "⚠️ Fora do Setor"}
+    </span>
+  );
+};
+
+
 export const Simulations: React.FC = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'gc' | 'discipleship'>('gc');
@@ -1377,8 +1399,16 @@ export const Simulations: React.FC = () => {
                 <div className="md:col-span-5 bg-white rounded-3xl border border-gray-100 shadow-sm flex flex-col overflow-hidden min-h-[550px]">
                   <div className="p-4 border-b border-gray-50 bg-gray-50/30 space-y-3">
                     <div>
-                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5 block">Grupo de Origem</label>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block">Grupo de Origem</label>
+                        {selectedSource && (
+                          <span className="text-[10px] bg-indigo-50 border border-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-extrabold">
+                            {sourceMembers.length} {sourceMembers.length === 1 ? 'remanescente' : 'remanescentes'}
+                          </span>
+                        )}
+                      </div>
                       <select 
+
                         value={selectedSource} 
                         onChange={e => {
                           setSelectedSource(e.target.value);
@@ -1503,11 +1533,7 @@ export const Simulations: React.FC = () => {
                                             <span className="text-[10px] text-gray-400">
                                               {age >= 0 ? `${age} anos` : 'Idade indefinida'} • {m.sexo === 'Masculino' ? 'M' : 'F'}
                                             </span>
-                                            {m.bairro && (
-                                              <span className="text-[9px] text-indigo-500 font-bold block mt-0.5" title={m.bairro + (m.logradouro ? ` - ${m.logradouro}` : '')}>
-                                                📍 {m.bairro}
-                                              </span>
-                                            )}
+                                            {renderBairroTag(m, sourceCell)}
                                           </div>
                                         </div>
                                         {selectedMembers.includes(idStr) && <CheckCircle2 className="w-3.5 h-3.5 text-primary-600" />}
@@ -1547,11 +1573,7 @@ export const Simulations: React.FC = () => {
                                       <span className="text-[10px] text-gray-400">
                                         {age >= 0 ? `${age} anos` : 'Idade indefinida'} • {m.sexo === 'Masculino' ? 'M' : 'F'}
                                       </span>
-                                      {m.bairro && (
-                                        <span className="text-[9px] text-indigo-500 font-bold block mt-0.5" title={m.bairro + (m.logradouro ? ` - ${m.logradouro}` : '')}>
-                                          📍 {m.bairro}
-                                        </span>
-                                      )}
+                                      {renderBairroTag(m, sourceCell)}
                                     </div>
                                   </div>
                                   {selectedMembers.includes(idStr) && <CheckCircle2 className="w-3.5 h-3.5 text-primary-600" />}
@@ -1591,7 +1613,14 @@ export const Simulations: React.FC = () => {
                   <div className="p-4 border-b border-gray-50 bg-gray-50/30 space-y-3">
                     <div>
                       <div className="flex items-center justify-between mb-1.5">
-                        <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block">Grupo de Destino</label>
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block">Grupo de Destino</label>
+                          {selectedTarget && (
+                            <span className="text-[10px] bg-indigo-50 border border-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-extrabold">
+                              {targetMembers.length + simulatedIncoming.length} {targetMembers.length + simulatedIncoming.length === 1 ? 'remanescente' : 'remanescentes'}
+                            </span>
+                          )}
+                        </div>
                         <button 
                           onClick={() => setIsCreateCellOpen(true)}
                           className="text-[10px] font-extrabold text-primary-600 hover:text-primary-500 hover:underline flex items-center gap-1 cursor-pointer transition-all"
@@ -1686,11 +1715,7 @@ export const Simulations: React.FC = () => {
                                         <span className="text-[9px] text-gray-500">
                                           {age >= 0 ? `${age} anos` : ''} • {m.sexo === 'Masculino' ? 'M' : 'F'}
                                         </span>
-                                        {m.bairro && (
-                                          <span className="text-[9px] text-indigo-500 font-bold block mt-0.5" title={m.bairro + (m.logradouro ? ` - ${m.logradouro}` : '')}>
-                                            📍 {m.bairro}
-                                          </span>
-                                        )}
+                                        {renderBairroTag(m, targetCell)}
                                       </div>
                                     </div>
                                     <div className="flex items-center gap-1.5">
@@ -1781,11 +1806,7 @@ export const Simulations: React.FC = () => {
                                                 <span className="text-[9px] text-gray-400">
                                                   {age >= 0 ? `${age} anos` : ''} • {m.sexo === 'Masculino' ? 'M' : 'F'}
                                                 </span>
-                                                {m.bairro && (
-                                                  <span className="text-[9px] text-indigo-500 font-bold block mt-0.5" title={m.bairro + (m.logradouro ? ` - ${m.logradouro}` : '')}>
-                                                    📍 {m.bairro}
-                                                  </span>
-                                                )}
+                                                {renderBairroTag(m, targetCell)}
                                               </div>
                                             </div>
                                             {selectedTargetMembers.includes(idStr) && <CheckCircle2 className="w-3.5 h-3.5 text-primary-600" />}
@@ -1822,11 +1843,7 @@ export const Simulations: React.FC = () => {
                                       <span className="text-[9px] text-gray-400">
                                         {age >= 0 ? `${age} anos` : ''} • {m.sexo === 'Masculino' ? 'M' : 'F'}
                                       </span>
-                                      {m.bairro && (
-                                        <span className="text-[9px] text-indigo-500 font-bold block mt-0.5" title={m.bairro + (m.logradouro ? ` - ${m.logradouro}` : '')}>
-                                          📍 {m.bairro}
-                                        </span>
-                                      )}
+                                      {renderBairroTag(m, targetCell)}
                                     </div>
                                   </div>
                                   {selectedTargetMembers.includes(idStr) && <CheckCircle2 className="w-3.5 h-3.5 text-primary-600" />}
