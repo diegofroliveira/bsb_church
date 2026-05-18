@@ -5,7 +5,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, Legend, PieChart, Pie, Cell
 } from 'recharts';
-import { Users, UserPlus, Home, TrendingUp, Loader2, X, Search, Layers, UserCheck, MapPin, RefreshCw } from 'lucide-react';
+import { Users, UserPlus, Home, TrendingUp, Loader2, X, Search, Layers, UserCheck, MapPin } from 'lucide-react';
 import clsx from 'clsx';
 
 export const Dashboard: React.FC = () => {
@@ -15,8 +15,7 @@ export const Dashboard: React.FC = () => {
   const [modalType, setModalType] = useState<any>(null);
   const [modalTitle, setModalTitle] = useState('');
   const [modalItems, setModalItems] = useState<any[]>([]);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [syncProgress, setSyncProgress] = useState(0);
+
   
   const [filterGender, setFilterGender] = useState('Todos');
   const [filterGroup, setFilterGroup] = useState('Todos');
@@ -59,51 +58,7 @@ export const Dashboard: React.FC = () => {
     fetchDashboardData();
   }, [user]);
 
-  const handleSync = async () => {
-    setIsSyncing(true);
-    setSyncProgress(0);
-    
-    const interval = setInterval(() => {
-      setSyncProgress(prev => {
-        if (prev >= 95) {
-          clearInterval(interval);
-          return 95;
-        }
-        return prev + Math.random() * 15;
-      });
-    }, 200);
 
-    try {
-      let membrosQuery = supabase.from('membros').select('nome, status, tipo_cadastro, nascimento, grupos_caseiros, sexo, cidade, estado, tipo_de_pessoa, data_de_cadastro, data_atualizacao, estado_civil');
-      let celulasQuery = supabase.from('celulas').select('grupo_caseiro, lider, auxiliar, setor');
-
-      if (user?.assigned_gc) {
-        membrosQuery = membrosQuery.ilike('grupos_caseiros', `%${user.assigned_gc}%`);
-        celulasQuery = celulasQuery.ilike('grupo_caseiro', `%${user.assigned_gc}%`);
-      }
-
-      const [membrosRes, celulasRes, discRes] = await Promise.all([
-        membrosQuery,
-        celulasQuery,
-        supabase.from('discipulado').select('discipulador, discipulo, status')
-      ]);
-
-      setRawMembros(membrosRes.data || []);
-      setRawCelulas(celulasRes.data || []);
-      setRawDiscipulado(discRes.data || []);
-      
-      setSyncProgress(100);
-      setTimeout(() => {
-        setIsSyncing(false);
-        setSyncProgress(0);
-      }, 500);
-    } catch (error) {
-      console.error('Sync error:', error);
-      setIsSyncing(false);
-    } finally {
-      clearInterval(interval);
-    }
-  };
 
   const dashboardData = useMemo(() => {
     if (isLoading || rawMembros.length === 0) return null;
@@ -297,29 +252,7 @@ export const Dashboard: React.FC = () => {
           </p>
         </div>
 
-        {isPastorOrAdmin && (
-          <div className="flex items-center gap-3">
-            {isSyncing && (
-              <div className="hidden md:block w-48 h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div className="h-full bg-primary-600 transition-all duration-300" style={{ width: `${syncProgress}%` }} />
-              </div>
-            )}
-            {user?.role === 'admin' && (
-            <button
-              onClick={handleSync}
-              disabled={isSyncing}
-              className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors disabled:opacity-50"
-            >
-              {isSyncing ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
-              )}
-              {isSyncing ? `Sincronizando (${Math.round(syncProgress)}%)` : 'Atualizar Dados'}
-            </button>
-          )}
-          </div>
-        )}
+
       </header>
 
       <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-wrap gap-4 items-center mb-6">
