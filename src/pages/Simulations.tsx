@@ -1450,8 +1450,8 @@ export const Simulations: React.FC = () => {
               
               {/* Draft Cell Pins (Red Markers) */}
               {draftCells.filter(c => c.latitude && c.longitude).map(c => (
-                <Marker 
-                  key={c.id} 
+                <React.Fragment key={c.id}>
+                  <Marker 
                   position={[c.latitude!, c.longitude!]}
                   icon={cellIcon}
                 >
@@ -1513,6 +1513,31 @@ export const Simulations: React.FC = () => {
                     </div>
                   </Popup>
                 </Marker>
+                {showPopupMembersGC === c.grupo_caseiro && (
+                  draftMembers
+                    .filter(m => m.grupos_caseiros === c.grupo_caseiro && m.status === 'Ativo' && m.latitude && m.longitude)
+                    .map(m => {
+                      const dist = calculateDistance(c.latitude!, c.longitude!, m.latitude!, m.longitude!);
+                      const distNum = dist ? parseFloat(dist) : 0;
+                      const lineColor = distNum > 5 
+                        ? '#ef4444' 
+                        : distNum > 3 
+                        ? '#d97706' 
+                        : '#10b981';
+                      
+                      return (
+                        <Polyline 
+                          key={`line_${c.id}_${m.id}`}
+                          positions={[[c.latitude!, c.longitude!], [m.latitude!, m.longitude!]]}
+                          color={lineColor}
+                          weight={2}
+                          dashArray="5, 5"
+                          opacity={0.85}
+                        />
+                      );
+                    })
+                )}
+              </React.Fragment>
               ))}
 
               {/* Draft Member Pins (Blue Markers) */}
