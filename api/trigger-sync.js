@@ -1,6 +1,6 @@
-const https = require('https');
+import https from 'https';
 
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
   // CORS Headers
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -40,22 +40,27 @@ module.exports = async (req, res) => {
     ref: 'main'
   });
 
-  const request = https.request(options, (response) => {
-    let data = '';
-    response.on('data', (chunk) => { data += chunk; });
-    response.on('end', () => {
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        return res.status(200).json({ success: true, message: 'Workflow triggered successfully' });
-      } else {
-        return res.status(response.statusCode).json({ error: `GitHub API returned status ${response.statusCode}: ${data}` });
-      }
+  return new Promise((resolve) => {
+    const request = https.request(options, (response) => {
+      let data = '';
+      response.on('data', (chunk) => { data += chunk; });
+      response.on('end', () => {
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          res.status(200).json({ success: true, message: 'Workflow triggered successfully' });
+          resolve();
+        } else {
+          res.status(response.statusCode).json({ error: `GitHub API returned status ${response.statusCode}: ${data}` });
+          resolve();
+        }
+      });
     });
-  });
 
-  request.on('error', (error) => {
-    return res.status(500).json({ error: `Internal request error: ${error.message}` });
-  });
+    request.on('error', (error) => {
+      res.status(500).json({ error: `Internal request error: ${error.message}` });
+      resolve();
+    });
 
-  request.write(postData);
-  request.end();
-};
+    request.write(postData);
+    request.end();
+  });
+}
