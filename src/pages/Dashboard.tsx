@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { 
@@ -11,6 +11,20 @@ import clsx from 'clsx';
 export const Dashboard: React.FC = () => {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
+  const [filterStatus, setFilterStatus] = useState('Todos');
+  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
+  const [isTypesOpen, setIsTypesOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsTypesOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
   const [isModalLoading, setIsModalLoading] = useState(false);
   const [modalType, setModalType] = useState<any>(null);
   const [modalTitle, setModalTitle] = useState('');
@@ -59,6 +73,11 @@ export const Dashboard: React.FC = () => {
   }, [user]);
 
 
+
+  const uniqueTypes = useMemo(() => {
+    const types = rawMembros.map(m => m.tipo_de_pessoa?.trim()).filter(Boolean);
+    return Array.from(new Set(types)).sort() as string[];
+  }, [rawMembros]);
 
   const dashboardData = useMemo(() => {
     if (isLoading || rawMembros.length === 0) return null;
@@ -118,7 +137,9 @@ export const Dashboard: React.FC = () => {
         const age = getAge(m.nascimento);
         const matchAge = (age >= filterMinAge && age <= filterMaxAge);
         const matchMarital = filterMaritalStatus === 'Todos' || m.estado_civil === filterMaritalStatus;
-        return matchGender && matchGroup && matchDisc && matchAge && matchMarital;
+        const matchStatus = filterStatus === 'Todos' || m.status === filterStatus;
+        const matchType = selectedTypes.length === 0 || selectedTypes.includes(m.tipo_de_pessoa?.trim());
+        return matchGender && matchGroup && matchDisc && matchAge && matchMarital && matchStatus && matchType;
     });
 
     const ativosOnly = filteredMembros.filter(m => m.status === 'Ativo');
@@ -211,7 +232,7 @@ export const Dashboard: React.FC = () => {
             discipuladores: discList
         }
     };
-  }, [isLoading, rawMembros, rawCelulas, rawDiscipulado, filterGender, filterGroup, filterDisc]);
+  }, [isLoading, rawMembros, rawCelulas, rawDiscipulado, filterGender, filterGroup, filterDisc, filterMaritalStatus, filterMinAge, filterMaxAge, filterStatus, selectedTypes]);
 
   const handleOpenModal = async (type: 'grupo' | 'setor' | 'discipulador', title: string) => {
     setModalType(type); setModalTitle(title); setIsModalLoading(true);
@@ -257,6 +278,96 @@ export const Dashboard: React.FC = () => {
 
       <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-wrap gap-4 items-center mb-6">
         <div className="flex items-center gap-2 text-gray-400 mr-2"><Search className="w-4 h-4" /><span className="text-xs font-bold uppercase tracking-wider">Filtros Rápidos:</span></div>
+        <select value={filterGender} onChange={e => setFilterGender(e.target.value)} className="text-sm border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50"><option value="Todos">Todos os Sexos</option><option value="Masculino">Masculino</option><option value="Feminino">Feminino</option></select>
+        <select value={filterGroup} onChange={e => setFilterGroup(e.target.value)} className="text-sm border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50 max-w-[200px]"><option value="Todos">Todos os Grupos</option>{rawCelulas.map(c => <option key={c.grupo_caseiro} value={c.grupo_caseiro}>{c.grupo_caseiro}</option>)}</select>
+        <select value={filterDisc} onChange={e => setFilterDisc(e.target.value)} className="text-sm border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50 max-w-[200px]"><option value="Todos">Todos os Discipuladores</option>{Array.from(new Set(rawDiscipulado.map(d => d.discipulador))).sort().map(d => <option key={d} value={d}>{d}</option>)}</select>
+        <select value={filterMaritalStatus} onChange={e => setFilterMaritalStatus(e.target.value)} className="text-sm border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50 max-w-[150px]"><option value="Todos">Estado Civil</option>{Array.from(new Set(rawMembros.map(m => m.estado_civil).filter(Boolean))).sort().map(s => <option key={s} value={s}>{s}</option>)}</select>
+        
+        {/* Status Filter (Ativo/Inativo) */}
+        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="text-sm border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50"><option value="Todos">Todos os Status</option><option value="Ativo">Ativo</option><option value="Inativo">Inativo</option></select>
+
+        {/* Types of Person Filter (Checkbox Multiselect Dropdown) */}
+        <div className="relative" ref={dropdownRef}>
+          <button
+            type="button"
+            onClick={() => setIsTypesOpen(!isTypesOpen)}
+            className="flex items-center justify-between gap-2 text-sm border border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50 px-3 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
+          >
+            <span>{selectedTypes.length === 0 ? 'Todos os Tipos' : `${selectedTypes.length} Tipo(s)`}</span>
+            <span className="text-xs text-gray-400">▼</span>
+          </button>
+
+          {isTypesOpen && (
+            <div className="absolute left-0 mt-2 w-64 bg-white border border-gray-100 rounded-xl shadow-xl z-50 p-3 space-y-2 animate-in fade-in slide-in-from-top-1 duration-150">
+              <div className="flex justify-between items-center pb-2 border-b border-gray-100">
+                <span className="text-[10px] font-bold text-gray-400 uppercase">Tipos de Pessoa</span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTypes([])}
+                    className="text-[10px] text-red-500 hover:underline font-bold"
+                  >
+                    Limpar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTypes(uniqueTypes)}
+                    className="text-[10px] text-primary-600 hover:underline font-bold"
+                  >
+                    Todos
+                  </button>
+                </div>
+              </div>
+              <div className="max-h-48 overflow-y-auto space-y-2 py-1 pr-1 scrollbar-thin">
+                {uniqueTypes.length === 0 ? (
+                  <span className="text-xs text-gray-400 block text-center">Nenhum tipo disponível</span>
+                ) : (
+                  uniqueTypes.map(type => (
+                    <label key={type} className="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors text-xs text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={selectedTypes.includes(type)}
+                        onChange={() => {
+                          setSelectedTypes(prev =>
+                            prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
+                          );
+                        }}
+                        className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 w-3.5 h-3.5"
+                      />
+                      <span className="font-medium truncate">{type}</span>
+                    </label>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2 bg-gray-50/50 border border-gray-200 rounded-lg px-3 py-1">
+           <span className="text-[10px] font-bold text-gray-400 uppercase">Idade:</span>
+           <input type="number" value={filterMinAge} onChange={e => setFilterMinAge(parseInt(e.target.value) || 0)} className="w-12 bg-transparent text-sm font-semibold outline-none border-b border-transparent focus:border-primary-500" placeholder="Min" />
+           <span className="text-gray-300">/</span>
+           <input type="number" value={filterMaxAge} onChange={e => setFilterMaxAge(parseInt(e.target.value) || 120)} className="w-12 bg-transparent text-sm font-semibold outline-none border-b border-transparent focus:border-primary-500" placeholder="Max" />
+        </div>
+
+        {(filterGender !== 'Todos' || filterGroup !== 'Todos' || filterDisc !== 'Todos' || filterMinAge !== 0 || filterMaxAge !== 120 || filterMaritalStatus !== 'Todos' || filterStatus !== 'Todos' || selectedTypes.length > 0) && (
+           <button 
+              onClick={() => { 
+                 setFilterGender('Todos'); 
+                 setFilterGroup('Todos'); 
+                 setFilterDisc('Todos'); 
+                 setFilterMinAge(0); 
+                 setFilterMaxAge(120); 
+                 setFilterMaritalStatus('Todos'); 
+                 setFilterStatus('Todos'); 
+                 setSelectedTypes([]); 
+              }} 
+              className="text-xs text-red-600 font-semibold hover:underline"
+           >
+              Limpar Filtros
+           </button>
+        )}
+      </div>
         <select value={filterGender} onChange={e => setFilterGender(e.target.value)} className="text-sm border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50"><option value="Todos">Todos os Sexos</option><option value="Masculino">Masculino</option><option value="Feminino">Feminino</option></select>
         <select value={filterGroup} onChange={e => setFilterGroup(e.target.value)} className="text-sm border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50 max-w-[200px]"><option value="Todos">Todos os Grupos</option>{rawCelulas.map(c => <option key={c.grupo_caseiro} value={c.grupo_caseiro}>{c.grupo_caseiro}</option>)}</select>
         <select value={filterDisc} onChange={e => setFilterDisc(e.target.value)} className="text-sm border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50 max-w-[200px]"><option value="Todos">Todos os Discipuladores</option>{Array.from(new Set(rawDiscipulado.map(d => d.discipulador))).sort().map(d => <option key={d} value={d}>{d}</option>)}</select>
