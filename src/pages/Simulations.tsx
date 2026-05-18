@@ -48,7 +48,8 @@ import {
   getAdministrativeRegion, 
   getGCRegion 
 } from '../lib/geoUtils';
-import { Member, Cell, DiscipleshipLink, Family, useFamilyEngine } from '../hooks/useFamilyEngine';
+import { useFamilyEngine } from '../hooks/useFamilyEngine';
+import type { Member, Cell, DiscipleshipLink, Family } from '../hooks/useFamilyEngine';
 
 // Componente auxiliar para alterar dinamicamente o centro e zoom do mapa Leaflet
 const ChangeMapView: React.FC<{ center: [number, number]; zoom: number }> = ({ center, zoom }) => {
