@@ -2683,8 +2683,7 @@ export const Simulations: React.FC = () => {
                 </div>
               </div>
             </div>
-        </div>
-      </div>
+          </div>
       
       {/* 4. Overlay Modal: Create Custom Sandbox GC */}
       {isCreateCellOpen && (
