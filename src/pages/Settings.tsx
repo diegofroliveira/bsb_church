@@ -16,14 +16,26 @@ export const Settings: React.FC = () => {
     setSyncStatus('idle');
     setSyncMessage('');
     
-    // Simulação rápida para feedback visual
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    setSyncStatus('error');
-    setSyncMessage(
-      'A sincronização automática do Sistema Prover está configurada para rodar de forma agendada no servidor local da igreja (para preservar as credenciais e evitar limites de tempo da Vercel Hobby). Para forçar a execução manual agora, por favor execute o script "python run_sync.py" no terminal do seu computador/servidor local.'
-    );
-    setIsSyncing(false);
+    try {
+      const response = await fetch('/api/trigger-sync', {
+        method: 'POST',
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        setSyncStatus('success');
+        setSyncMessage('Sincronização iniciada com sucesso! O robô do Prover está executando no GitHub Actions e atualizará o Supabase em breve.');
+      } else {
+        setSyncStatus('error');
+        setSyncMessage(data.error || 'Erro ao acionar a sincronização na nuvem.');
+      }
+    } catch (error) {
+      setSyncStatus('error');
+      setSyncMessage('Erro de conexão ao tentar acionar o servidor.');
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   useEffect(() => {
@@ -69,10 +81,9 @@ export const Settings: React.FC = () => {
                   <CloudLightning className="w-6 h-6"/>
                </div>
                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Automação de Dados</h3>
+                  <h3 className="text-lg font-semibold text-gray-900">Automação de Dados (Nuvem)</h3>
                   <p className="text-sm text-gray-500 max-w-xl mt-1">
-                     A base de dados é atualizada automaticamente de forma agendada no Sistema Prover. 
-                     Caso precise forçar uma atualização manual, clique no botão ao lado.
+                     Este processo aciona os robôs de sincronização na nuvem (GitHub Actions) para buscar os dados mais recentes do Sistema Prover e atualizá-los no Supabase.
                   </p>
                   
                   {syncStatus !== 'idle' && (
@@ -89,7 +100,7 @@ export const Settings: React.FC = () => {
                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed text-white px-5 py-2.5 rounded-xl text-sm font-medium transition-colors shadow-sm shrink-0"
             >
                {isSyncing ? <Loader2 className="w-4 h-4 animate-spin"/> : <Cloud className="w-4 h-4"/>}
-               {isSyncing ? 'Conectando...' : 'Como Forçar Sincronização'}
+               {isSyncing ? 'Conectando...' : 'Forçar Sincronização'}
             </button>
          </div>
       </div>
