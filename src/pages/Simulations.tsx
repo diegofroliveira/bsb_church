@@ -156,6 +156,9 @@ export const Simulations: React.FC = () => {
   // Expandable UI for territorial insights residents
   const [expandedInsightIndex, setExpandedInsightIndex] = useState<number | null>(null);
 
+  // Expandable state for Territorial Insights panel
+  const [isTerritorialInsightsExpanded, setIsTerritorialInsightsExpanded] = useState(true);
+
   // States for creating a custom draft cell
   const [isCreateCellOpen, setIsCreateCellOpen] = useState(false);
   // Auditoria collapsible states (Auditoria de Alocação)
@@ -2359,7 +2362,6 @@ export const Simulations: React.FC = () => {
              </div>
            )}
 
-           /* 2. Expansion Alerts & Optimization Panel */
             <div className="bg-gray-900 rounded-3xl p-6 text-white shadow-2xl overflow-hidden relative">
                <div className={clsx("relative z-10", isTerritorialInsightsExpanded ? "space-y-4" : "space-y-0")}>
                  <div 
