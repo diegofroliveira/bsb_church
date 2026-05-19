@@ -955,17 +955,12 @@ export const Simulations: React.FC = () => {
   const territorialInsights = useMemo(() => {
     if (isLoading || draftMembers.length === 0) return { insights: [], minMembersInAnyGC: 0, activeGCsCount: 0 };
     
-    const countableMembers = draftMembers.filter(m => {
-      if (m.status !== 'Ativo') return false;
-      const type = (m.tipo_de_pessoa || '').toUpperCase().trim();
-      return type !== 'AGREGADO';
-    });
-
-    const membersByRA: Record<string, Member[]> = {};
-    countableMembers.forEach(m => {
+    // Group all active residents by RA
+    const allActiveByRA: Record<string, Member[]> = {};
+    draftMembers.filter(m => m.status === 'Ativo').forEach(m => {
       const ra = getAdministrativeRegion(m.bairro);
-      if (!membersByRA[ra]) membersByRA[ra] = [];
-      membersByRA[ra].push(m);
+      if (!allActiveByRA[ra]) allActiveByRA[ra] = [];
+      allActiveByRA[ra].push(m);
     });
 
     const gcsByRA: Record<string, Cell[]> = {};
@@ -998,19 +993,26 @@ export const Simulations: React.FC = () => {
     const insights: any[] = [];
     
     // 2. Scan all RAs to generate alerts based on the exact rules
-    Object.entries(membersByRA).forEach(([ra, members]) => {
+    Object.entries(allActiveByRA).forEach(([ra, residents]) => {
       if (ra === 'NÃO INFORMADO') return;
+      
+      const totalCount = residents.length;
+      const countableMembersList = residents.filter(m => {
+        const type = (m.tipo_de_pessoa || '').toUpperCase().trim();
+        return type !== 'AGREGADO';
+      });
+      const countableCount = countableMembersList.length;
       
       const gcList = gcsByRA[ra] || [];
       if (gcList.length === 0) {
         // New GC threshold is exactly 10 members (excluding aggregates)
-        if (members.length >= 10) {
+        if (countableCount >= 10) {
           insights.push({
             type: 'expansion',
             title: `Alerta de Expansão: ${ra}`,
-            description: `Localidade ${ra} possui quórum de ${members.length} moradores ativos (excluindo agregados), atingindo a capacidade saudável de pelo menos 10 membros para iniciar um novo grupo local no bairro.`,
+            description: `Localidade ${ra} possui quórum de ${countableCount} membros ativos (excluindo agregados) e ${totalCount} residentes totais. Isso atinge a capacidade saudável de pelo menos 10 membros para iniciar um novo grupo local no bairro.`,
             action: 'Ação sugerida: Avaliar criação de GC local ou reorganização regional',
-            memberNames: members.map(m => m.nome).sort()
+            memberNames: countableMembersList.map(m => m.nome).sort()
           });
         }
       } else {
@@ -1022,7 +1024,7 @@ export const Simulations: React.FC = () => {
           thresholdForNextGC = (gcList.length + 1) * 18;
         }
 
-        if (members.length >= thresholdForNextGC) {
+        if (countableCount >= thresholdForNextGC) {
           const getRomanNumeral = (num: number): string => {
             const roman = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
             return roman[num - 1] || num.toString();
@@ -1032,9 +1034,9 @@ export const Simulations: React.FC = () => {
           insights.push({
             type: 'expansion_next',
             title: `Oportunidade: Novo Grupo em ${ra}`,
-            description: `Localidade ${ra} já possui ${gcList.length} grupo(s) cadastrado(s), mas conta com um quórum de ${members.length} moradores ativos. Isso indica capacidade saudável para criar um novo grupo local (${ra} ${nextNumStr}) para unificar e acolher esses membros locais.`,
+            description: `Localidade ${ra} já possui ${gcList.length} grupo(s) cadastrado(s), mas conta com um quórum de ${countableCount} membros ativos (excluindo agregados) e ${totalCount} residentes totais. Isso indica capacidade saudável para criar um novo grupo local (${ra} ${nextNumStr}) para unificar e acolher esses membros locais.`,
             action: `Ação sugerida: Avaliar abertura de ${ra} ${nextNumStr} / desdobramento territorial`,
-            memberNames: members.map(m => m.nome).sort()
+            memberNames: countableMembersList.map(m => m.nome).sort()
           });
         }
       }
