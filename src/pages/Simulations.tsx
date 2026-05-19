@@ -1488,7 +1488,7 @@ export const Simulations: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="w-3.5 h-3.5 rounded-full border-2 border-dashed border-[#7c3aed] bg-[#8b5cf6]/20 inline-block shrink-0"></span>
-                  <span className="text-gray-600 font-medium text-[11px]">Oportunidade (>=4 Moradores)</span>
+                  <span className="text-gray-600 font-medium text-[11px]">Oportunidade (&gt;= 4 Moradores)</span>
                 </div>
                 <div className="border-t border-gray-100 my-1.5 pt-1.5 text-[9px] font-bold text-gray-400 uppercase tracking-wider">
                   Distância ao Grupo (Linhas)
