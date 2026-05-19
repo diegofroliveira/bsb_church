@@ -1017,12 +1017,7 @@ export const Simulations: React.FC = () => {
         }
       } else {
         // If RA already has GCs, suggest splitting if it has a high resident quorum!
-        let thresholdForNextGC = 24;
-        if (gcList.length === 2) {
-          thresholdForNextGC = 40;
-        } else if (gcList.length >= 3) {
-          thresholdForNextGC = (gcList.length + 1) * 18;
-        }
+        const thresholdForNextGC = (gcList.length + 1) * 10;
 
         if (countableCount >= thresholdForNextGC) {
           const getRomanNumeral = (num: number): string => {
