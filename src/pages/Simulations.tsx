@@ -172,9 +172,40 @@ export const Simulations: React.FC = () => {
   const [newCellLeader, setNewCellLeader] = useState('');
   const [newCellSector, setNewCellSector] = useState('');
 
-  // Ignored and Minimized alerts states for the pastor
-  const [ignoredAlerts, setIgnoredAlerts] = useState<string[]>([]);
-  const [minimizedAlerts, setMinimizedAlerts] = useState<string[]>([]);
+  // Ignored and Minimized alerts states for the pastor with localStorage persistence
+  const [ignoredAlerts, setIgnoredAlerts] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('bsb_ignored_alerts');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [minimizedAlerts, setMinimizedAlerts] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('bsb_minimized_alerts');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('bsb_ignored_alerts', JSON.stringify(ignoredAlerts));
+    } catch (e) {
+      console.error('Error saving ignored alerts:', e);
+    }
+  }, [ignoredAlerts]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('bsb_minimized_alerts', JSON.stringify(minimizedAlerts));
+    } catch (e) {
+      console.error('Error saving minimized alerts:', e);
+    }
+  }, [minimizedAlerts]);
 
   const toggleIgnoreAlert = (key: string) => {
     setIgnoredAlerts(prev => 
@@ -2429,7 +2460,7 @@ export const Simulations: React.FC = () => {
                                )}
                                {insight.title}
                             </h4>
-                            <div className="flex items-center gap-1 shrink-0 opacity-40 group-hover:opacity-100 transition-opacity">
+                            <div className="flex items-center gap-1 shrink-0 opacity-60 hover:opacity-100 transition-opacity">
                               <button 
                                 onClick={() => toggleMinimizeAlert(key)}
                                 className="text-gray-400 hover:text-white p-1 hover:bg-white/5 rounded-lg transition-all cursor-pointer"
@@ -2529,10 +2560,16 @@ export const Simulations: React.FC = () => {
                                   </div>
                                 )}
                               </div>
-               </div>         <CheckCircle2 className="w-10 h-10 mx-auto mb-2 text-emerald-400 animate-pulse" />
-                          <p className="text-xs font-semibold">Nenhuma localidade com necessidade ou desvio territorial detectado.</p>
-                       </div>
-                     )}
+                            )
+                          )}
+                        </div>
+                      );
+                    }) : (
+                      <div className="text-center py-8 opacity-50">
+                         <CheckCircle2 className="w-10 h-10 mx-auto mb-2 text-emerald-400 animate-pulse" />
+                         <p className="text-xs font-semibold">Nenhuma localidade com necessidade ou desvio territorial detectado.</p>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-primary-600/20 rounded-full blur-3xl"></div>
@@ -2551,8 +2588,12 @@ export const Simulations: React.FC = () => {
                   {(ignoredAlerts.some(k => k.startsWith('mismatch') || k.startsWith('overcrowded') || k.startsWith('critical') || k.startsWith('suggestion')) || minimizedAlerts.some(k => k.startsWith('mismatch') || k.startsWith('overcrowded') || k.startsWith('critical') || k.startsWith('suggestion'))) && (
                     <button
                       onClick={() => {
-                        setIgnoredAlerts(prev => prev.filter(k => !k.startsWith('mismatch') && !k.startsWith('overcrowded') && !k.startsWith('critical') && !k.startsWith('suggestion')));
-                        setMinimizedAlerts(prev => prev.filter(k => !k.startsWith('mismatch') && !k.startsWith('overcrowded') && !k.startsWith('critical') && !k.startsWith('suggestion')));
+                        const newIgnored = ignoredAlerts.filter(k => !k.startsWith('mismatch') && !k.startsWith('overcrowded') && !k.startsWith('critical') && !k.startsWith('suggestion'));
+                        const newMinimized = minimizedAlerts.filter(k => !k.startsWith('mismatch') && !k.startsWith('overcrowded') && !k.startsWith('critical') && !k.startsWith('suggestion'));
+                        setIgnoredAlerts(newIgnored);
+                        setMinimizedAlerts(newMinimized);
+                        localStorage.setItem('ignoredAlerts', JSON.stringify(newIgnored));
+                        localStorage.setItem('minimizedAlerts', JSON.stringify(newMinimized));
                       }}
                       className="text-[9px] font-bold text-amber-700 hover:text-amber-900 hover:underline border-l border-amber-200 pl-1.5 ml-1 cursor-pointer transition-all active:scale-95"
                       title="Restaurar todos os alertas de auditoria de saúde ocultados ou minimizados"
@@ -2594,7 +2635,7 @@ export const Simulations: React.FC = () => {
                                   <span className="text-xs font-black text-gray-800 truncate">{mismatch.memberName}</span>
                                   <span className="text-[8px] bg-gray-100 text-gray-500 px-1 py-0.2 rounded font-bold uppercase shrink-0">Minimizado</span>
                                 </div>
-                                <div className="flex items-center gap-1 shrink-0">
+                                <div className="flex items-center gap-1 shrink-0 opacity-60 hover:opacity-100 transition-opacity">
                                   <button 
                                     onClick={() => toggleMinimizeAlert(key)}
                                     className="text-gray-400 hover:text-indigo-600 p-0.5 hover:bg-gray-100 rounded transition-all cursor-pointer"
@@ -2631,7 +2672,7 @@ export const Simulations: React.FC = () => {
                                   <span className="text-[9px] bg-gray-100 text-gray-600 px-1.5 py-0.2 rounded font-bold uppercase">
                                     {mismatch.memberRA}
                                   </span>
-                                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <div className="flex items-center gap-0.5 opacity-60 hover:opacity-100 transition-opacity">
                                     <button 
                                       onClick={() => toggleMinimizeAlert(key)}
                                       className="text-gray-400 hover:text-indigo-600 p-0.5 hover:bg-gray-100 rounded transition-all cursor-pointer"
@@ -2710,7 +2751,7 @@ export const Simulations: React.FC = () => {
                                   <span className="font-black text-rose-600 shrink-0">{gc.count} membros</span>
                                   <span className="text-[8px] bg-gray-100 text-gray-500 px-1 py-0.2 rounded font-bold uppercase shrink-0">Minimizado</span>
                                 </div>
-                                <div className="flex items-center gap-1 shrink-0">
+                                <div className="flex items-center gap-1 shrink-0 opacity-60 hover:opacity-100 transition-opacity">
                                   <button 
                                     onClick={() => toggleMinimizeAlert(key)}
                                     className="text-gray-400 hover:text-indigo-600 p-0.5 hover:bg-gray-100 rounded transition-all cursor-pointer"
@@ -2766,7 +2807,7 @@ export const Simulations: React.FC = () => {
                                 >
                                   ⚡ Multiplicar
                                 </button>
-                                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity ml-1 border-l border-gray-150 pl-1.5">
+                                <div className="flex items-center gap-0.5 opacity-60 hover:opacity-100 transition-opacity ml-1 border-l border-gray-150 pl-1.5">
                                   <button 
                                     onClick={() => toggleMinimizeAlert(key)}
                                     className="text-gray-400 hover:text-indigo-600 p-0.5 hover:bg-gray-100 rounded transition-all cursor-pointer"
@@ -2824,7 +2865,7 @@ export const Simulations: React.FC = () => {
                                   <span className="font-black text-amber-600 shrink-0">{gc.count} membros</span>
                                   <span className="text-[8px] bg-gray-100 text-gray-500 px-1 py-0.2 rounded font-bold uppercase shrink-0">Minimizado</span>
                                 </div>
-                                <div className="flex items-center gap-1 shrink-0">
+                                <div className="flex items-center gap-1 shrink-0 opacity-60 hover:opacity-100 transition-opacity">
                                   <button 
                                     onClick={() => toggleMinimizeAlert(key)}
                                     className="text-gray-400 hover:text-indigo-600 p-0.5 hover:bg-gray-100 rounded transition-all cursor-pointer"
@@ -2866,7 +2907,7 @@ export const Simulations: React.FC = () => {
                                 >
                                   Destinar
                                 </button>
-                                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity ml-1 border-l border-gray-150 pl-1.5">
+                                <div className="flex items-center gap-0.5 opacity-60 hover:opacity-100 transition-opacity ml-1 border-l border-gray-150 pl-1.5">
                                   <button 
                                     onClick={() => toggleMinimizeAlert(key)}
                                     className="text-gray-400 hover:text-indigo-600 p-0.5 hover:bg-gray-100 rounded transition-all cursor-pointer"
@@ -2919,7 +2960,7 @@ export const Simulations: React.FC = () => {
                               <span className="font-semibold text-gray-700 truncate">Renomear GCs do Recanto</span>
                               <span className="text-[8px] bg-gray-100 text-gray-500 px-1 py-0.2 rounded font-bold uppercase shrink-0">Minimizado</span>
                             </div>
-                            <div className="flex items-center gap-1 shrink-0">
+                            <div className="flex items-center gap-1 shrink-0 opacity-60 hover:opacity-100 transition-opacity">
                               <button 
                                 onClick={() => toggleMinimizeAlert('suggestion_recanto')}
                                 className="text-gray-400 hover:text-indigo-600 p-0.5 hover:bg-gray-100 rounded transition-all cursor-pointer"
@@ -2943,7 +2984,7 @@ export const Simulations: React.FC = () => {
                                 <span className="font-extrabold text-gray-800">Renomear GCs do Recanto</span>
                                 <span className="text-[8px] bg-amber-50 text-amber-700 border border-amber-100 px-1.5 py-0.2 rounded font-black uppercase">Recomendado</span>
                               </div>
-                              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <div className="flex items-center gap-0.5 opacity-60 hover:opacity-100 transition-opacity">
                                 <button 
                                   onClick={() => toggleMinimizeAlert('suggestion_recanto')}
                                   className="text-gray-400 hover:text-indigo-600 p-0.5 hover:bg-gray-100 rounded transition-all cursor-pointer"
@@ -2975,7 +3016,7 @@ export const Simulations: React.FC = () => {
                               <span className="font-semibold text-gray-700 truncate">Alocação de Regiões Sem Quórum</span>
                               <span className="text-[8px] bg-gray-100 text-gray-500 px-1 py-0.2 rounded font-bold uppercase shrink-0">Minimizado</span>
                             </div>
-                            <div className="flex items-center gap-1 shrink-0">
+                            <div className="flex items-center gap-1 shrink-0 opacity-60 hover:opacity-100 transition-opacity">
                               <button 
                                 onClick={() => toggleMinimizeAlert('suggestion_quorum')}
                                 className="text-gray-400 hover:text-indigo-600 p-0.5 hover:bg-gray-100 rounded transition-all cursor-pointer"
@@ -2999,7 +3040,7 @@ export const Simulations: React.FC = () => {
                                 <span className="font-extrabold text-gray-800">Alocação de Regiões Sem Quórum</span>
                                 <span className="text-[8px] bg-indigo-50 text-indigo-700 border border-indigo-100 px-1.5 py-0.2 rounded font-black uppercase">Diretriz</span>
                               </div>
-                              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <div className="flex items-center gap-0.5 opacity-60 hover:opacity-100 transition-opacity">
                                 <button 
                                   onClick={() => toggleMinimizeAlert('suggestion_quorum')}
                                   className="text-gray-400 hover:text-indigo-600 p-0.5 hover:bg-gray-100 rounded transition-all cursor-pointer"
@@ -3055,7 +3096,7 @@ export const Simulations: React.FC = () => {
                                 <span className="font-extrabold text-gray-800">Sudoeste & Cruzeiro ➔ Asa Sul</span>
                                 <span className="text-[8px] bg-indigo-50 text-indigo-700 border border-indigo-100 px-1.5 py-0.2 rounded font-black uppercase">Diretriz</span>
                               </div>
-                              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <div className="flex items-center gap-0.5 opacity-60 hover:opacity-100 transition-opacity">
                                 <button 
                                   onClick={() => toggleMinimizeAlert('suggestion_sudoeste')}
                                   className="text-gray-400 hover:text-indigo-600 p-0.5 hover:bg-gray-100 rounded transition-all cursor-pointer"
