@@ -97,7 +97,7 @@ const renderBairroTag = (m: Member, activeCell: Cell | undefined, allCells?: Cel
 export const Simulations: React.FC = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'gc' | 'discipleship'>('gc');
-  const [isMapExpanded, setIsMapExpanded] = useState(false);
+  const [isMapExpanded, setIsMapExpanded] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   
   // Sandbox Data (Drafts)
@@ -176,7 +176,7 @@ export const Simulations: React.FC = () => {
     setIsLoading(true);
     try {
       const [membersRes, cellsRes, discRes] = await Promise.all([
-        supabase.from('membros').select('id, nome, grupos_caseiros, status, sexo, bairro, pai, mae, logradouro, celular_principal_sms, telefone_fixo, estado_civil, nascimento, latitude, longitude'),
+        supabase.from('membros').select('id, nome, grupos_caseiros, status, sexo, bairro, pai, mae, logradouro, celular_principal_sms, telefone_fixo, estado_civil, nascimento, latitude, longitude, tipo_de_pessoa'),
         supabase.from('celulas').select('id, grupo_caseiro, lider, setor, latitude, longitude'),
         supabase.from('discipulado').select('discipulador, discipulo')
       ]);
@@ -955,8 +955,14 @@ export const Simulations: React.FC = () => {
   const territorialInsights = useMemo(() => {
     if (isLoading || draftMembers.length === 0) return { insights: [], minMembersInAnyGC: 0, activeGCsCount: 0 };
     
+    const countableMembers = draftMembers.filter(m => {
+      if (m.status !== 'Ativo') return false;
+      const type = (m.tipo_de_pessoa || '').toUpperCase().trim();
+      return type !== 'AGREGADO';
+    });
+
     const membersByRA: Record<string, Member[]> = {};
-    draftMembers.filter(m => m.status === 'Ativo').forEach(m => {
+    countableMembers.forEach(m => {
       const ra = getAdministrativeRegion(m.bairro);
       if (!membersByRA[ra]) membersByRA[ra] = [];
       membersByRA[ra].push(m);
@@ -965,8 +971,15 @@ export const Simulations: React.FC = () => {
     const gcsByRA: Record<string, Cell[]> = {};
     draftCells.forEach(c => {
       const ra = getGCRegion(c.grupo_caseiro);
-      if (!gcsByRA[ra]) gcsByRA[ra] = [];
-      gcsByRA[ra].push(c);
+      if (ra === 'GUARÁ-NB') {
+        if (!gcsByRA['GUARÁ']) gcsByRA['GUARÁ'] = [];
+        gcsByRA['GUARÁ'].push(c);
+        if (!gcsByRA['NÚCLEO BANDEIRANTE']) gcsByRA['NÚCLEO BANDEIRANTE'] = [];
+        gcsByRA['NÚCLEO BANDEIRANTE'].push(c);
+      } else {
+        if (!gcsByRA[ra]) gcsByRA[ra] = [];
+        gcsByRA[ra].push(c);
+      }
     });
 
     // 1. Calculate members count in each GC today (excluding Cobertura VIX)
@@ -984,20 +997,46 @@ export const Simulations: React.FC = () => {
 
     const insights: any[] = [];
     
-    // 2. Scan all RAs to generate alerts based on the exact rule:
-    // If RA has 0 GCs AND members count is >= minMembersInAnyGC
+    // 2. Scan all RAs to generate alerts based on the exact rules
     Object.entries(membersByRA).forEach(([ra, members]) => {
       if (ra === 'NÃO INFORMADO') return;
       
       const gcList = gcsByRA[ra] || [];
-      if (gcList.length === 0 && members.length >= minMembersInAnyGC) {
-        insights.push({
-          type: 'expansion',
-          title: `Alerta de Expansão: ${ra}`,
-          description: `Localidade ${ra} possui quantidade de membros (${members.length}) igual ou superior ao mínimo dos membros por grupo (${minMembersInAnyGC} membros/GC), mas não possui grupo na localidade.`,
-          action: 'Ação sugerida: Avaliar criação de GC local ou reorganização regional',
-          memberNames: members.map(m => m.nome).sort()
-        });
+      if (gcList.length === 0) {
+        // New GC threshold is exactly 10 members (excluding aggregates)
+        if (members.length >= 10) {
+          insights.push({
+            type: 'expansion',
+            title: `Alerta de Expansão: ${ra}`,
+            description: `Localidade ${ra} possui quórum de ${members.length} moradores ativos (excluindo agregados), atingindo a capacidade saudável de pelo menos 10 membros para iniciar um novo grupo local no bairro.`,
+            action: 'Ação sugerida: Avaliar criação de GC local ou reorganização regional',
+            memberNames: members.map(m => m.nome).sort()
+          });
+        }
+      } else {
+        // If RA already has GCs, suggest splitting if it has a high resident quorum!
+        let thresholdForNextGC = 24;
+        if (gcList.length === 2) {
+          thresholdForNextGC = 40;
+        } else if (gcList.length >= 3) {
+          thresholdForNextGC = (gcList.length + 1) * 18;
+        }
+
+        if (members.length >= thresholdForNextGC) {
+          const getRomanNumeral = (num: number): string => {
+            const roman = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
+            return roman[num - 1] || num.toString();
+          };
+          const nextNumStr = getRomanNumeral(gcList.length + 1);
+          
+          insights.push({
+            type: 'expansion_next',
+            title: `Oportunidade: Novo Grupo em ${ra}`,
+            description: `Localidade ${ra} já possui ${gcList.length} grupo(s) cadastrado(s), mas conta com um quórum de ${members.length} moradores ativos. Isso indica capacidade saudável para criar um novo grupo local (${ra} ${nextNumStr}) para unificar e acolher esses membros locais.`,
+            action: `Ação sugerida: Avaliar abertura de ${ra} ${nextNumStr} / desdobramento territorial`,
+            memberNames: members.map(m => m.nome).sort()
+          });
+        }
       }
     });
 
@@ -1429,6 +1468,43 @@ export const Simulations: React.FC = () => {
 
 
             </MapContainer>
+
+            {/* Floating Map Legend overlaid on Leaflet Map */}
+            <div className="absolute bottom-4 left-4 z-[999] bg-white/95 backdrop-blur-md border border-gray-200 rounded-2xl p-4 shadow-xl max-w-[240px] text-xs space-y-2.5 pointer-events-auto">
+              <div className="font-bold text-gray-800 border-b border-gray-100 pb-1.5 flex items-center gap-1.5">
+                <Filter className="w-3.5 h-3.5 text-indigo-500" />
+                Legenda do Mapa
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-[#ef4444] border border-white shadow-sm inline-block shrink-0"></span>
+                  <span className="text-gray-600 font-medium text-[11px]">Grupo Caseiro (Pino Vermelho)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-[#3b82f6] border border-white shadow-sm inline-block shrink-0"></span>
+                  <span className="text-gray-600 font-medium text-[11px]">Membro Ativo (Pino Azul)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-3.5 h-3.5 rounded-full border-2 border-dashed border-[#7c3aed] bg-[#8b5cf6]/20 inline-block shrink-0"></span>
+                  <span className="text-gray-600 font-medium text-[11px]">Oportunidade (>=4 Moradores)</span>
+                </div>
+                <div className="border-t border-gray-100 my-1.5 pt-1.5 text-[9px] font-bold text-gray-400 uppercase tracking-wider">
+                  Distância ao Grupo (Linhas)
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-5 h-0.5 border-t-2 border-dashed border-[#10b981] inline-block shrink-0"></span>
+                  <span className="text-gray-600 font-medium text-[11px]">Excelente (&lt;= 3 km)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-5 h-0.5 border-t-2 border-dashed border-[#d97706] inline-block shrink-0"></span>
+                  <span className="text-gray-600 font-medium text-[11px]">Intermediária (3 a 5 km)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-5 h-0.5 border-t-2 border-dashed border-[#ef4444] inline-block shrink-0"></span>
+                  <span className="text-gray-600 font-medium text-[11px]">Distante (&gt; 5 km)</span>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>

@@ -8,7 +8,7 @@ import {
 } from '../lib/geoUtils';
 import { 
   Heart, Search, Users, MapPin, AlertCircle, Phone, 
-  TrendingUp, Map, Filter, CheckCircle2, AlertTriangle, 
+  TrendingUp, Map as MapIcon, Filter, CheckCircle2, AlertTriangle, 
   ChevronRight, Calendar, User, Eye, Sparkles
 } from 'lucide-react';
 import clsx from 'clsx';
@@ -134,70 +134,140 @@ export const Families: React.FC = () => {
   const parentelas = useMemo(() => {
     if (members.length === 0 || Object.keys(families).length === 0) return [];
 
-    const parentelaClusters: Record<string, {
-      id: string;
-      name: string;
-      subFamilies: any[];
-      totalMembersCount: number;
-      surnames: string[];
-    }> = {};
+    const normName = (name: string | null | undefined): string => {
+      if (!name) return '';
+      return name.trim().toUpperCase()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .replace(/\s+/g, ' ');
+    };
 
-    familyData.list.forEach((famData) => {
-      const head = members.find(m => m.id.toString() === famData.headId);
-      if (!head) return;
+    const isVal = (s: string) => s && s.length > 3 && !s.includes('INFORMADO') && !s.includes('CONSTA') && !s.includes('IGNORADO');
 
-      const mother = head.mae ? head.mae.trim().toUpperCase() : '';
-      const father = head.pai ? head.pai.trim().toUpperCase() : '';
-      
-      let clusterKey = '';
-      let clusterTitle = '';
+    // Helper to check if two nuclear families are related by parentage
+    const areFamiliesRelated = (famA: any, famB: any): boolean => {
+      const headA = members.find(m => m.id.toString() === famA.headId);
+      const headB = members.find(m => m.id.toString() === famB.headId);
+      if (!headA || !headB) return false;
 
-      if (mother && mother !== 'NAO INFORMADO' && mother !== 'NÃO INFORMADO') {
-        clusterKey = `MAE:${mother}`;
-        clusterTitle = `Parentela de ${head.mae}`;
-      } else if (father && father !== 'NAO INFORMADO' && father !== 'NÃO INFORMADO') {
-        clusterKey = `PAI:${father}`;
-        clusterTitle = `Parentela de ${head.pai}`;
-      } else {
-        // Fallback to last surname
-        const parts = head.nome.split(' ');
-        const surname = parts.length > 1 ? parts[parts.length - 1] : '';
-        if (surname && surname.length > 3) {
-          clusterKey = `SOBRENOME:${surname}`;
-          clusterTitle = `Tronco Familiar ${surname}`;
+      const nameA = normName(headA.nome);
+      const nameB = normName(headB.nome);
+      const fatherA = headA.pai ? normName(headA.pai) : '';
+      const motherA = headA.mae ? normName(headA.mae) : '';
+      const fatherB = headB.pai ? normName(headB.pai) : '';
+      const motherB = headB.mae ? normName(headB.mae) : '';
+
+      // 1. Parent-child link (either way)
+      if (fatherA && (fatherA === nameB || nameB.includes(fatherA) || fatherA.includes(nameB))) return true;
+      if (motherA && (motherA === nameB || nameB.includes(motherA) || motherA.includes(nameB))) return true;
+      if (fatherB && (fatherB === nameA || nameA.includes(fatherB) || fatherB.includes(nameA))) return true;
+      if (motherB && (motherB === nameA || nameA.includes(motherB) || motherB.includes(nameA))) return true;
+
+      // 2. Sibling link (shared parents, ignoring placeholder/incomplete values)
+      if (isVal(fatherA) && isVal(fatherB) && fatherA === fatherB) return true;
+      if (isVal(motherA) && isVal(motherB) && motherA === motherB) return true;
+
+      return false;
+    };
+
+    const visited = new Set<string>();
+    const parentelasList: any[] = [];
+
+    familyData.list.forEach((fam) => {
+      if (visited.has(fam.headId)) return;
+
+      // BFS to find all connected families in this relative/lineage cluster
+      const component: any[] = [];
+      const queue: any[] = [fam];
+      visited.add(fam.headId);
+
+      while (queue.length > 0) {
+        const current = queue.shift()!;
+        component.push(current);
+
+        familyData.list.forEach((other) => {
+          if (visited.has(other.headId)) return;
+          if (areFamiliesRelated(current, other)) {
+            visited.add(other.headId);
+            queue.push(other);
+          }
+        });
+      }
+
+      // Only display actual parentelas (consisting of multiple nuclear families related by common father/mother)
+      if (component.length > 1) {
+        // Count frequencies of father and mother names across all heads in this component to find the patriarch
+        const parentFreqs = new Map<string, number>();
+        const parentOriginalNames = new Map<string, string>();
+
+        component.forEach((c) => {
+          const cHead = members.find(m => m.id.toString() === c.headId);
+          if (!cHead) return;
+          if (cHead.pai && isVal(normName(cHead.pai))) {
+            const fNorm = normName(cHead.pai);
+            parentFreqs.set(fNorm, (parentFreqs.get(fNorm) || 0) + 1);
+            parentOriginalNames.set(fNorm, cHead.pai);
+          }
+          if (cHead.mae && isVal(normName(cHead.mae))) {
+            const mNorm = normName(cHead.mae);
+            parentFreqs.set(mNorm, (parentFreqs.get(mNorm) || 0) + 1);
+            parentOriginalNames.set(mNorm, cHead.mae);
+          }
+        });
+
+        // Find the most frequent parent name that is shared
+        let bestParent = '';
+        let maxFreq = 1;
+        parentFreqs.forEach((freq, normP) => {
+          if (freq > maxFreq) {
+            maxFreq = freq;
+            bestParent = parentOriginalNames.get(normP) || '';
+          }
+        });
+
+        // Fallback to the oldest head's parent if no common parent name has frequency > 1
+        if (!bestParent) {
+          let oldest = component[0];
+          let oldestAge = -1;
+          component.forEach((c) => {
+            const cHead = members.find(m => m.id.toString() === c.headId);
+            if (cHead) {
+              const parts = cHead.nascimento ? cHead.nascimento.split('-') : [];
+              const age = parts.length > 0 ? (new Date().getFullYear() - Number(parts[0])) : -1;
+              if (age > oldestAge) {
+                oldestAge = age;
+                oldest = c;
+              }
+            }
+          });
+          const oHead = members.find(m => m.id.toString() === oldest.headId);
+          bestParent = oHead ? (oHead.pai || oHead.mae || oHead.nome) : 'Não informado';
         }
-      }
 
-      if (!clusterKey) {
-        clusterKey = `NUCLEO:${head.id}`;
-        clusterTitle = `Núcleo de ${head.nome}`;
-      }
+        const name = `Parentela de ${bestParent}`;
 
-      if (!parentelaClusters[clusterKey]) {
-        parentelaClusters[clusterKey] = {
-          id: clusterKey,
-          name: clusterTitle,
-          subFamilies: [],
-          totalMembersCount: 0,
-          surnames: []
-        };
-      }
+        // Collect all unique surnames
+        const surnamesSet = new Set<string>();
+        component.forEach((c) => {
+          const cHead = members.find(m => m.id.toString() === c.headId);
+          if (cHead) {
+            const parts = cHead.nome.split(' ');
+            if (parts.length > 1) {
+              surnamesSet.add(parts[parts.length - 1]);
+            }
+          }
+        });
 
-      parentelaClusters[clusterKey].subFamilies.push(famData);
-      parentelaClusters[clusterKey].totalMembersCount += famData.membersCount;
-      const parts = head.nome.split(' ');
-      if (parts.length > 1) {
-        const last = parts[parts.length - 1];
-        if (!parentelaClusters[clusterKey].surnames.includes(last)) {
-          parentelaClusters[clusterKey].surnames.push(last);
-        }
+        parentelasList.push({
+          id: `PARENTELA:${component[0].headId}`,
+          name,
+          subFamilies: component,
+          totalMembersCount: component.reduce((sum, f) => sum + f.membersCount, 0),
+          surnames: Array.from(surnamesSet)
+        });
       }
     });
 
-    // Only display clusters with relationships (either containing multiple nuclear families or at least 4 members)
-    return Object.values(parentelaClusters)
-      .filter(p => p.subFamilies.length > 1 || p.totalMembersCount >= 3)
-      .sort((a, b) => b.totalMembersCount - a.totalMembersCount);
+    return parentelasList.sort((a, b) => b.totalMembersCount - a.totalMembersCount);
   }, [familyData, members, families]);
 
   // Filtering nuclear family cards
@@ -207,7 +277,7 @@ export const Families: React.FC = () => {
       const matchesSearch = searchTerm === '' || 
         fam.headName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         fam.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        fam.memberBairro.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        fam.headBairro.toLowerCase().includes(searchTerm.toLowerCase()) ||
         fam.familyMembers.some((m: Member) => m.nome.toLowerCase().includes(searchTerm.toLowerCase())) ||
         fam.gcsAttended.some((g: string) => g.toLowerCase().includes(searchTerm.toLowerCase()));
 
@@ -393,11 +463,11 @@ export const Families: React.FC = () => {
                         {/* Split vs Unified Badge */}
                         {fam.isDivided ? (
                           <span className="inline-flex items-center gap-1 text-[8px] bg-amber-50 text-amber-700 border border-amber-100 px-2 py-0.5 rounded-full font-black uppercase tracking-wider animate-pulse shrink-0">
-                            ⚠️ Dividida
+                            ⚠️ GCs Diferentes
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 text-[8px] bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded-full font-black uppercase tracking-wider shrink-0">
-                            🏠 Unificada
+                            🏠 Mesmo GC
                           </span>
                         )}
                       </div>
@@ -447,7 +517,7 @@ export const Families: React.FC = () => {
                                   {m.nome.split(' ')[0]} {m.nome.split(' ').slice(-1)[0]}
                                   {isHead && (
                                     <span className="text-[8px] bg-indigo-50 border border-indigo-100 text-indigo-700 px-1 rounded-md font-bold uppercase shrink-0">
-                                      Líder
+                                      Titular
                                     </span>
                                   )}
                                   {isSpouse && (
@@ -515,7 +585,7 @@ export const Families: React.FC = () => {
             <div>
               <h3 className="text-base font-bold">Mapeamento de Parentelas Estendidas</h3>
               <p className="text-xs text-pink-700/90 leading-relaxed mt-1">
-                Este motor relaciona e agrupa múltiplos núcleos familiares que possuem ascendentes em comum (nomes de mãe/pai compartilhados) ou compartilham sobrenomes familiares representativos. Isso ajuda a mapear linhagens completas para aconselhamentos e eventos de pastoreamento familiar integrado.
+                Este motor relaciona e agrupa múltiplos núcleos familiares que possuem ascendentes diretos em comum (nomes de pai ou mãe compartilhados no cadastro). Isso ajuda a mapear linhagens completas para aconselhamentos e eventos de pastoreamento familiar integrado.
               </p>
             </div>
           </div>
@@ -557,11 +627,11 @@ export const Families: React.FC = () => {
                           </span>
                           {fam.isDivided ? (
                             <span className="text-[8px] bg-amber-50 border border-amber-100 text-amber-700 font-bold px-1.5 py-0.2 rounded-full uppercase shrink-0">
-                              Dividido
+                              GCs Diferentes
                             </span>
                           ) : (
                             <span className="text-[8px] bg-emerald-50 border border-emerald-100 text-emerald-700 font-bold px-1.5 py-0.2 rounded-full uppercase shrink-0">
-                              Unificado
+                              Mesmo GC
                             </span>
                           )}
                         </div>

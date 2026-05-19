@@ -22,6 +22,7 @@ export interface Member {
   nascimento: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  tipo_de_pessoa?: string | null;
 }
 
 export interface Cell {
