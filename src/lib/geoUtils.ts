@@ -72,8 +72,8 @@ export const getAdministrativeRegion = (bairro: string | null | undefined): stri
   if (norm.includes('NUCLEO BANDEIRANTE') || norm.includes('NB')) return 'NÚCLEO BANDEIRANTE';
   if (norm.includes('VICENTE PIRES') || norm.includes('JOQUEI')) return 'VICENTE PIRES';
   if (norm.includes('TAGUATINGA') || norm.includes('TAGUA')) return 'TAGUATINGA';
-  if (norm.includes('ARNIQUEIRA') || norm.includes('AREAL')) return 'ARNIQUEIRA';
-  if (norm.includes('AGUAS CLARAS')) return 'ÁGUAS CLARAS';
+  if (norm.includes('ARNIQUEIRA')) return 'ARNIQUEIRA';
+  if (norm.includes('AGUAS CLARAS') || norm.includes('AREAL')) return 'ÁGUAS CLARAS';
   if (norm.includes('GUARA') || norm.includes('LUCIO COSTA')) return 'GUARÁ';
   if (norm.includes('ASA SUL')) return 'ASA SUL';
   if (norm.includes('ASA NORTE') || norm.includes('HABITACOES INDIVIDUAIS NORTE')) return 'ASA NORTE';
@@ -99,8 +99,8 @@ export const getGCRegion = (gcName: string): string => {
   if (norm.includes('NUCLEO BANDEIRANTE') || norm.includes('NB')) return 'NÚCLEO BANDEIRANTE';
   if (norm.includes('VICENTE PIRES') || norm.includes('JOQUEI')) return 'VICENTE PIRES';
   if (norm.includes('TAGUATINGA') || norm.includes('TAGUA')) return 'TAGUATINGA';
-  if (norm.includes('ARNIQUEIRA') || norm.includes('AREAL')) return 'ARNIQUEIRA';
-  if (norm.includes('AGUAS CLARAS')) return 'ÁGUAS CLARAS';
+  if (norm.includes('ARNIQUEIRA')) return 'ARNIQUEIRA';
+  if (norm.includes('AGUAS CLARAS') || norm.includes('AREAL')) return 'ÁGUAS CLARAS';
   if (norm.includes('GUARA')) return 'GUARÁ';
   if (norm.includes('ASA SUL')) return 'ASA SUL';
   if (norm.includes('ASA NORTE')) return 'ASA NORTE';
