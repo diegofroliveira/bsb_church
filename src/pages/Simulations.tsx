@@ -2359,222 +2359,236 @@ export const Simulations: React.FC = () => {
              </div>
            )}
 
-           {/* 2. Expansion Alerts & Optimization Panel */}
-           <div className="bg-gray-900 rounded-3xl p-6 text-white shadow-2xl overflow-hidden relative">
-              <div className="relative z-10 space-y-4">
-                <div className="flex items-center justify-between gap-2 text-indigo-400 text-xs font-bold uppercase tracking-widest">
-                   <span className="flex items-center gap-2">
-                      <Brain className="w-4 h-4 animate-bounce" /> Alertas & Otimizações Territoriais
-                   </span>
-                   {(ignoredAlerts.some(k => k.startsWith('expansion') || k.startsWith('consolidation')) || minimizedAlerts.some(k => k.startsWith('expansion') || k.startsWith('consolidation'))) && (
-                     <button
-                       onClick={() => {
-                         setIgnoredAlerts(prev => prev.filter(k => !k.startsWith('expansion') && !k.startsWith('consolidation')));
-                         setMinimizedAlerts(prev => prev.filter(k => !k.startsWith('expansion') && !k.startsWith('consolidation')));
-                       }}
-                       className="text-[9px] font-bold text-indigo-300 hover:text-indigo-200 hover:underline flex items-center gap-1 cursor-pointer transition-all bg-white/5 hover:bg-white/10 px-2 py-0.5 rounded-lg border border-white/10 active:scale-95"
-                       title="Restaurar alertas territoriais ocultados ou minimizados"
-                     >
-                       Restaurar
-                     </button>
-                   )}
-                </div>
-                
-                <div className="flex flex-col gap-1 bg-white/5 border border-white/10 rounded-2xl p-3 text-xs leading-relaxed">
-                  <div className="flex justify-between font-bold text-gray-300">
-                    <span>Mínimo de Membros/GC:</span>
-                    <span className="text-indigo-300">{territorialInsights.minMembersInAnyGC} membros/GC</span>
-                  </div>
-                  <div className="flex justify-between text-[10px] text-gray-400 font-semibold">
-                    <span>Total de GCs Ativos:</span>
-                    <span>{territorialInsights.activeGCsCount} células</span>
-                  </div>
-                  <p className="text-[9px] text-gray-400 mt-1 border-t border-white/5 pt-1">
-                    Análise automatizada de alocação: detecta desequilíbrios territoriais, membros dispersos e oportunidades de criação de novos grupos baseados na proximidade geográfica.
-                  </p>
-                </div>
+           /* 2. Expansion Alerts & Optimization Panel */
+            <div className="bg-gray-900 rounded-3xl p-6 text-white shadow-2xl overflow-hidden relative">
+               <div className={clsx("relative z-10", isTerritorialInsightsExpanded ? "space-y-4" : "space-y-0")}>
+                 <div 
+                   onClick={() => setIsTerritorialInsightsExpanded(!isTerritorialInsightsExpanded)}
+                   className="flex items-center justify-between gap-2 text-indigo-400 text-xs font-bold uppercase tracking-widest cursor-pointer select-none group/hdr"
+                 >
+                    <span className="flex items-center gap-2">
+                       <Brain className="w-4 h-4 animate-bounce shrink-0" /> Alertas & Otimizações Territoriais
+                       <span className="text-[10px] bg-indigo-500/25 text-indigo-200 font-bold px-1.5 py-0.5 rounded-full border border-indigo-500/10">
+                         {activeInsights.length}
+                       </span>
+                    </span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {(ignoredAlerts.some(k => k.startsWith('expansion') || k.startsWith('consolidation')) || minimizedAlerts.some(k => k.startsWith('expansion') || k.startsWith('consolidation'))) && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIgnoredAlerts(prev => prev.filter(k => !k.startsWith('expansion') && !k.startsWith('consolidation')));
+                            setMinimizedAlerts(prev => prev.filter(k => !k.startsWith('expansion') && !k.startsWith('consolidation')));
+                          }}
+                          className="text-[9px] font-bold text-indigo-300 hover:text-indigo-200 hover:underline flex items-center gap-1 cursor-pointer transition-all bg-white/5 hover:bg-white/10 px-2 py-0.5 rounded-lg border border-white/10 active:scale-95 z-20"
+                          title="Restaurar alertas territoriais ocultados ou minimizados"
+                        >
+                          Restaurar
+                        </button>
+                      )}
+                      <ChevronDown className={clsx("w-4 h-4 text-gray-400 group-hover/hdr:text-white transition-all duration-200", isTerritorialInsightsExpanded && "rotate-180")} />
+                    </div>
+                 </div>
+                 
+                 {isTerritorialInsightsExpanded && (
+                   <>
+                     <div className="flex flex-col gap-1 bg-white/5 border border-white/10 rounded-2xl p-3 text-xs leading-relaxed animate-in fade-in duration-200">
+                       <div className="flex justify-between font-bold text-gray-300">
+                         <span>Mínimo de Membros/GC:</span>
+                         <span className="text-indigo-300">{territorialInsights.minMembersInAnyGC} membros/GC</span>
+                       </div>
+                       <div className="flex justify-between text-[10px] text-gray-400 font-semibold">
+                         <span>Total de GCs Ativos:</span>
+                         <span>{territorialInsights.activeGCsCount} células</span>
+                       </div>
+                       <p className="text-[9px] text-gray-400 mt-1 border-t border-white/5 pt-1">
+                         Análise automatizada de alocação: detecta desequilíbrios territoriais, membros dispersos e oportunidades de criação de novos grupos baseados na proximidade geográfica.
+                       </p>
+                     </div>
 
-                <div className="space-y-4">
-                   {activeInsights.length > 0 ? activeInsights.map((insight, i) => {
-                     const isConsolidation = insight.type === 'consolidation';
-                     const key = `${insight.type}_${insight.ra}`;
-                     const isMinimized = minimizedAlerts.includes(key);
+                     <div className="space-y-4 animate-in fade-in duration-200">
+                        {activeInsights.length > 0 ? activeInsights.map((insight, i) => {
+                          const isConsolidation = insight.type === 'consolidation';
+                          const key = `${insight.type}_${insight.ra}`;
+                          const isMinimized = minimizedAlerts.includes(key);
 
-                     if (isMinimized) {
-                       return (
-                         <div 
-                           key={key} 
-                           className={clsx(
-                             "rounded-2xl p-3 border transition-all cursor-default group flex items-center justify-between gap-3 animate-in fade-in duration-200",
-                             isConsolidation
-                               ? "bg-amber-950/10 border-amber-500/10 hover:bg-amber-950/15"
-                               : "bg-white/5 border-white/5 hover:bg-white/10"
-                           )}
-                         >
-                            <div className="flex items-center gap-2 min-w-0">
-                               {isConsolidation ? (
-                                 <Network className="w-3.5 h-3.5 text-amber-400/60 shrink-0" />
-                               ) : (
-                                 <MapPin className="w-3.5 h-3.5 text-emerald-400/60 shrink-0" />
-                               )}
-                               <span className="text-xs font-bold text-gray-300 truncate">{insight.title}</span>
-                               <span className="text-[8px] uppercase font-semibold text-gray-500 bg-white/5 px-1.5 py-0.2 rounded shrink-0">Minimizado</span>
-                            </div>
-                            
-                            <div className="flex items-center gap-1 shrink-0">
-                              <button 
-                                onClick={() => toggleMinimizeAlert(key)}
-                                className="text-gray-400 hover:text-white p-1 hover:bg-white/5 rounded-lg transition-all cursor-pointer"
-                                title="Maximizar Alerta"
-                              >
-                                <ChevronDown className="w-3.5 h-3.5" />
-                              </button>
-                              <button 
-                                onClick={() => toggleIgnoreAlert(key)}
-                                className="text-gray-400 hover:text-rose-400 p-1 hover:bg-white/5 rounded-lg transition-all cursor-pointer"
-                                title="Ignorar Alerta"
-                              >
-                                <EyeOff className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                         </div>
-                       );
-                     }
-
-                     return (
-                       <div 
-                         key={key} 
-                         className={clsx(
-                           "rounded-2xl p-4 border transition-all cursor-default group relative animate-in fade-in duration-200",
-                           isConsolidation
-                             ? "bg-amber-950/20 border-amber-500/25 hover:bg-amber-950/30"
-                             : "bg-white/10 border-white/10 hover:bg-white/20"
-                         )}
-                       >
-                          <div className="flex justify-between items-start gap-4 mb-1">
-                            <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                               {isConsolidation ? (
-                                 <Network className="w-4 h-4 text-amber-400 animate-pulse" />
-                               ) : (
-                                 <MapPin className="w-4 h-4 text-emerald-400" />
-                               )}
-                               {insight.title}
-                            </h4>
-                            <div className="flex items-center gap-1 shrink-0 opacity-60 hover:opacity-100 transition-opacity">
-                              <button 
-                                onClick={() => toggleMinimizeAlert(key)}
-                                className="text-gray-400 hover:text-white p-1 hover:bg-white/5 rounded-lg transition-all cursor-pointer"
-                                title="Minimizar Alerta"
-                              >
-                                <ChevronUp className="w-3.5 h-3.5" />
-                              </button>
-                              <button 
-                                onClick={() => toggleIgnoreAlert(key)}
-                                className="text-gray-400 hover:text-rose-400 p-1 hover:bg-white/5 rounded-lg transition-all cursor-pointer"
-                                title="Ignorar Alerta"
-                              >
-                                <EyeOff className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-                          <p className="text-xs text-gray-300 leading-relaxed mb-3">{insight.description}</p>
-                          <div 
-                            className={clsx(
-                              "text-[10px] font-bold uppercase tracking-tighter px-2 py-1 rounded inline-block",
-                              isConsolidation
-                                ? "text-amber-300 bg-amber-500/10"
-                                : "text-indigo-300 bg-indigo-500/10"
-                            )}
-                          >
-                             {insight.action}
-                          </div>
-                          
-                          {isConsolidation ? (
-                            <div className="mt-3 pt-3 border-t border-white/10">
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setExpandedInsightIndex(expandedInsightIndex === i ? null : i);
-                                }}
-                                className="text-[10px] font-bold text-amber-300 hover:text-amber-200 hover:underline flex items-center gap-1 cursor-pointer transition-all"
-                              >
-                                {expandedInsightIndex === i 
-                                  ? 'Ocultar Detalhes' 
-                                  : `Listar Integrantes / Desvios (${insight.scatteredResidents.length + insight.externalParticipants.length})`}
-                                <ChevronDown className={clsx("w-3 h-3 transition-transform", expandedInsightIndex === i && "rotate-180")} />
-                              </button>
-                              {expandedInsightIndex === i && (
-                                <div className="mt-2 p-2 bg-black/35 rounded-xl space-y-3 max-h-56 overflow-y-auto border border-white/5 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent text-[10px]">
-                                  {insight.scatteredResidents.length > 0 && (
-                                    <div>
-                                      <div className="font-extrabold text-amber-400 mb-1 border-b border-white/5 pb-0.5 uppercase tracking-wider">
-                                        📍 Moradores de {insight.ra} em GCs Externos ({insight.scatteredResidents.length})
-                                      </div>
-                                      <div className="space-y-1">
-                                        {insight.scatteredResidents.map((m: any) => (
-                                          <div key={m.nome} className="text-gray-300 py-0.5 border-b border-white/5 last:border-0 pl-1">
-                                            • <strong className="text-white">{m.nome}</strong> ({m.tipo})
-                                            <span className="text-[9px] text-gray-400 block ml-2">📍 Bairro: {m.bairro} ➔ GC Atual: <strong className="text-indigo-300">{m.gc}</strong></span>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  )}
-                                  
-                                  {insight.externalParticipants.length > 0 && (
-                                    <div>
-                                      <div className="font-extrabold text-indigo-400 mb-1 border-b border-white/5 pb-0.5 uppercase tracking-wider">
-                                        ⚠️ Membros Externos nos GCs de {insight.ra} ({insight.externalParticipants.length})
-                                      </div>
-                                      <div className="space-y-1">
-                                        {insight.externalParticipants.map((m: any) => (
-                                          <div key={m.nome} className="text-gray-300 py-0.5 border-b border-white/5 last:border-0 pl-1">
-                                            • <strong className="text-white">{m.nome}</strong> ({m.tipo})
-                                            <span className="text-[9px] text-gray-400 block ml-2">🏠 Reside em: {m.residenceRA} ({m.bairro}) ➔ GC Local: <strong className="text-emerald-300">{m.gc}</strong></span>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            insight.memberNames && insight.memberNames.length > 0 && (
-                              <div className="mt-3 pt-3 border-t border-white/10">
-                                <button 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setExpandedInsightIndex(expandedInsightIndex === i ? null : i);
-                                  }}
-                                  className="text-[10px] font-bold text-indigo-300 hover:text-indigo-200 hover:underline flex items-center gap-1 cursor-pointer transition-all"
-                                >
-                                  {expandedInsightIndex === i ? 'Ocultar Residentes' : `Listar Residentes (${insight.memberNames.length})`}
-                                  <ChevronDown className={clsx("w-3 h-3 transition-transform", expandedInsightIndex === i && "rotate-180")} />
-                                </button>
-                                {expandedInsightIndex === i && (
-                                  <div className="mt-2 p-2 bg-black/20 rounded-xl space-y-1 max-h-36 overflow-y-auto border border-white/5 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
-                                    {insight.memberNames.map((name: string) => (
-                                      <div key={name} className="text-[10px] text-gray-300 font-medium py-0.5 border-b border-white/5 last:border-0">{name}</div>
-                                    ))}
-                                  </div>
+                          if (isMinimized) {
+                            return (
+                              <div 
+                                key={key} 
+                                className={clsx(
+                                  "rounded-2xl p-3 border transition-all cursor-default group flex items-center justify-between gap-3 animate-in fade-in duration-200",
+                                  isConsolidation
+                                    ? "bg-amber-950/10 border-amber-500/10 hover:bg-amber-950/15"
+                                    : "bg-white/5 border-white/5 hover:bg-white/10"
                                 )}
+                              >
+                                 <div className="flex items-center gap-2 min-w-0">
+                                    {isConsolidation ? (
+                                      <Network className="w-3.5 h-3.5 text-amber-400/60 shrink-0" />
+                                    ) : (
+                                      <MapPin className="w-3.5 h-3.5 text-emerald-400/60 shrink-0" />
+                                    )}
+                                    <span className="text-xs font-bold text-gray-300 truncate">{insight.title}</span>
+                                    <span className="text-[8px] uppercase font-semibold text-gray-500 bg-white/5 px-1.5 py-0.2 rounded shrink-0">Minimizado</span>
+                                 </div>
+                                 
+                                 <div className="flex items-center gap-1 shrink-0">
+                                   <button 
+                                     onClick={() => toggleMinimizeAlert(key)}
+                                     className="text-gray-400 hover:text-white p-1 hover:bg-white/5 rounded-lg transition-all cursor-pointer"
+                                     title="Maximizar Alerta"
+                                   >
+                                     <ChevronDown className="w-3.5 h-3.5" />
+                                   </button>
+                                   <button 
+                                     onClick={() => toggleIgnoreAlert(key)}
+                                     className="text-gray-400 hover:text-rose-400 p-1 hover:bg-white/5 rounded-lg transition-all cursor-pointer"
+                                     title="Ignorar Alerta"
+                                   >
+                                     <EyeOff className="w-3.5 h-3.5" />
+                                   </button>
+                                 </div>
                               </div>
-                            )
-                          )}
-                        </div>
-                      );
-                    }) : (
-                      <div className="text-center py-8 opacity-50">
-                         <CheckCircle2 className="w-10 h-10 mx-auto mb-2 text-emerald-400 animate-pulse" />
-                         <p className="text-xs font-semibold">Nenhuma localidade com necessidade ou desvio territorial detectado.</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-primary-600/20 rounded-full blur-3xl"></div>
-             </div>
-             
+                            );
+                          }
+
+                          return (
+                            <div 
+                              key={key} 
+                              className={clsx(
+                                "rounded-2xl p-4 border transition-all cursor-default group relative animate-in fade-in duration-200",
+                                isConsolidation
+                                  ? "bg-amber-950/20 border-amber-500/25 hover:bg-amber-950/30"
+                                  : "bg-white/10 border-white/10 hover:bg-white/20"
+                              )}
+                            >
+                               <div className="flex justify-between items-start gap-4 mb-1">
+                                 <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                                    {isConsolidation ? (
+                                      <Network className="w-4 h-4 text-amber-400 animate-pulse" />
+                                    ) : (
+                                      <MapPin className="w-4 h-4 text-emerald-400" />
+                                    )}
+                                    {insight.title}
+                                 </h4>
+                                 <div className="flex items-center gap-1 shrink-0 opacity-60 hover:opacity-100 transition-opacity">
+                                   <button 
+                                     onClick={() => toggleMinimizeAlert(key)}
+                                     className="text-gray-400 hover:text-white p-1 hover:bg-white/5 rounded-lg transition-all cursor-pointer"
+                                     title="Minimizar Alerta"
+                                   >
+                                     <ChevronUp className="w-3.5 h-3.5" />
+                                   </button>
+                                   <button 
+                                     onClick={() => toggleIgnoreAlert(key)}
+                                     className="text-gray-400 hover:text-rose-400 p-1 hover:bg-white/5 rounded-lg transition-all cursor-pointer"
+                                     title="Ignorar Alerta"
+                                   >
+                                     <EyeOff className="w-3.5 h-3.5" />
+                                   </button>
+                                 </div>
+                               </div>
+                               <p className="text-xs text-gray-300 leading-relaxed mb-3">{insight.description}</p>
+                               <div 
+                                 className={clsx(
+                                   "text-[10px] font-bold uppercase tracking-tighter px-2 py-1 rounded inline-block",
+                                   isConsolidation
+                                     ? "text-amber-300 bg-amber-500/10"
+                                     : "text-indigo-300 bg-indigo-500/10"
+                                 )}
+                               >
+                                  {insight.action}
+                               </div>
+                               
+                               {isConsolidation ? (
+                                 <div className="mt-3 pt-3 border-t border-white/10">
+                                   <button 
+                                     onClick={(e) => {
+                                       e.stopPropagation();
+                                       setExpandedInsightIndex(expandedInsightIndex === i ? null : i);
+                                     }}
+                                     className="text-[10px] font-bold text-amber-300 hover:text-amber-200 hover:underline flex items-center gap-1 cursor-pointer transition-all"
+                                   >
+                                     {expandedInsightIndex === i 
+                                       ? 'Ocultar Detalhes' 
+                                       : `Listar Integrantes / Desvios (${insight.scatteredResidents.length + insight.externalParticipants.length})`}
+                                     <ChevronDown className={clsx("w-3.5 h-3.5 transition-transform", expandedInsightIndex === i && "rotate-180")} />
+                                   </button>
+                                   {expandedInsightIndex === i && (
+                                     <div className="mt-2 p-2 bg-black/35 rounded-xl space-y-3 max-h-56 overflow-y-auto border border-white/5 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent text-[10px]">
+                                       {insight.scatteredResidents.length > 0 && (
+                                         <div>
+                                           <div className="font-extrabold text-amber-400 mb-1 border-b border-white/5 pb-0.5 uppercase tracking-wider">
+                                             📍 Moradores de ${insight.ra} em GCs Externos (${insight.scatteredResidents.length})
+                                           </div>
+                                           <div className="space-y-1">
+                                             {insight.scatteredResidents.map((m) => (
+                                               <div key={m.nome} className="text-gray-300 py-0.5 border-b border-white/5 last:border-0 pl-1">
+                                                 • <strong className="text-white">{m.nome}</strong> ({m.tipo})
+                                                 <span className="text-[9px] text-gray-400 block ml-2">📍 Bairro: {m.bairro} ➔ GC Atual: <strong className="text-indigo-300">{m.gc}</strong></span>
+                                               </div>
+                                             ))}
+                                           </div>
+                                         </div>
+                                       )}
+                                       
+                                       {insight.externalParticipants.length > 0 && (
+                                         <div>
+                                           <div className="font-extrabold text-indigo-400 mb-1 border-b border-white/5 pb-0.5 uppercase tracking-wider">
+                                             ⚠️ Membros Externos nos GCs de ${insight.ra} (${insight.externalParticipants.length})
+                                           </div>
+                                           <div className="space-y-1">
+                                             {insight.externalParticipants.map((m) => (
+                                               <div key={m.nome} className="text-gray-300 py-0.5 border-b border-white/5 last:border-0 pl-1">
+                                                 • <strong className="text-white">{m.nome}</strong> ({m.tipo})
+                                                 <span className="text-[9px] text-gray-400 block ml-2">🏠 Reside em: {m.residenceRA} ({m.bairro}) ➔ GC Local: <strong className="text-emerald-300">{m.gc}</strong></span>
+                                               </div>
+                                             ))}
+                                           </div>
+                                         </div>
+                                       )}
+                                     </div>
+                                   )}
+                                 </div>
+                               ) : (
+                                 insight.memberNames && insight.memberNames.length > 0 && (
+                                   <div className="mt-3 pt-3 border-t border-white/10">
+                                     <button 
+                                       onClick={(e) => {
+                                         e.stopPropagation();
+                                         setExpandedInsightIndex(expandedInsightIndex === i ? null : i);
+                                       }}
+                                       className="text-[10px] font-bold text-indigo-300 hover:text-indigo-200 hover:underline flex items-center gap-1 cursor-pointer transition-all"
+                                     >
+                                       {expandedInsightIndex === i ? 'Ocultar Residentes' : `Listar Residentes (${insight.memberNames.length})`}
+                                       <ChevronDown className={clsx("w-3 h-3 transition-transform", expandedInsightIndex === i && "rotate-180")} />
+                                     </button>
+                                     {expandedInsightIndex === i && (
+                                       <div className="mt-2 p-2 bg-black/20 rounded-xl space-y-1 max-h-36 overflow-y-auto border border-white/5 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+                                         {insight.memberNames.map((name) => (
+                                           <div key={name} className="text-[10px] text-gray-300 font-medium py-0.5 border-b border-white/5 last:border-0">{name}</div>
+                                         ))}
+                                       </div>
+                                     )}
+                                   </div>
+                                 )
+                               )}
+                            </div>
+                          );
+                        }) : (
+                          <div className="text-center py-8 opacity-50">
+                             <CheckCircle2 className="w-10 h-10 mx-auto mb-2 text-emerald-400 animate-pulse" />
+                             <p className="text-xs font-semibold">Nenhuma localidade com necessidade ou desvio territorial detectado.</p>
+                          </div>
+                        )}
+                     </div>
+                   </>
+                 )}
+               </div>
+               <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-primary-600/20 rounded-full blur-3xl"></div>
+            </div>
+            
             {/* Coluna Direita: Auditoria & Diagnósticos de Expansão */}
             
               {/* Painel de Auditoria de Alocação */}
