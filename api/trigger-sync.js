@@ -26,7 +26,7 @@ export default async function handler(req, res) {
 
   const options = {
     hostname: 'api.github.com',
-    path: '/repos/diegofroliveira/bsb_church/actions/workflows/268386022/dispatches',
+    path: '/repos/diegofroliveira/bsb_church/actions/workflows/sync_prover.yml/dispatches',
     method: 'POST',
     headers: {
       'User-Agent': 'bsb-church-app',

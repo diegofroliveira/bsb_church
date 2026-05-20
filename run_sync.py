@@ -7,8 +7,12 @@ def run_step(name, command):
     print(f"🚀 INICIANDO: {name}")
     print(f"{'='*60}")
     
-    # Usa o executável do venv
-    python_exe = ".\\venv\\Scripts\\python.exe"
+    # Usa o executável correto (compatível com local Windows e GitHub Actions Linux)
+    import os
+    if os.environ.get('GITHUB_ACTIONS') == 'true':
+        python_exe = sys.executable
+    else:
+        python_exe = ".\\venv\\Scripts\\python.exe" if os.path.exists(".\\venv\\Scripts\\python.exe") else sys.executable
     
     try:
         process = subprocess.Popen([python_exe] + command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding='utf-8')
