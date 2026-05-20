@@ -4,7 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { 
   Handshake, Users, MapPin, Search, Plus, Trash2, Heart, 
   Smile, Compass, BookOpen, AlertTriangle, Sparkles, 
-  CheckCircle2, Map, Filter, ArrowRight, Clock, PlusCircle, Check
+  CheckCircle2, Map, Filter, ArrowRight, Clock, PlusCircle, Check,
+  Sliders, Play, RefreshCw, XCircle, FileSpreadsheet
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -32,6 +33,11 @@ interface Member {
   foto?: string;
 }
 
+interface SimulatedPair {
+  memberIds: string[];
+  distance: number;
+}
+
 export const Companionship: React.FC = () => {
   const { user: currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState<'active' | 'assistant' | 'theology'>('active');
@@ -45,6 +51,13 @@ export const Companionship: React.FC = () => {
   const [sexFilter, setSexFilter] = useState<'Todos' | 'Masculino' | 'Feminino'>('Todos');
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [trioSecondMember, setTrioSecondMember] = useState<Member | null>(null);
+
+  // Simulation States
+  const [isSimulationMode, setIsSimulationMode] = useState(false);
+  const [simulatedMatches, setSimulatedMatches] = useState<SimulatedPair[]>([]);
+  const [simulatedUnmatched, setSimulatedUnmatched] = useState<string[]>([]);
+  const [simMaxDistance, setSimMaxDistance] = useState<number>(15); // Padrão: 15km para Brasília
+  const [simAllowTrios, setSimAllowTrios] = useState<boolean>(true);
   
   // Modals / Input States
   const [newPrayerText, setNewPrayerText] = useState<Record<string, string>>({});
@@ -343,6 +356,158 @@ export const Companionship: React.FC = () => {
       .sort((a, b) => a.distance - b.distance);
   };
 
+  // ----------------------------------------------------
+  // MOTOR DO SIMULADOR GEOGRÁFICO EM MASSA (YOLO ENGINE)
+  // ----------------------------------------------------
+  const handleGenerateSimulation = () => {
+    setIsLoading(true);
+    
+    // Obter todos os membros sem companheirismo que têm coordenadas
+    const pool = members.filter(m => !isMemberLinked(m.id) && m.latitude !== null && m.longitude !== null);
+    
+    const simulated: SimulatedPair[] = [];
+    const unmatched: string[] = [];
+    const visited = new Set<string>();
+
+    const sexes = ['Masculino', 'Feminino'];
+
+    for (const s of sexes) {
+      const sexPool = pool.filter(m => m.sexo === s);
+      
+      for (let i = 0; i < sexPool.length; i++) {
+        const m1 = sexPool[i];
+        if (visited.has(m1.id)) continue;
+
+        let bestPartner: Member | null = null;
+        let bestDist = Infinity;
+
+        // Procurar o vizinho mais próximo não visitado do mesmo sexo
+        for (let j = i + 1; j < sexPool.length; j++) {
+          const m2 = sexPool[j];
+          if (visited.has(m2.id)) continue;
+
+          const dist = calculateDistance(m1.latitude, m1.longitude, m2.latitude, m2.longitude);
+          if (dist !== null && dist < bestDist && dist <= simMaxDistance) {
+            bestDist = dist;
+            bestPartner = m2;
+          }
+        }
+
+        if (bestPartner) {
+          visited.add(m1.id);
+          visited.add(bestPartner.id);
+          simulated.push({
+            memberIds: [m1.id, bestPartner.id],
+            distance: bestDist
+          });
+        } else {
+          unmatched.push(m1.id);
+        }
+      }
+
+      // Adicionar à lista de órfãos quem não tem coordenadas ou restou na filtragem
+      const unmatchedBySex = sexPool.filter(m => !visited.has(m.id));
+      unmatchedBySex.forEach(m => {
+        if (!unmatched.includes(m.id)) unmatched.push(m.id);
+      });
+    }
+
+    // Gerar Trios se permitido (para não deixar ninguém isolado na proximidade)
+    if (simAllowTrios && unmatched.length > 0) {
+      const remainingUnmatched: string[] = [];
+
+      for (const unmatchedId of unmatched) {
+        const unmatchedMember = members.find(m => m.id === unmatchedId);
+        if (!unmatchedMember || unmatchedMember.latitude === null || unmatchedMember.longitude === null) {
+          remainingUnmatched.push(unmatchedId);
+          continue;
+        }
+
+        let bestPairIdx = -1;
+        let bestPairDist = Infinity;
+
+        // Achar a dupla mais próxima do mesmo sexo que ainda não seja um trio
+        for (let i = 0; i < simulated.length; i++) {
+          const pair = simulated[i];
+          if (pair.memberIds.length >= 3) continue;
+
+          const pairLeader = members.find(m => m.id === pair.memberIds[0]);
+          if (!pairLeader || pairLeader.sexo !== unmatchedMember.sexo) continue;
+
+          const dist = calculateDistance(unmatchedMember.latitude, unmatchedMember.longitude, pairLeader.latitude, pairLeader.longitude);
+          if (dist !== null && dist < bestPairDist && dist <= simMaxDistance) {
+            bestPairDist = dist;
+            bestPairIdx = i;
+          }
+        }
+
+        if (bestPairIdx !== -1) {
+          simulated[bestPairIdx].memberIds.push(unmatchedId);
+          // Recalcular distância média
+          const p1 = members.find(m => m.id === simulated[bestPairIdx].memberIds[0])!;
+          const p2 = members.find(m => m.id === simulated[bestPairIdx].memberIds[1])!;
+          const d1 = calculateDistance(p1.latitude, p1.longitude, p2.latitude, p2.longitude) || 0;
+          const d2 = calculateDistance(p1.latitude, p1.longitude, unmatchedMember.latitude, unmatchedMember.longitude) || 0;
+          simulated[bestPairIdx].distance = parseFloat(((d1 + d2) / 2).toFixed(1));
+        } else {
+          remainingUnmatched.push(unmatchedId);
+        }
+      }
+      setSimulatedUnmatched(remainingUnmatched);
+    } else {
+      setSimulatedUnmatched(unmatched);
+    }
+
+    // Incluir também membros que já não tinham coordenadas de jeito nenhum na lista de órfãos
+    const noCoordsMembers = members.filter(m => !isMemberLinked(m.id) && (m.latitude === null || m.longitude === null));
+    setSimulatedUnmatched(prev => {
+      const merged = [...prev];
+      noCoordsMembers.forEach(m => {
+        if (!merged.includes(m.id)) merged.push(m.id);
+      });
+      return merged;
+    });
+
+    setSimulatedMatches(simulated);
+    setIsSimulationMode(true);
+    setIsLoading(false);
+  };
+
+  // Efetivar simulação (Salvar em lote)
+  const handleApplySimulation = () => {
+    if (simulatedMatches.length === 0) return;
+    
+    if (!confirm(`Deseja efetivar a simulação e criar automaticamente ${simulatedMatches.length} novas alianças de companheirismo na base oficial? Todos os membros serão iniciados no status "Em Oração".`)) {
+      return;
+    }
+
+    const newCovenants: CompanionshipData[] = simulatedMatches.map(sm => ({
+      id: crypto.randomUUID(),
+      memberIds: sm.memberIds,
+      status: 'EM ORAÇÃO',
+      dataInicio: new Date().toISOString().split('T')[0],
+      oracoes: [],
+      atividades: []
+    }));
+
+    const mergedList = [...companionships, ...newCovenants];
+    saveCompanionships(mergedList);
+    
+    setIsSimulationMode(false);
+    setSimulatedMatches([]);
+    setSimulatedUnmatched([]);
+    setActiveTab('active');
+    
+    alert('Simulação georreferenciada gravada com sucesso! Vínculos ativos criados.');
+  };
+
+  // Descartar simulação
+  const handleDiscardSimulation = () => {
+    setIsSimulationMode(false);
+    setSimulatedMatches([]);
+    setSimulatedUnmatched([]);
+  };
+
   // Filtro de membros sem companheiro
   const unlinkedMembers = members.filter(m => !isMemberLinked(m.id));
   
@@ -385,6 +550,35 @@ export const Companionship: React.FC = () => {
         </div>
       </header>
 
+      {/* Banner de Modo de Simulação Ativado */}
+      {isSimulationMode && (
+        <div className="bg-amber-500 text-white rounded-2xl p-4 shadow-lg border border-amber-600 flex flex-col md:flex-row items-center justify-between gap-4 animate-bounce" style={{ animationDuration: '6s' }}>
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="h-6 w-6 shrink-0 text-white" />
+            <div>
+              <div className="font-bold text-sm">Modo de Simulação Geográfica Ativo!</div>
+              <div className="text-xs text-white/90">
+                O motor gerou <strong>{simulatedMatches.length} alianças simuladas</strong> e deixou <strong>{simulatedUnmatched.length} órfãos</strong> com distância limite de {simMaxDistance}km.
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={handleApplySimulation}
+              className="bg-white text-amber-600 hover:bg-gray-50 px-4 py-2 rounded-xl text-xs font-bold shadow-md transition-all active:scale-95 flex items-center gap-1.5"
+            >
+              <CheckCircle2 className="h-4 w-4" /> Efetivar e Gravar na Nuvem
+            </button>
+            <button
+              onClick={handleDiscardSimulation}
+              className="bg-amber-600 hover:bg-amber-700 text-white border border-amber-700 px-4 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5"
+            >
+              <XCircle className="h-4 w-4" /> Descartar
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="border-b border-gray-200">
         <nav className="-mb-px flex space-x-8" aria-label="Tabs">
@@ -408,7 +602,7 @@ export const Companionship: React.FC = () => {
               'whitespace-nowrap border-b-2 py-4 px-1 text-sm transition-all'
             )}
           >
-            Assistente de Proximidade ({unlinkedMembers.length})
+            {isSimulationMode ? 'Revisar Simulação' : 'Assistente de Proximidade'} ({unlinkedMembers.length})
           </button>
           <button
             onClick={() => setActiveTab('theology')}
@@ -428,13 +622,13 @@ export const Companionship: React.FC = () => {
         <div className="flex h-64 items-center justify-center bg-white rounded-2xl border border-gray-100 shadow-sm">
           <div className="text-center space-y-3">
             <div className="h-10 w-10 border-4 border-blue-600 border-t-transparent animate-spin rounded-full mx-auto" />
-            <p className="text-gray-500 text-sm">Carregando dados geográficos da igreja...</p>
+            <p className="text-gray-500 text-sm">Processando dados geográficos da igreja...</p>
           </div>
         </div>
       ) : (
         <div className="space-y-6">
           {/* ABA 1: ALIANÇAS ATIVAS */}
-          {activeTab === 'active' && (
+          {activeTab === 'active' && !isSimulationMode && (
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               {companionships.map((c) => {
                 const linkedMembers = c.memberIds.map(id => members.find(m => m.id === id)).filter(Boolean) as Member[];
@@ -670,253 +864,439 @@ export const Companionship: React.FC = () => {
             </div>
           )}
 
-          {/* ABA 2: ASSISTENTE DE VÍNCULOS GEOGRÁFICOS */}
+          {/* ABA 2: ASSISTENTE DE VÍNCULOS / REVISAR SIMULAÇÃO */}
           {activeTab === 'assistant' && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-              {/* Painel Esquerdo: Lista de membros sem aliança */}
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm lg:col-span-1 flex flex-col max-h-[700px] overflow-hidden">
-                <div className="p-4 border-b border-gray-50 space-y-3">
-                  <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wider">Membros sem Aliança</h3>
-                  
-                  {/* Busca e Sexo */}
-                  <div className="space-y-2">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+            <div className="space-y-6 animate-in fade-in duration-300">
+              
+              {/* Barra de Ferramentas de Simulação (Simulador em Massa) */}
+              {!isSimulationMode ? (
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50/50 rounded-2xl border border-blue-100/50 p-6 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                  <div className="space-y-1">
+                    <h3 className="text-sm font-extrabold text-blue-900 flex items-center gap-2">
+                      <Sparkles className="h-5 w-5 text-indigo-600 animate-pulse" />
+                      Simulador Geográfico em Massa
+                    </h3>
+                    <p className="text-xs text-blue-700 leading-relaxed max-w-xl">
+                      Deseja que o sistema simule automaticamente o companheirismo de todos os <strong>{unlinkedMembers.length} membros sem aliança</strong> de uma só vez baseando-se nas distâncias geográficas residenciais?
+                    </p>
+                  </div>
+
+                  {/* Parâmetros e Gatilho */}
+                  <div className="flex flex-wrap items-center gap-4">
+                    <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-gray-100 shadow-sm text-xs font-semibold text-gray-700">
+                      <Sliders className="h-4 w-4 text-gray-400" />
+                      Limite: 
                       <input
-                        type="text"
-                        placeholder="Buscar por nome ou bairro..."
-                        className="block w-full rounded-lg border-0 py-2 pl-10 pr-3 text-gray-900 ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-1 focus:ring-blue-600 sm:text-xs"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                      />
+                        type="number"
+                        className="w-12 text-center text-blue-600 bg-gray-50 border-0 p-0 font-bold focus:ring-0 focus:outline-none"
+                        value={simMaxDistance}
+                        onChange={(e) => setSimMaxDistance(Math.max(1, parseInt(e.target.value) || 1))}
+                      /> km
                     </div>
-                    
-                    {/* Filtro Sexo */}
-                    <div className="flex gap-1.5">
-                      {(['Todos', 'Masculino', 'Feminino'] as const).map((s) => (
+
+                    <label className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-gray-100 shadow-sm text-xs font-semibold text-gray-700 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={simAllowTrios}
+                        onChange={(e) => setSimAllowTrios(e.target.checked)}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      Permitir Trios
+                    </label>
+
+                    <button
+                      onClick={handleGenerateSimulation}
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2 rounded-xl text-xs flex items-center gap-2 shadow hover:shadow-md transition-all active:scale-95"
+                    >
+                      <Play className="h-4 w-4 shrink-0 fill-current" /> Rodar Simulador
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* Controles do Modo Simulação Ativo */
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="space-y-0.5">
+                    <h3 className="text-sm font-extrabold text-amber-900 flex items-center gap-2">
+                      <RefreshCw className="h-4 w-4 text-amber-600 animate-spin" style={{ animationDuration: '4s' }} />
+                      Revisando Proposta Geográfica Simula
+                    </h3>
+                    <p className="text-xs text-amber-800">
+                      As duplas e trios abaixo foram calculados e propostos. Revise e clique em <strong>Efetivar</strong> para criar as alianças ou em <strong>Descartar</strong> para voltar.
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleApplySimulation}
+                      className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-5 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow"
+                    >
+                      <CheckCircle2 className="h-4.5 w-4.5" /> Efetivar {simulatedMatches.length} Alianças
+                    </button>
+                    <button
+                      onClick={handleDiscardSimulation}
+                      className="bg-white hover:bg-gray-100 text-gray-700 border border-gray-200 px-5 py-2 rounded-xl text-xs font-bold"
+                    >
+                      Descartar Proposta
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* LISTAGEM PRINCIPAL DO ASSISTENTE / SIMULADOR */}
+              {!isSimulationMode ? (
+                /* Grid clássico do Assistente Geográfico Manual */
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+                  {/* Painel Esquerdo: Lista de membros sem aliança */}
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm lg:col-span-1 flex flex-col max-h-[700px] overflow-hidden">
+                    <div className="p-4 border-b border-gray-50 space-y-3">
+                      <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wider">Membros sem Aliança</h3>
+                      
+                      {/* Busca e Sexo */}
+                      <div className="space-y-2">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                          <input
+                            type="text"
+                            placeholder="Buscar por nome ou bairro..."
+                            className="block w-full rounded-lg border-0 py-2 pl-10 pr-3 text-gray-900 ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-1 focus:ring-blue-600 sm:text-xs"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                          />
+                        </div>
+                        
+                        {/* Filtro Sexo */}
+                        <div className="flex gap-1.5">
+                          {(['Todos', 'Masculino', 'Feminino'] as const).map((s) => (
+                            <button
+                              key={s}
+                              onClick={() => setSexFilter(s)}
+                              className={clsx(
+                                sexFilter === s ? 'bg-blue-50 text-blue-700 border-blue-200 font-semibold' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50',
+                                'flex-1 text-[10px] border rounded-md py-1 text-center transition-all'
+                              )}
+                            >
+                              {s === 'Todos' ? 'Ambos' : s === 'Masculino' ? 'Homens' : 'Mulheres'}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Lista */}
+                    <div className="overflow-y-auto divide-y divide-gray-50 p-2 space-y-1">
+                      {filteredUnlinked.map((m) => (
                         <button
-                          key={s}
-                          onClick={() => setSexFilter(s)}
+                          key={m.id}
+                          onClick={() => {
+                            setSelectedMember(m);
+                            setTrioSecondMember(null);
+                          }}
                           className={clsx(
-                            sexFilter === s ? 'bg-blue-50 text-blue-700 border-blue-200 font-semibold' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50',
-                            'flex-1 text-[10px] border rounded-md py-1 text-center transition-all'
+                            selectedMember?.id === m.id ? 'bg-blue-50/50 border-blue-200 shadow-sm' : 'border-transparent hover:bg-gray-50',
+                            'w-full text-left p-3 rounded-xl border flex items-center gap-3 transition-all'
                           )}
                         >
-                          {s === 'Todos' ? 'Ambos' : s === 'Masculino' ? 'Homens' : 'Mulheres'}
+                          <div className="h-10 w-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-sm">
+                            {m.foto ? <img src={m.foto} alt={m.nome} className="h-10 w-10 rounded-full object-cover" /> : m.nome.charAt(0)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs font-bold text-gray-900 truncate">{m.nome}</div>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className={clsx(
+                                m.sexo === 'Masculino' ? 'bg-blue-50 text-blue-700' : 'bg-pink-50 text-pink-700',
+                                'text-[9px] font-bold px-1.5 py-0.5 rounded-full'
+                              )}>
+                                {m.sexo === 'Masculino' ? 'H' : 'M'}
+                              </span>
+                              <span className="text-[9px] text-gray-400 font-semibold uppercase">{m.tipo_de_pessoa}</span>
+                            </div>
+                            <span className="text-[9px] text-gray-500 font-medium truncate block mt-0.5">📍 Bairro: {m.bairro || 'Não informado'}</span>
+                          </div>
                         </button>
                       ))}
+
+                      {filteredUnlinked.length === 0 && (
+                        <div className="text-center py-12 text-gray-400 text-xs italic">Nenhum membro pendente encontrado.</div>
+                      )}
                     </div>
                   </div>
-                </div>
 
-                {/* Lista */}
-                <div className="overflow-y-auto divide-y divide-gray-50 p-2 space-y-1">
-                  {filteredUnlinked.map((m) => (
-                    <button
-                      key={m.id}
-                      onClick={() => {
-                        setSelectedMember(m);
-                        setTrioSecondMember(null);
-                      }}
-                      className={clsx(
-                        selectedMember?.id === m.id ? 'bg-blue-50/50 border-blue-200 shadow-sm' : 'border-transparent hover:bg-gray-50',
-                        'w-full text-left p-3 rounded-xl border flex items-center gap-3 transition-all'
-                      )}
-                    >
-                      <div className="h-10 w-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-sm">
-                        {m.foto ? <img src={m.foto} alt={m.nome} className="h-10 w-10 rounded-full object-cover" /> : m.nome.charAt(0)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-xs font-bold text-gray-900 truncate">{m.nome}</div>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className={clsx(
-                            m.sexo === 'Masculino' ? 'bg-blue-50 text-blue-700' : 'bg-pink-50 text-pink-700',
-                            'text-[9px] font-bold px-1.5 py-0.5 rounded-full'
-                          )}>
-                            {m.sexo === 'Masculino' ? 'H' : 'M'}
-                          </span>
-                          <span className="text-[9px] text-gray-400 font-semibold uppercase">{m.tipo_de_pessoa}</span>
-                        </div>
-                        <span className="text-[9px] text-gray-500 font-medium truncate block mt-0.5">📍 Bairro: {m.bairro || 'Não informado'}</span>
-                      </div>
-                    </button>
-                  ))}
-
-                  {filteredUnlinked.length === 0 && (
-                    <div className="text-center py-12 text-gray-400 text-xs italic">Nenhum membro pendente encontrado.</div>
-                  )}
-                </div>
-              </div>
-
-              {/* Painel Central e Direito: Sugestões e Mapa */}
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm lg:col-span-2 min-h-[400px] flex flex-col">
-                {selectedMember ? (
-                  <div className="p-6 space-y-6 flex-1 flex flex-col justify-between">
-                    <div>
-                      {/* Perfil Selecionado */}
-                      <div className="flex items-center gap-4 bg-gradient-to-r from-blue-50/50 to-indigo-50/30 p-4 rounded-2xl border border-blue-50/50">
-                        <div className="h-14 w-14 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xl font-bold border border-blue-200">
-                          {selectedMember.foto ? (
-                            <img src={selectedMember.foto} alt={selectedMember.nome} className="h-14 w-14 rounded-full object-cover" />
-                          ) : (
-                            selectedMember.nome.charAt(0)
-                          )}
-                        </div>
+                  {/* Painel Central e Direito: Sugestões e Mapa */}
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm lg:col-span-2 min-h-[400px] flex flex-col">
+                    {selectedMember ? (
+                      <div className="p-6 space-y-6 flex-1 flex flex-col justify-between">
                         <div>
-                          <h4 className="text-sm font-bold text-gray-900">{selectedMember.nome}</h4>
-                          <div className="text-xs text-gray-500 mt-1 flex flex-wrap gap-2">
-                            <span>Sexo: <strong>{selectedMember.sexo}</strong></span>
-                            <span>Bairro: <strong>{selectedMember.bairro || 'Sem Bairro'}</strong></span>
-                            <span>GC: <strong>{selectedMember.grupos_caseiros || 'Nenhum'}</strong></span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Motor Geográfico */}
-                      <div className="mt-6 space-y-4">
-                        <div className="flex items-center justify-between">
-                          <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
-                            <Compass className="h-4 w-4 text-blue-600 animate-spin" style={{ animationDuration: '6s' }} />
-                            Vizinhos Recomendados (Proximidade)
-                          </h4>
-                          <span className="text-[10px] text-gray-400 font-semibold italic">Apenas mesmo sexo sem aliança ativa</span>
-                        </div>
-
-                        {/* Tabela de Vizinhos Recomendados */}
-                        <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
-                          {getRecommendedNeighbors(selectedMember).slice(0, 5).map((candidate, idx) => {
-                            const isSelectedTrio = trioSecondMember?.id === candidate.id;
-                            
-                            // Badge de cores baseado na distância
-                            const dist = candidate.distance;
-                            const distanceBadge = 
-                              dist < 3 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                              dist < 8 ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                              dist < 15 ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                              'bg-red-50 text-red-700 border-red-200';
-                            
-                            const distLabel = 
-                              dist < 3 ? 'Extremamente Próximo' :
-                              dist < 8 ? 'Próximo' :
-                              dist < 15 ? 'Relativamente Próximo' :
-                              'Distante';
-
-                            return (
-                              <div
-                                key={candidate.id}
-                                className={clsx(
-                                  idx === 0 ? 'ring-1 ring-blue-500 bg-blue-50/10' : 'bg-gray-50/50',
-                                  'p-3 rounded-xl border border-gray-100 flex items-center justify-between gap-4 hover:bg-gray-50 transition-all'
-                                )}
-                              >
-                                <div className="flex items-center gap-3 min-w-0">
-                                  <div className="relative">
-                                    <div className="h-9 w-9 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs border">
-                                      {candidate.foto ? <img src={candidate.foto} alt={candidate.nome} className="h-9 w-9 rounded-full object-cover" /> : candidate.nome.charAt(0)}
-                                    </div>
-                                    {idx === 0 && (
-                                      <span className="absolute -top-1 -left-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[8px] font-bold text-white shadow animate-bounce">
-                                        1º
-                                      </span>
-                                    )}
-                                  </div>
-                                  
-                                  <div className="min-w-0">
-                                    <div className="text-xs font-bold text-gray-900 truncate">{candidate.nome}</div>
-                                    <div className="text-[10px] text-gray-500 truncate mt-0.5">📍 Bairro: {candidate.bairro || 'Sem Bairro'} • GC: {candidate.grupos_caseiros || 'Nenhum'}</div>
-                                  </div>
-                                </div>
-
-                                <div className="flex items-center gap-2 shrink-0">
-                                  {/* Badge da Distância */}
-                                  <div className={clsx(distanceBadge, 'text-right border px-2 py-0.5 rounded text-[10px] font-bold flex flex-col')}>
-                                    <span>{dist} km</span>
-                                    <span className="text-[8px] font-medium opacity-80">{distLabel}</span>
-                                  </div>
-
-                                  {/* Botão de Associação Rápida ou Trio */}
-                                  {idx === 0 ? (
-                                    <button
-                                      onClick={handleLinkMembers}
-                                      className="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors"
-                                      title="Vincular com o vizinho mais próximo recomendado!"
-                                    >
-                                      <Plus className="h-4 w-4" /> Vincular
-                                    </button>
-                                  ) : (
-                                    <button
-                                      onClick={() => handleManualLink(selectedMember.id, candidate.id)}
-                                      className="bg-white hover:bg-gray-100 text-gray-700 border border-gray-200 p-2 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors"
-                                      title="Vincular Manualmente"
-                                    >
-                                      Conectar
-                                    </button>
-                                  )}
-
-                                  {/* Botão para montar um Trio */}
-                                  <button
-                                    onClick={() => setTrioSecondMember(isSelectedTrio ? null : candidate)}
-                                    className={clsx(
-                                      isSelectedTrio ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-transparent',
-                                      'p-1.5 rounded-lg border text-[10px] font-bold transition-all'
-                                    )}
-                                    title="Incluir este membro no vínculo para formar um Trio"
-                                  >
-                                    {isSelectedTrio ? 'Remover do Trio' : '+ Trio'}
-                                  </button>
-                                </div>
+                          {/* Perfil Selecionado */}
+                          <div className="flex items-center gap-4 bg-gradient-to-r from-blue-50/50 to-indigo-50/30 p-4 rounded-2xl border border-blue-50/50">
+                            <div className="h-14 w-14 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xl font-bold border border-blue-200">
+                              {selectedMember.foto ? (
+                                <img src={selectedMember.foto} alt={selectedMember.nome} className="h-14 w-14 rounded-full object-cover" />
+                              ) : (
+                                selectedMember.nome.charAt(0)
+                              )}
+                            </div>
+                            <div>
+                              <h4 className="text-sm font-bold text-gray-900">{selectedMember.nome}</h4>
+                              <div className="text-xs text-gray-500 mt-1 flex flex-wrap gap-2">
+                                <span>Sexo: <strong>{selectedMember.sexo}</strong></span>
+                                <span>Bairro: <strong>{selectedMember.bairro || 'Sem Bairro'}</strong></span>
+                                <span>GC: <strong>{selectedMember.grupos_caseiros || 'Nenhum'}</strong></span>
                               </div>
-                            );
-                          })}
+                            </div>
+                          </div>
 
-                          {getRecommendedNeighbors(selectedMember).length === 0 && (
-                            <div className="text-center py-8 text-gray-400 text-xs italic">Não existem vizinhos cadastrados com coordenadas geográficas do mesmo sexo sem vínculo ativo.</div>
+                          {/* Motor Geográfico */}
+                          <div className="mt-6 space-y-4">
+                            <div className="flex items-center justify-between">
+                              <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
+                                <Compass className="h-4 w-4 text-blue-600 animate-spin" style={{ animationDuration: '6s' }} />
+                                Vizinhos Recomendados (Proximidade)
+                              </h4>
+                              <span className="text-[10px] text-gray-400 font-semibold italic">Apenas mesmo sexo sem aliança ativa</span>
+                            </div>
+
+                            {/* Tabela de Vizinhos Recomendados */}
+                            <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+                              {getRecommendedNeighbors(selectedMember).slice(0, 5).map((candidate, idx) => {
+                                const isSelectedTrio = trioSecondMember?.id === candidate.id;
+                                
+                                // Badge de cores baseado na distância
+                                const dist = candidate.distance;
+                                const distanceBadge = 
+                                  dist < 3 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                  dist < 8 ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                  dist < 15 ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                  'bg-red-50 text-red-700 border-red-200';
+                                
+                                const distLabel = 
+                                  dist < 3 ? 'Extremamente Próximo' :
+                                  dist < 8 ? 'Próximo' :
+                                  dist < 15 ? 'Relativamente Próximo' :
+                                  'Distante';
+
+                                return (
+                                  <div
+                                    key={candidate.id}
+                                    className={clsx(
+                                      idx === 0 ? 'ring-1 ring-blue-500 bg-blue-50/10' : 'bg-gray-50/50',
+                                      'p-3 rounded-xl border border-gray-100 flex items-center justify-between gap-4 hover:bg-gray-50 transition-all'
+                                    )}
+                                  >
+                                    <div className="flex items-center gap-3 min-w-0">
+                                      <div className="relative">
+                                        <div className="h-9 w-9 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs border">
+                                          {candidate.foto ? <img src={candidate.foto} alt={candidate.nome} className="h-9 w-9 rounded-full object-cover" /> : candidate.nome.charAt(0)}
+                                        </div>
+                                        {idx === 0 && (
+                                          <span className="absolute -top-1 -left-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[8px] font-bold text-white shadow animate-bounce">
+                                            1º
+                                          </span>
+                                        )}
+                                      </div>
+                                      
+                                      <div className="min-w-0">
+                                        <div className="text-xs font-bold text-gray-900 truncate">{candidate.nome}</div>
+                                        <div className="text-[10px] text-gray-500 truncate mt-0.5">📍 Bairro: {candidate.bairro || 'Sem Bairro'} • GC: {candidate.grupos_caseiros || 'Nenhum'}</div>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      {/* Badge da Distância */}
+                                      <div className={clsx(distanceBadge, 'text-right border px-2 py-0.5 rounded text-[10px] font-bold flex flex-col')}>
+                                        <span>{dist} km</span>
+                                        <span className="text-[8px] font-medium opacity-80">{distLabel}</span>
+                                      </div>
+
+                                      {/* Botão de Associação Rápida ou Trio */}
+                                      {idx === 0 ? (
+                                        <button
+                                          onClick={handleLinkMembers}
+                                          className="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors"
+                                          title="Vincular com o vizinho mais próximo recomendado!"
+                                        >
+                                          <Plus className="h-4 w-4" /> Vincular
+                                        </button>
+                                      ) : (
+                                        <button
+                                          onClick={() => handleManualLink(selectedMember.id, candidate.id)}
+                                          className="bg-white hover:bg-gray-100 text-gray-700 border border-gray-200 p-2 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors"
+                                          title="Vincular Manualmente"
+                                        >
+                                          Conectar
+                                        </button>
+                                      )}
+
+                                      {/* Botão para montar um Trio */}
+                                      <button
+                                        onClick={() => setTrioSecondMember(isSelectedTrio ? null : candidate)}
+                                        className={clsx(
+                                          isSelectedTrio ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-transparent',
+                                          'p-1.5 rounded-lg border text-[10px] font-bold transition-all'
+                                        )}
+                                        title="Incluir este membro no vínculo para formar um Trio"
+                                      >
+                                        {isSelectedTrio ? 'Remover do Trio' : '+ Trio'}
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+
+                              {getRecommendedNeighbors(selectedMember).length === 0 && (
+                                <div className="text-center py-8 text-gray-400 text-xs italic">Não existem vizinhos cadastrados com coordenadas geográficas do mesmo sexo sem vínculo ativo.</div>
+                              )}
+                            </div>
+                          </div>
+
+                          {trioSecondMember && (
+                            <div className="mt-4 bg-indigo-50/50 border border-indigo-100 rounded-xl p-3 flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[9px] font-bold text-indigo-700 bg-indigo-100 rounded-full px-2 py-0.5 uppercase">Trio Ativado</span>
+                                <span className="text-xs font-bold text-gray-700">Companheiro Adicional: {trioSecondMember.nome}</span>
+                              </div>
+                              <button
+                                onClick={() => setTrioSecondMember(null)}
+                                className="text-xs font-semibold text-red-600 hover:text-red-700"
+                              >
+                                Cancelar Trio
+                              </button>
+                            </div>
                           )}
                         </div>
-                      </div>
 
-                      {/* Visualizador de Trio Ativado */}
-                      {trioSecondMember && (
-                        <div className="mt-4 bg-indigo-50/50 border border-indigo-100 rounded-xl p-3 flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[9px] font-bold text-indigo-700 bg-indigo-100 rounded-full px-2 py-0.5 uppercase">Trio Ativado</span>
-                            <span className="text-xs font-bold text-gray-700">Companheiro Adicional: {trioSecondMember.nome}</span>
-                          </div>
+                        {/* Botão de Criação de Covenants */}
+                        <div className="p-4 bg-gray-50 border-t border-gray-100 rounded-b-2xl flex justify-between items-center">
+                          <span className="text-[10px] text-gray-400 font-semibold italic">Todos os vínculos começam no status "Em Oração"</span>
                           <button
-                            onClick={() => setTrioSecondMember(null)}
-                            className="text-xs font-semibold text-red-600 hover:text-red-700"
+                            onClick={handleLinkMembers}
+                            disabled={isSaving}
+                            className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold px-6 py-2.5 rounded-xl shadow hover:shadow-md hover:from-blue-700 hover:to-indigo-700 transition-all flex items-center gap-2 text-xs"
                           >
-                            Cancelar Trio
+                            {isSaving ? 'Gravando...' : 'Iniciar Aliança de Companheirismo'}
+                            <ArrowRight className="h-4 w-4" />
                           </button>
                         </div>
-                      )}
+                      </div>
+                    ) : (
+                      <div className="flex-1 flex flex-col items-center justify-center p-12 text-center text-gray-400 space-y-4">
+                        <div className="h-16 w-16 rounded-full bg-gray-50 flex items-center justify-center text-gray-300">
+                          <Compass className="h-8 w-8" />
+                        </div>
+                        <div className="space-y-1">
+                          <h3 className="text-sm font-bold text-gray-700">Assistente de Conexão Inteligente</h3>
+                          <p className="text-xs text-gray-400 max-w-sm">Selecione um irmão ou irmã na lista à esquerda para carregar o motor geográfico e visualizar os vizinhos de residência mais próximos para recomendação.</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                /* MODO SIMULAÇÃO EM ANDAMENTO: LISTAGEM DE DUPLAS E ÓRFÃOS */
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start animate-in fade-in duration-300">
+                  
+                  {/* Coluna Esquerda & Central: Grade de Duplas/Trios Propostos */}
+                  <div className="lg:col-span-2 space-y-4">
+                    <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5 mb-2">
+                      <Sparkles className="h-4 w-4 text-amber-600" /> Vínculos Propostos ({simulatedMatches.length})
+                    </h4>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[600px] overflow-y-auto pr-1">
+                      {simulatedMatches.map((sm, idx) => {
+                        const smMembers = sm.memberIds.map(id => members.find(m => m.id === id)).filter(Boolean) as Member[];
+                        if (smMembers.length < 2) return null;
+                        
+                        const m1 = smMembers[0];
+                        const m2 = smMembers[1];
+                        const m3 = smMembers[2];
+
+                        return (
+                          <div key={idx} className="bg-white rounded-xl border border-gray-150 p-4 shadow-sm space-y-3 relative hover:border-amber-400 transition-all flex flex-col justify-between">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-100 rounded-full px-2 py-0.5">
+                                {m3 ? 'Trio Proposto' : 'Dupla Proposta'}
+                              </span>
+                              <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                <MapPin className="h-3 w-3" /> {sm.distance} km
+                              </span>
+                            </div>
+
+                            {/* Detalhe Membros */}
+                            <div className="grid grid-cols-3 gap-2 items-center py-2 bg-gray-50/50 rounded-lg p-2">
+                              {/* Membro 1 */}
+                              <div className="text-center">
+                                <div className="h-8 w-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs mx-auto">
+                                  {m1.nome.charAt(0)}
+                                </div>
+                                <div className="text-[10px] font-bold text-gray-800 truncate mt-1">{m1.nome.split(' ')[0]}</div>
+                                <div className="text-[8px] text-gray-400 font-medium truncate">{m1.bairro || 'Sem Bairro'}</div>
+                              </div>
+                              {/* Handshake */}
+                              <div className="text-center text-gray-300">
+                                <Handshake className="h-5 w-5 mx-auto" />
+                              </div>
+                              {/* Membro 2 */}
+                              <div className="text-center">
+                                <div className="h-8 w-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs mx-auto">
+                                  {m2.nome.charAt(0)}
+                                </div>
+                                <div className="text-[10px] font-bold text-gray-800 truncate mt-1">{m2.nome.split(' ')[0]}</div>
+                                <div className="text-[8px] text-gray-400 font-medium truncate">{m2.bairro || 'Sem Bairro'}</div>
+                              </div>
+
+                              {/* Membro 3 (trio) */}
+                              {m3 && (
+                                <div className="col-span-3 border-t border-dashed border-gray-150 pt-2 flex items-center justify-center gap-2 text-center">
+                                  <div className="h-6 w-6 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-[10px]">
+                                    {m3.nome.charAt(0)}
+                                  </div>
+                                  <div className="text-[10px] font-bold text-gray-800 truncate">{m3.nome.split(' ')[0]}</div>
+                                  <div className="text-[8px] text-gray-400 font-medium bg-gray-100 px-1 rounded">{m3.bairro || 'Sem Bairro'}</div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Coluna Direita: Membros que restaram órfãos na simulação */}
+                  <div className="bg-white rounded-2xl border border-gray-150 p-5 shadow-sm lg:col-span-1 flex flex-col max-h-[600px] overflow-hidden">
+                    <div className="space-y-1 mb-4">
+                      <h4 className="text-xs font-bold text-red-700 uppercase tracking-wider flex items-center gap-1.5">
+                        <AlertTriangle className="h-4.5 w-4.5 text-red-500" /> Órfãos na Simulação ({simulatedUnmatched.length})
+                      </h4>
+                      <p className="text-[10px] text-gray-500">
+                        Estes membros excedem o limite de {simMaxDistance}km de distância para vizinhos de mesmo sexo ou não possuem coordenadas cadastradas.
+                      </p>
                     </div>
 
-                    {/* Botão de Criação de Covenants */}
-                    <div className="p-4 bg-gray-50 border-t border-gray-100 rounded-b-2xl flex justify-between items-center">
-                      <span className="text-[10px] text-gray-400 font-semibold italic">Todos os vínculos começam no status "Em Oração"</span>
-                      <button
-                        onClick={handleLinkMembers}
-                        disabled={isSaving}
-                        className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold px-6 py-2.5 rounded-xl shadow hover:shadow-md hover:from-blue-700 hover:to-indigo-700 transition-all flex items-center gap-2 text-xs"
-                      >
-                        {isSaving ? 'Gravando...' : 'Iniciar Aliança de Companheirismo'}
-                        <ArrowRight className="h-4 w-4" />
-                      </button>
+                    <div className="overflow-y-auto divide-y divide-gray-50 space-y-1">
+                      {simulatedUnmatched.map(id => {
+                        const m = members.find(member => member.id === id);
+                        if (!m) return null;
+                        return (
+                          <div key={id} className="p-3 bg-gray-50 rounded-xl flex items-center gap-3 border border-gray-100">
+                            <div className="h-8 w-8 rounded-full bg-red-50 text-red-600 flex items-center justify-center font-bold text-xs shrink-0">
+                              {m.nome.charAt(0)}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-xs font-bold text-gray-900 truncate">{m.nome}</div>
+                              <div className="text-[9px] text-gray-500 truncate mt-0.5">
+                                Sexo: {m.sexo} • Bairro: {m.bairro || 'Sem Coordenadas 📍'}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {simulatedUnmatched.length === 0 && (
+                        <div className="text-center py-12 text-gray-400 text-xs italic">Nenhum membro órfão! Todos foram pareados perfeitamente.</div>
+                      )}
                     </div>
                   </div>
-                ) : (
-                  <div className="flex-1 flex flex-col items-center justify-center p-12 text-center text-gray-400 space-y-4">
-                    <div className="h-16 w-16 rounded-full bg-gray-50 flex items-center justify-center text-gray-300">
-                      <Compass className="h-8 w-8" />
-                    </div>
-                    <div className="space-y-1">
-                      <h3 className="text-sm font-bold text-gray-700">Assistente de Conexão Inteligente</h3>
-                      <p className="text-xs text-gray-400 max-w-sm">Selecione um irmão ou irmã na lista à esquerda para carregar o motor geográfico e visualizar os vizinhos de residência mais próximos para recomendação.</p>
-                    </div>
-                  </div>
-                )}
-              </div>
+
+                </div>
+              )}
+
             </div>
           )}
 
