@@ -29,13 +29,32 @@ const memberIcon = new L.Icon({
   shadowSize: [41, 41]
 });
 
+const disciplerIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+
+const isolatedIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+
+
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { 
-  Users, Home, Play, RotateCcw, Save, ArrowRight, ArrowLeft,
+  Users, Home, Play, RotateCcw, ArrowRight, ArrowLeft,
   Search, ShieldAlert, CheckCircle2, Download, Filter,
-  BookOpen, Network, TrendingUp, AlertTriangle, Brain, MapPin,
-  ChevronDown, ChevronUp, UserCheck, Eye, EyeOff, Heart, Plus, X, PlusCircle, Zap, Lightbulb
+  Network, TrendingUp, AlertTriangle, Brain, MapPin,
+  ChevronDown, ChevronUp, UserCheck, Eye, EyeOff, Plus, X, PlusCircle, Zap, Lightbulb
 } from 'lucide-react';
 import clsx from 'clsx';
 import { 
@@ -43,14 +62,12 @@ import {
   regionCoordinates, 
   calculateAge, 
   normalizeName, 
-  normalizePhone, 
-  normalizeAddress, 
   getAdministrativeRegion, 
   getGCRegion,
   getFallbackRegion
 } from '../lib/geoUtils';
 import { useFamilyEngine } from '../hooks/useFamilyEngine';
-import type { Member, Cell, DiscipleshipLink, Family } from '../hooks/useFamilyEngine';
+import type { Member, Cell, DiscipleshipLink } from '../hooks/useFamilyEngine';
 
 // Componente auxiliar para alterar dinamicamente o centro e zoom do mapa Leaflet
 const ChangeMapView: React.FC<{ center: [number, number]; zoom: number }> = ({ center, zoom }) => {
@@ -95,7 +112,7 @@ const renderBairroTag = (m: Member, activeCell: Cell | undefined, allCells?: Cel
 
 
 export const Simulations: React.FC = () => {
-  const { user } = useAuth();
+  useAuth();
   const [activeTab, setActiveTab] = useState<'gc' | 'discipleship'>('gc');
   const [isMapExpanded, setIsMapExpanded] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
@@ -107,6 +124,12 @@ export const Simulations: React.FC = () => {
   
   // Baseline (to compare)
   const [baselineMembers, setBaselineMembers] = useState<Member[]>([]);
+  const [baselineLinks, setBaselineLinks] = useState<DiscipleshipLink[]>([]);
+
+  // Discipleship Audit collapsible states
+  const [isDiscAuditIsolatedExpanded, setIsDiscAuditIsolatedExpanded] = useState(true);
+  const [isDiscAuditOverloadedExpanded, setIsDiscAuditOverloadedExpanded] = useState(false);
+  const [isDiscAuditDisplacedExpanded, setIsDiscAuditDisplacedExpanded] = useState(false);
   
   // Selection State
   const [selectedSource, setSelectedSource] = useState<string>('');
@@ -131,8 +154,8 @@ export const Simulations: React.FC = () => {
     }
   };
 
-  const handleLocalizeMember = (memberId: string) => {
-    const member = draftMembers.find(m => m.id === memberId);
+  const handleLocalizeMember = (memberId: number | string) => {
+    const member = draftMembers.find(m => m.id === Number(memberId));
     if (member && member.latitude && member.longitude) {
       setIsMapExpanded(true);
       setMapCenter([member.latitude, member.longitude]);
@@ -158,6 +181,7 @@ export const Simulations: React.FC = () => {
 
   // Expandable state for Territorial Insights panel
   const [isTerritorialInsightsExpanded, setIsTerritorialInsightsExpanded] = useState(true);
+  const [isDiscipleshipInsightsExpanded, setIsDiscipleshipInsightsExpanded] = useState(true);
 
   // States for creating a custom draft cell
   const [isCreateCellOpen, setIsCreateCellOpen] = useState(false);
@@ -242,7 +266,10 @@ export const Simulations: React.FC = () => {
         setBaselineMembers(parsedMembers.map(m => ({ ...m })));
       }
       if (cellsRes.data) setDraftCells(cellsRes.data);
-      if (discRes.data) setDraftLinks(discRes.data);
+      if (discRes.data) {
+        setDraftLinks(discRes.data);
+        setBaselineLinks(discRes.data.map((l: any) => ({ ...l })));
+      }
       
     } catch (err) {
       console.error('Error loading simulation data:', err);
@@ -573,68 +600,142 @@ export const Simulations: React.FC = () => {
   const [proverComplete, setProverComplete] = useState(false);
 
   // Conselheiro de Expansão (IA de Expansão) Calculations
-  const expansionRecommendations = useMemo(() => {
-    const alerts: { type: 'danger' | 'warning' | 'info'; text: string }[] = [];
-    const suggestions: string[] = [];
-
-    // Analyze cell sizes
-    draftCells.forEach(c => {
-      const count = draftMembers.filter(m => m.grupos_caseiros === c.grupo_caseiro && m.status === 'Ativo').length;
-      if (count > 25) {
-        alerts.push({
-          type: 'danger',
-          text: `Crítico: Célula "${c.grupo_caseiro}" está superlotada com ${count} membros. Risco de enfraquecimento de pastoreio em 2 meses!`
-        });
-      } else if (count > 15) {
-        alerts.push({
-          type: 'warning',
-          text: `Alerta: Célula "${c.grupo_caseiro}" tem ${count} membros. Risco de saturação em 4-6 meses (Projeção: ${Math.round(count * 1.25)} membros).`
-        });
-      }
-    });
-
-    // Detect displaced clusters for smart suggestions
-    draftCells.forEach(c => {
-      const cellRegion = getGCRegion(c.grupo_caseiro);
-      const members = draftMembers.filter(m => m.grupos_caseiros === c.grupo_caseiro && m.status === 'Ativo');
-      
-      const regionCounts: Record<string, number> = {};
-      members.forEach(m => {
-        const mRegion = getAdministrativeRegion(m.bairro || '');
-        if (mRegion !== cellRegion && mRegion !== 'OUTRO') {
-          regionCounts[mRegion] = (regionCounts[mRegion] || 0) + 1;
-        }
-      });
-
-      Object.entries(regionCounts).forEach(([region, count]) => {
-        if (count >= 3) {
-          const matchingLocalCell = draftCells.find(x => getGCRegion(x.grupo_caseiro) === region);
-          if (matchingLocalCell) {
-            suggestions.push(
-              `Mover as ${count} pessoas que moram em ${region} do "${c.grupo_caseiro}" para a célula local "${matchingLocalCell.grupo_caseiro}" liderada por ${matchingLocalCell.lider}.`
-            );
-          } else {
-            suggestions.push(
-              `Plantar um novo GC Rascunho em ${region} para acolher as ${count} pessoas deslocadas que hoje frequentam o "${c.grupo_caseiro}".`
-            );
-          }
-        }
-      });
-    });
-
-    if (alerts.length === 0) {
-      alerts.push({
-        type: 'info',
-        text: 'Crescimento Sustentável: Todas as células estão operando dentro do limite saudável de tamanho!'
-      });
-    }
-
-    return { alerts, suggestions };
-  }, [draftCells, draftMembers]);
+  // const expansionRecommendations = useMemo(() => {
+  //   const alerts: { type: 'danger' | 'warning' | 'info'; text: string }[] = [];
+  //   const suggestions: string[] = [];
+  // 
+  //   // Analyze cell sizes
+  //   draftCells.forEach(c => {
+  //     const count = draftMembers.filter(m => m.grupos_caseiros === c.grupo_caseiro && m.status === 'Ativo').length;
+  //     if (count > 25) {
+  //       alerts.push({
+  //         type: 'danger',
+  //         text: `Crítico: Célula "${c.grupo_caseiro}" está superlotada com ${count} membros. Risco de enfraquecimento de pastoreio em 2 meses!`
+  //       });
+  //     } else if (count > 15) {
+  //       alerts.push({
+  //         type: 'warning',
+  //         text: `Alerta: Célula "${c.grupo_caseiro}" tem ${count} membros. Risco de saturação em 4-6 meses (Projeção: ${Math.round(count * 1.25)} membros).`
+  //       });
+  //     }
+  //   });
+  // 
+  //   // Detect displaced clusters for smart suggestions
+  //   draftCells.forEach(c => {
+  //     const cellRegion = getGCRegion(c.grupo_caseiro);
+  //     const members = draftMembers.filter(m => m.grupos_caseiros === c.grupo_caseiro && m.status === 'Ativo');
+  //     
+  //     const regionCounts: Record<string, number> = {};
+  //     members.forEach(m => {
+  //       const mRegion = getAdministrativeRegion(m.bairro || '');
+  //       if (mRegion !== cellRegion && mRegion !== 'OUTRO') {
+  //         regionCounts[mRegion] = (regionCounts[mRegion] || 0) + 1;
+  //       }
+  //     });
+  // 
+  //     Object.entries(regionCounts).forEach(([region, count]) => {
+  //       if (count >= 3) {
+  //         const matchingLocalCell = draftCells.find(x => getGCRegion(x.grupo_caseiro) === region);
+  //         if (matchingLocalCell) {
+  //           suggestions.push(
+  //             `Mover as ${count} pessoas que moram em ${region} do "${c.grupo_caseiro}" para a célula local "${matchingLocalCell.grupo_caseiro}" liderada por ${matchingLocalCell.lider}.`
+  //           );
+  //         } else {
+  //           suggestions.push(
+  //             `Plantar um novo GC Rascunho em ${region} para acolher as ${count} pessoas deslocadas que hoje frequentam o "${c.grupo_caseiro}".`
+  //           );
+  //         }
+  //       }
+  //     });
+  //   });
+  // 
+  //   if (alerts.length === 0) {
+  //     alerts.push({
+  //       type: 'info',
+  //       text: 'Crescimento Sustentável: Todas as células estão operando dentro do limite saudável de tamanho!'
+  //     });
+  //   }
+  // 
+  //   return { alerts, suggestions };
+  // }, [draftCells, draftMembers]);
 
 
 
   const handleSaveModel = () => {
+    if (activeTab === 'discipleship') {
+      if (discipleshipImpactStats.changes === 0) {
+        alert("Nenhum novo vínculo ou alteração de discipulado foi simulado ainda.");
+        return;
+      }
+      
+      const today = new Date().toLocaleDateString('pt-BR');
+      let report = `====================================================\n`;
+      report += `     BSB CHURCH - PLANO DE REDE DE DISCIPULADO\n`;
+      report += `          GERADO VIA LABORATÓRIO DE ESTRUTURA\n`;
+      report += `====================================================\n`;
+      report += `⚠️ IMPORTANTE: Este plano é 100% SIMULADO (Sandbox).\n`;
+      report += `Nenhuma alteração foi realizada no banco de dados real.\n`;
+      report += `As alterações oficiais de vínculos devem ser feitas\n`;
+      report += `manualmente dentro do sistema oficial PROVER.\n`;
+      report += `====================================================\n\n`;
+      report += `Data de Planejamento: ${today}\n`;
+      report += `Total de Novos Vínculos Simulados: ${discipleshipImpactStats.changes}\n\n`;
+
+      report += `----------------------------------------------------\n`;
+      report += `1. DETALHE DOS NOVOS VÍNCULOS (DE ➔ PARA)\n`;
+      report += `----------------------------------------------------\n`;
+      discipleshipImpactStats.movedLinks.forEach((ml, idx) => {
+        report += `${idx + 1}. Discípulo: ${ml.discipulo}\n`;
+        report += `   🔴 De: ${ml.de}\n`;
+        report += `   🟢 Para: ${ml.para}\n\n`;
+      });
+
+      report += `----------------------------------------------------\n`;
+      report += `2. RESUMO COMPLETO DAS REDES DE DISCIPULADO\n`;
+      report += `----------------------------------------------------\n`;
+      
+      // Group disciples by their discipler in draftLinks
+      const disciplesByDiscipler: Record<string, string[]> = {};
+      draftLinks.forEach(link => {
+        if (!disciplesByDiscipler[link.discipulador]) {
+          disciplesByDiscipler[link.discipulador] = [];
+        }
+        disciplesByDiscipler[link.discipulador].push(link.discipulo);
+      });
+
+      Object.entries(disciplesByDiscipler).forEach(([discipler, disciples]) => {
+        report += `👑 Discipulador: ${discipler}\n`;
+        report += `   📊 Total de Discípulos: ${disciples.length}\n`;
+        report += `   👥 Discípulos:\n`;
+        disciples.forEach(d => {
+          report += `     - ${d}\n`;
+        });
+        report += `\n`;
+      });
+
+      report += `====================================================\n`;
+      report += `3. ASSINATURA E APROVAÇÃO\n`;
+      report += `====================================================\n`;
+      report += `Aprovado por: _____________________________________\n`;
+      report += `Data da Aprovação: ____/____/________\n\n`;
+      report += `⚠️ Lembrete: Efetivar vínculos manualmente no PROVER.\n`;
+      report += `Gerado no Simulador BSB Church.\n`;
+
+      // Download the report as a .txt file
+      const blob = new Blob([report], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `BSB_Church_Rede_Discipulado_${today.replace(/\//g, '-')}.txt`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      alert("🎉 Plano de Rede de Discipulado exportado com sucesso!\n\nLembre-se: Este é um plano simulado. Para que esses novos vínculos se tornem oficiais, você deve realizá-las manualmente dentro do sistema oficial PROVER.");
+      return;
+    }
+
     if (impactStats.changes === 0) {
       alert("Nenhuma transferência ou mudança foi simulada ainda.");
       return;
@@ -724,6 +825,7 @@ export const Simulations: React.FC = () => {
   const resetSimulation = () => {
     if (confirm('Deseja descartar todas as alterações da simulação e voltar aos dados reais?')) {
       setDraftMembers(baselineMembers.map(m => ({ ...m })));
+      setDraftLinks(baselineLinks.map(l => ({ ...l })));
       setSelectedMembers([]);
       setSelectedTargetMembers([]);
     }
@@ -875,7 +977,7 @@ export const Simulations: React.FC = () => {
     if (!selectedTarget) return null;
     
     // Real members in target (drawn from baseline)
-    const baselineInTarget = baselineMembers.filter(m => m.grupos_caseiros === selectedTarget && m.status === 'Ativo');
+    // const baselineInTarget = baselineMembers.filter(m => m.grupos_caseiros === selectedTarget && m.status === 'Ativo');
     
     // Simulated members currently in target (drawn from draftMembers)
     const currentDraftTarget = draftMembers.filter(m => m.grupos_caseiros === selectedTarget && m.status === 'Ativo');
@@ -1353,6 +1455,161 @@ export const Simulations: React.FC = () => {
     return territorialInsights.insights.filter((insight: any) => !ignoredAlerts.includes(`${insight.type}_${insight.ra}`));
   }, [territorialInsights.insights, ignoredAlerts]);
 
+  const discipleshipAudit = useMemo(() => {
+    if (isLoading || draftMembers.length === 0) {
+      return { isolatedMembers: [], overloadedDisciplers: [], displacedDisciples: [] };
+    }
+
+    const activeMembersByName = new Map<string, Member>();
+    draftMembers.forEach(m => {
+      if (m.status === 'Ativo') {
+        activeMembersByName.set(m.nome, m);
+      }
+    });
+
+    const disciplesCountByDiscipler: Record<string, string[]> = {};
+    draftLinks.forEach(link => {
+      const dName = link.discipulador;
+      if (!disciplesCountByDiscipler[dName]) {
+        disciplesCountByDiscipler[dName] = [];
+      }
+      disciplesCountByDiscipler[dName].push(link.discipulo);
+    });
+
+    const overloadedDisciplers = Object.entries(disciplesCountByDiscipler)
+      .filter(([_, disciples]) => disciples.length > 5)
+      .map(([discipler, disciples]) => ({
+        name: discipler,
+        count: disciples.length,
+        disciples
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    const displacedDisciples: any[] = [];
+    draftLinks.forEach(link => {
+      const disciple = activeMembersByName.get(link.discipulo);
+      const discipler = activeMembersByName.get(link.discipulador);
+      if (disciple && discipler && disciple.latitude && disciple.longitude && discipler.latitude && discipler.longitude) {
+        const distStr = calculateDistance(discipler.latitude, discipler.longitude, disciple.latitude, disciple.longitude);
+        if (distStr) {
+          const distNum = parseFloat(distStr);
+          if (distNum > 8) {
+            displacedDisciples.push({
+              discipleName: link.discipulo,
+              discipleId: disciple.id,
+              discipleRA: getAdministrativeRegion(disciple.bairro),
+              disciplerName: link.discipulador,
+              disciplerId: discipler.id,
+              disciplerRA: getAdministrativeRegion(discipler.bairro),
+              distance: distNum
+            });
+          }
+        }
+      }
+    });
+    displacedDisciples.sort((a, b) => b.distance - a.distance);
+
+    const disciplesSet = new Set(draftLinks.map(l => l.discipulo));
+    const isolatedMembers: any[] = [];
+    draftMembers.forEach(m => {
+      if (m.status === 'Ativo' && !disciplesSet.has(m.nome)) {
+        const memberRA = getAdministrativeRegion(m.bairro);
+        
+        const recommendations: { name: string; count: number; distance: number | null }[] = [];
+        
+        activeMembersByName.forEach((otherMem, otherName) => {
+          if (otherName === m.nome) return;
+          const currentDisciplesCount = disciplesCountByDiscipler[otherName]?.length || 0;
+          if (currentDisciplesCount >= 5) return;
+
+          const otherRA = getAdministrativeRegion(otherMem.bairro);
+          if (otherRA === memberRA && memberRA !== 'NÃO INFORMADO') {
+            let distNum: number | null = null;
+            if (m.latitude && m.longitude && otherMem.latitude && otherMem.longitude) {
+              const distStr = calculateDistance(otherMem.latitude, otherMem.longitude, m.latitude!, m.longitude!);
+              distNum = distStr ? parseFloat(distStr) : null;
+            }
+            recommendations.push({
+              name: otherName,
+              count: currentDisciplesCount,
+              distance: distNum
+            });
+          }
+        });
+
+        recommendations.sort((a, b) => {
+          if (a.distance !== null && b.distance !== null) return a.distance - b.distance;
+          if (a.distance !== null) return -1;
+          if (b.distance !== null) return 1;
+          return b.count - a.count;
+        });
+
+        isolatedMembers.push({
+          id: m.id,
+          name: m.nome,
+          bairro: m.bairro || 'Não informado',
+          ra: memberRA,
+          recommendations: recommendations.slice(0, 3)
+        });
+      }
+    });
+
+    isolatedMembers.sort((a, b) => a.name.localeCompare(b.name));
+
+    return { isolatedMembers, overloadedDisciplers, displacedDisciples };
+  }, [isLoading, draftMembers, draftLinks]);
+
+  const activeIsolatedMembers = useMemo(() => {
+    return discipleshipAudit.isolatedMembers.filter(m => !ignoredAlerts.includes(`disc_isolated_${m.id}`));
+  }, [discipleshipAudit.isolatedMembers, ignoredAlerts]);
+
+  const activeOverloadedDisciplers = useMemo(() => {
+    return discipleshipAudit.overloadedDisciplers.filter(d => !ignoredAlerts.includes(`disc_overloaded_${d.name}`));
+  }, [discipleshipAudit.overloadedDisciplers, ignoredAlerts]);
+
+  const activeDisplacedDisciples = useMemo(() => {
+    return discipleshipAudit.displacedDisciples.filter(d => !ignoredAlerts.includes(`disc_displaced_${d.discipleId}`));
+  }, [discipleshipAudit.displacedDisciples, ignoredAlerts]);
+
+  const discipleshipImpactStats = useMemo(() => {
+    const movedLinks = draftLinks.filter(dl => {
+      const base = baselineLinks.find(bl => bl.discipulo === dl.discipulo);
+      return !base || base.discipulador !== dl.discipulador;
+    }).map(dl => {
+      const base = baselineLinks.find(bl => bl.discipulo === dl.discipulo);
+      return {
+        discipulo: dl.discipulo,
+        de: base ? base.discipulador : 'Sem Discipulador',
+        para: dl.discipulador
+      };
+    });
+
+    const changes = movedLinks.length;
+    return { changes, movedLinks };
+  }, [draftLinks, baselineLinks]);
+
+  const handleLinkDiscipleship = (discipleName: string, disciplerName: string) => {
+    setDraftLinks(prev => {
+      const exists = prev.some(l => l.discipulo === discipleName);
+      if (exists) {
+        return prev.map(l => l.discipulo === discipleName ? { ...l, discipulador: disciplerName } : l);
+      } else {
+        return [...prev, { discipulo: discipleName, discipulador: disciplerName }];
+      }
+    });
+  };
+
+  const handleTabChange = (tab: 'gc' | 'discipleship') => {
+    setActiveTab(tab);
+    setSelectedSource('');
+    setSelectedTarget('');
+    setSelectedMembers([]);
+    setSelectedTargetMembers([]);
+    if (tab === 'discipleship') {
+      setIsMapExpanded(true);
+    }
+  };
+
 
 
   if (isLoading) return <div className="flex h-96 items-center justify-center"><TrendingUp className="h-8 w-8 animate-spin text-primary-600" /></div>;
@@ -1378,7 +1635,7 @@ export const Simulations: React.FC = () => {
             <Download className="w-4 h-4" /> Salvar Modelo
           </button>
           <button 
-            disabled={impactStats.changes === 0}
+            disabled={activeTab === 'gc' ? impactStats.changes === 0 : discipleshipImpactStats.changes === 0}
             onClick={() => {
               setProverModalOpen(true);
               setProverLoadingStep(0);
@@ -1441,187 +1698,351 @@ export const Simulations: React.FC = () => {
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               />
               
-              {/* Draft Cell Pins (Red Markers) */}
-              {draftCells.filter(c => c.latitude && c.longitude).map(c => (
-                <React.Fragment key={c.id}>
-                  <Marker 
-                  position={[c.latitude!, c.longitude!]}
-                  icon={cellIcon}
-                >
-                  <Popup>
-                    <div className="p-2 text-xs w-64 max-h-[300px] overflow-y-auto scrollbar-thin">
-                      <div className="font-black text-gray-900 border-b pb-1 mb-1 flex items-center gap-1.5">
-                        <Home className="w-3.5 h-3.5 text-rose-500" />
-                        {c.grupo_caseiro}
-                      </div>
-                      <p><strong>Líder:</strong> {c.lider}</p>
-                      <p><strong>Setor:</strong> {c.setor}</p>
-                      <p className="text-[10px] text-indigo-500 font-bold mt-1">
-                        👥 Membros Simulados: {draftMembers.filter(m => m.grupos_caseiros === c.grupo_caseiro && m.status === 'Ativo').length}
-                      </p>
+              {/* GC Mode Layers */}
+              {activeTab === 'gc' && (
+                <>
+                  {/* Draft Cell Pins (Red Markers) */}
+                  {draftCells.filter(c => c.latitude && c.longitude).map(c => (
+                    <React.Fragment key={c.id}>
+                      <Marker 
+                        position={[c.latitude!, c.longitude!]}
+                        icon={cellIcon}
+                      >
+                        <Popup>
+                          <div className="p-2 text-xs w-64 max-h-[300px] overflow-y-auto scrollbar-thin">
+                            <div className="font-black text-gray-900 border-b pb-1 mb-1 flex items-center gap-1.5">
+                              <Home className="w-3.5 h-3.5 text-rose-500" />
+                              {c.grupo_caseiro}
+                            </div>
+                            <p><strong>Líder:</strong> {c.lider}</p>
+                            <p><strong>Setor:</strong> {c.setor}</p>
+                            <p className="text-[10px] text-indigo-500 font-bold mt-1">
+                              👥 Membros Simulados: {draftMembers.filter(m => m.grupos_caseiros === c.grupo_caseiro && m.status === 'Ativo').length}
+                            </p>
 
-                      <div className="mt-2 border-t pt-2">
-                        <button
-                          onClick={() => {
-                            setShowPopupMembersGC(showPopupMembersGC === c.grupo_caseiro ? null : c.grupo_caseiro);
-                          }}
-                          className="w-full py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-100 rounded-xl text-[10px] font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
-                        >
-                          {showPopupMembersGC === c.grupo_caseiro ? '✕ Ocultar Membros' : '👥 Listar Membros & Distâncias'}
-                        </button>
-                      </div>
+                            <div className="mt-2 border-t pt-2">
+                              <button
+                                onClick={() => {
+                                  setShowPopupMembersGC(showPopupMembersGC === c.grupo_caseiro ? null : c.grupo_caseiro);
+                                }}
+                                className="w-full py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-100 rounded-xl text-[10px] font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+                              >
+                                {showPopupMembersGC === c.grupo_caseiro ? '✕ Ocultar Membros' : '👥 Listar Membros & Distâncias'}
+                              </button>
+                            </div>
 
-                      {showPopupMembersGC === c.grupo_caseiro && (
-                        <div className="mt-2 space-y-1 max-h-36 overflow-y-auto divide-y divide-gray-50 pt-1">
-                          {draftMembers
-                            .filter(m => m.grupos_caseiros === c.grupo_caseiro && m.status === 'Ativo')
-                            .map(m => {
-                              const dist = (m.latitude && m.longitude && c.latitude && c.longitude)
-                                ? calculateDistance(c.latitude, c.longitude, m.latitude, m.longitude)
-                                : null;
-                              
-                              const distNum = dist ? parseFloat(dist) : 0;
-                              const distColor = distNum > 5 
-                                ? 'text-rose-600 font-black' 
-                                : distNum > 3 
-                                ? 'text-amber-600 font-bold' 
-                                : 'text-emerald-600 font-bold';
+                            {showPopupMembersGC === c.grupo_caseiro && (
+                              <div className="mt-2 space-y-1 max-h-36 overflow-y-auto divide-y divide-gray-50 pt-1">
+                                {draftMembers
+                                  .filter(m => m.grupos_caseiros === c.grupo_caseiro && m.status === 'Ativo')
+                                  .map(m => {
+                                    const dist = (m.latitude && m.longitude && c.latitude && c.longitude)
+                                      ? calculateDistance(c.latitude, c.longitude, m.latitude, m.longitude)
+                                      : null;
+                                    
+                                    const distNum = dist ? parseFloat(dist) : 0;
+                                    const distColor = distNum > 5 
+                                      ? 'text-rose-600 font-black' 
+                                      : distNum > 3 
+                                      ? 'text-amber-600 font-bold' 
+                                      : 'text-emerald-600 font-bold';
 
-                              return (
-                                <div key={m.id} className="py-1 flex items-center justify-between text-[10px] first:pt-0">
-                                  <span className="font-medium text-gray-700 truncate max-w-[140px]" title={m.nome}>
-                                    {m.nome}
-                                  </span>
-                                  <span className={clsx("shrink-0", distColor)}>
-                                    {dist ? `${dist} km` : 'Sem coord.'}
-                                  </span>
-                                </div>
-                              );
-                            })}
-                          {draftMembers.filter(m => m.grupos_caseiros === c.grupo_caseiro && m.status === 'Ativo').length === 0 && (
-                            <p className="text-[9px] text-gray-400 text-center py-1">Nenhum membro neste GC.</p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </Popup>
-                </Marker>
-                {showPopupMembersGC === c.grupo_caseiro && (
-                  draftMembers
-                    .filter(m => m.grupos_caseiros === c.grupo_caseiro && m.status === 'Ativo' && m.latitude && m.longitude)
-                    .map(m => {
-                      const dist = calculateDistance(c.latitude!, c.longitude!, m.latitude!, m.longitude!);
-                      const distNum = dist ? parseFloat(dist) : 0;
-                      const lineColor = distNum > 5 
-                        ? '#ef4444' 
-                        : distNum > 3 
-                        ? '#d97706' 
-                        : '#10b981';
-                      
-                      return (
-                        <Polyline 
-                          key={`line_${c.id}_${m.id}`}
-                          positions={[[c.latitude!, c.longitude!], [m.latitude!, m.longitude!]]}
-                          color={lineColor}
-                          weight={2}
-                          dashArray="5, 5"
-                          opacity={0.85}
-                        />
-                      );
-                    })
-                )}
-              </React.Fragment>
-              ))}
-
-              {/* Draft Member Pins (Blue Markers) */}
-              {draftMembers.filter(m => m.latitude && m.longitude && m.status === 'Ativo').map(m => {
-                const assignedCell = draftCells.find(c => c.grupo_caseiro === m.grupos_caseiros);
-                const isSelected = selectedSource === m.grupos_caseiros || selectedTarget === m.grupos_caseiros;
-
-                return (
-                  <React.Fragment key={m.id}>
-                    <Marker 
-                      position={[m.latitude!, m.longitude!]}
-                      icon={memberIcon}
-                    >
-                      <Popup>
-                        <div className="p-2 text-xs">
-                          <div className="font-black text-gray-900 border-b pb-1 mb-1">
-                            👤 {m.nome}
+                                    return (
+                                      <div key={m.id} className="py-1 flex items-center justify-between text-[10px] first:pt-0">
+                                        <span className="font-medium text-gray-700 truncate max-w-[140px]" title={m.nome}>
+                                          {m.nome}
+                                        </span>
+                                        <span className={clsx("shrink-0", distColor)}>
+                                          {dist ? `${dist} km` : 'Sem coord.'}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
+                                {draftMembers.filter(m => m.grupos_caseiros === c.grupo_caseiro && m.status === 'Ativo').length === 0 && (
+                                  <p className="text-[9px] text-gray-400 text-center py-1">Nenhum membro neste GC.</p>
+                                )}
+                              </div>
+                            )}
                           </div>
-                          <p><strong>📍 Bairro:</strong> {m.bairro || 'Não informado'}</p>
-                          <p><strong>🏠 GC Atual (Draft):</strong> {m.grupos_caseiros || 'Sem GC'}</p>
-                          {m.logradouro && <p className="text-[10px] text-gray-400 mt-1 max-w-[200px]">{m.logradouro}</p>}
-                        </div>
-                      </Popup>
-                    </Marker>
+                        </Popup>
+                      </Marker>
+                      {showPopupMembersGC === c.grupo_caseiro && (
+                        draftMembers
+                          .filter(m => m.grupos_caseiros === c.grupo_caseiro && m.status === 'Ativo' && m.latitude && m.longitude)
+                          .map(m => {
+                            const dist = calculateDistance(c.latitude!, c.longitude!, m.latitude!, m.longitude!);
+                            const distNum = dist ? parseFloat(dist) : 0;
+                            const lineColor = distNum > 5 
+                              ? '#ef4444' 
+                              : distNum > 3 
+                              ? '#d97706' 
+                              : '#10b981';
+                            
+                            return (
+                              <Polyline 
+                                key={`line_${c.id}_${m.id}`}
+                                positions={[[c.latitude!, c.longitude!], [m.latitude!, m.longitude!]]}
+                                color={lineColor}
+                                weight={2}
+                                dashArray="5, 5"
+                                opacity={0.85}
+                              />
+                            );
+                          })
+                      )}
+                    </React.Fragment>
+                  ))}
 
-                    {/* Polyline connection to the current draft GC cell if selected */}
-                    {isSelected && assignedCell && assignedCell.latitude && assignedCell.longitude && (
-                      <Polyline 
-                        positions={[[m.latitude!, m.longitude!], [assignedCell.latitude!, assignedCell.longitude!]]}
-                        color="#3b82f6"
-                        weight={1.5}
-                        dashArray="5, 5"
-                        opacity={0.7}
-                      />
-                    )}
-                  </React.Fragment>
-                );
-              })}
-              {/* 1. Territorial Opportunity Heatmap (Pulsing Circles) */}
-              {Object.entries(regionCoordinates).map(([region, coords]) => {
-                // Count active members living here
-                const localMembersCount = draftMembers.filter(m => getAdministrativeRegion(m.bairro || '') === region && m.status === 'Ativo').length;
-                // Count cells already active in this region
-                const localCellsCount = draftCells.filter(c => getGCRegion(c.grupo_caseiro) === region).length;
-                
-                // An opportunity exists if we have >= 4 members but 0 cells!
-                const isOpportunity = localMembersCount >= 4 && localCellsCount === 0;
+                  {/* Draft Member Pins (Blue Markers) */}
+                  {draftMembers.filter(m => m.latitude && m.longitude && m.status === 'Ativo').map(m => {
+                    const assignedCell = draftCells.find(c => c.grupo_caseiro === m.grupos_caseiros);
+                    const isSelected = selectedSource === m.grupos_caseiros || selectedTarget === m.grupos_caseiros;
 
-                if (!isOpportunity) return null;
-
-                return (
-                  <Circle
-                    key={`opp_${region}`}
-                    center={coords}
-                    radius={450}
-                    pathOptions={{ 
-                      fillColor: '#8b5cf6', 
-                      color: '#7c3aed', 
-                      weight: 2, 
-                      fillOpacity: 0.25,
-                      dashArray: '3, 6'
-                    }}
-                  >
-                    <Popup>
-                      <div className="p-2 text-xs space-y-1.5 max-w-[220px]">
-                        <div className="font-black text-indigo-900 border-b border-indigo-100 pb-1 flex items-center gap-1.5">
-                          <Brain className="w-4 h-4 text-indigo-600 animate-pulse" />
-                          Oportunidade de Plantação!
-                        </div>
-                        <p className="text-[11px] text-gray-600">
-                          Encontramos <strong>{localMembersCount} membros</strong> residentes em <strong>{region}</strong> que estão sem GC local assistindo eles!
-                        </p>
-                        <button
-                          onClick={() => {
-                            setNewCellName(`BSB ${region}`);
-                            setNewCellSector('SETOR SIMULADO');
-                            setNewCellLeader('');
-                            setIsCreateCellOpen(true);
-                          }}
-                          className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold rounded-lg transition-colors cursor-pointer text-center text-[10px] flex items-center justify-center gap-1"
+                    return (
+                      <React.Fragment key={m.id}>
+                        <Marker 
+                          position={[m.latitude!, m.longitude!]}
+                          icon={memberIcon}
                         >
-                          ⚡ Plantar GC em {region}
-                        </button>
-                      </div>
-                    </Popup>
-                  </Circle>
-                );
-              })}
+                          <Popup>
+                            <div className="p-2 text-xs">
+                              <div className="font-black text-gray-900 border-b pb-1 mb-1">
+                                👤 {m.nome}
+                              </div>
+                              <p><strong>📍 Bairro:</strong> {m.bairro || 'Não informado'}</p>
+                              <p><strong>🏠 GC Atual (Draft):</strong> {m.grupos_caseiros || 'Sem GC'}</p>
+                              {m.logradouro && <p className="text-[10px] text-gray-400 mt-1 max-w-[200px]">{m.logradouro}</p>}
+                            </div>
+                          </Popup>
+                        </Marker>
 
+                        {/* Polyline connection to the current draft GC cell if selected */}
+                        {isSelected && assignedCell && assignedCell.latitude && assignedCell.longitude && (
+                          <Polyline 
+                            positions={[[m.latitude!, m.longitude!], [assignedCell.latitude!, assignedCell.longitude!]]}
+                            color="#3b82f6"
+                            weight={1.5}
+                            dashArray="5, 5"
+                            opacity={0.7}
+                          />
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
 
+                  {/* Territorial Opportunity Heatmap (Pulsing Circles) */}
+                  {Object.entries(regionCoordinates).map(([region, coords]) => {
+                    const localMembersCount = draftMembers.filter(m => getAdministrativeRegion(m.bairro || '') === region && m.status === 'Ativo').length;
+                    const localCellsCount = draftCells.filter(c => getGCRegion(c.grupo_caseiro) === region).length;
+                    const isOpportunity = localMembersCount >= 4 && localCellsCount === 0;
 
+                    if (!isOpportunity) return null;
+
+                    return (
+                      <Circle
+                        key={`opp_${region}`}
+                        center={coords}
+                        radius={450}
+                        pathOptions={{ 
+                          fillColor: '#8b5cf6', 
+                          color: '#7c3aed', 
+                          weight: 2, 
+                          fillOpacity: 0.25,
+                          dashArray: '3, 6'
+                        }}
+                      >
+                        <Popup>
+                          <div className="p-2 text-xs space-y-1.5 max-w-[220px]">
+                            <div className="font-black text-indigo-900 border-b border-indigo-100 pb-1 flex items-center gap-1.5">
+                              <Brain className="w-4 h-4 text-indigo-600 animate-pulse" />
+                              Oportunidade de Plantação!
+                            </div>
+                            <p className="text-[11px] text-gray-600">
+                              Encontramos <strong>{localMembersCount} membros</strong> residentes em <strong>{region}</strong> que estão sem GC local assistindo eles!
+                            </p>
+                            <button
+                              onClick={() => {
+                                setNewCellName(`BSB ${region}`);
+                                setNewCellSector('SETOR SIMULADO');
+                                setNewCellLeader('');
+                                setIsCreateCellOpen(true);
+                              }}
+                              className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold rounded-lg transition-colors cursor-pointer text-center text-[10px] flex items-center justify-center gap-1"
+                            >
+                              ⚡ Plantar GC em {region}
+                            </button>
+                          </div>
+                        </Popup>
+                      </Circle>
+                    );
+                  })}
+                </>
+              )}
+
+              {/* Discipleship Mode Layers */}
+              {activeTab === 'discipleship' && (
+                <>
+                  {/* Discipleship Member Pins */}
+                  {draftMembers.filter(m => m.latitude && m.longitude && m.status === 'Ativo').map(m => {
+                    const disciplersSet = new Set(draftLinks.map(l => l.discipulador));
+                    const disciplesSet = new Set(draftLinks.map(l => l.discipulo));
+                    const isDiscipler = disciplersSet.has(m.nome);
+                    const isIsolated = !disciplesSet.has(m.nome);
+                    const icon = isIsolated ? isolatedIcon : (isDiscipler ? disciplerIcon : memberIcon);
+
+                    const memberRA = getAdministrativeRegion(m.bairro || '');
+                    
+                    // Generate recommendations
+                    const activeMembersByName = new Map<string, any>();
+                    draftMembers.forEach(otherM => {
+                      if (otherM.status === 'Ativo') {
+                        activeMembersByName.set(otherM.nome, otherM);
+                      }
+                    });
+                    
+                    const disciplesCountByDiscipler: Record<string, string[]> = {};
+                    draftLinks.forEach(link => {
+                      const dName = link.discipulador;
+                      if (!disciplesCountByDiscipler[dName]) {
+                        disciplesCountByDiscipler[dName] = [];
+                      }
+                      disciplesCountByDiscipler[dName].push(link.discipulo);
+                    });
+
+                    const recommendations: { name: string; count: number; distance: number | null }[] = [];
+                    if (isIsolated) {
+                      activeMembersByName.forEach((otherMem, otherName) => {
+                        if (otherName === m.nome) return;
+                        const currentDisciplesCount = disciplesCountByDiscipler[otherName]?.length || 0;
+                        if (currentDisciplesCount >= 5) return;
+
+                        const otherRA = getAdministrativeRegion(otherMem.bairro);
+                        if (otherRA === memberRA && memberRA !== 'NÃO INFORMADO') {
+                          let distNum: number | null = null;
+                          if (m.latitude && m.longitude && otherMem.latitude && otherMem.longitude) {
+                            const distStr = calculateDistance(otherMem.latitude, otherMem.longitude, m.latitude!, m.longitude!);
+                            distNum = distStr ? parseFloat(distStr) : null;
+                          }
+                          recommendations.push({
+                            name: otherName,
+                            count: currentDisciplesCount,
+                            distance: distNum
+                          });
+                        }
+                      });
+
+                      recommendations.sort((a, b) => {
+                        if (a.distance !== null && b.distance !== null) return a.distance - b.distance;
+                        if (a.distance !== null) return -1;
+                        if (b.distance !== null) return 1;
+                        return b.count - a.count;
+                      });
+                    }
+
+                    const topRecommendations = recommendations.slice(0, 3);
+
+                    return (
+                      <Marker 
+                        key={m.id}
+                        position={[m.latitude!, m.longitude!]}
+                        icon={icon}
+                      >
+                        <Popup>
+                          <div className="p-2 text-xs w-64 max-h-[300px] overflow-y-auto scrollbar-thin">
+                            <div className="font-black text-gray-900 border-b pb-1 mb-1">
+                              {isIsolated ? '🟠 Membro Isolado' : (isDiscipler ? '🟢 Discipulador' : '🔵 Discípulo')}
+                            </div>
+                            <div className="font-bold text-gray-800 text-[13px]">{m.nome}</div>
+                            <p className="mt-1"><strong>📍 RA/Bairro:</strong> {memberRA} / {m.bairro || 'Não informado'}</p>
+                            
+                            {!isIsolated ? (
+                              <p className="mt-1 text-indigo-600 font-bold">
+                                🤝 Discipulador: {draftLinks.find(l => l.discipulo === m.nome)?.discipulador}
+                              </p>
+                            ) : (
+                              <div className="mt-2 pt-2 border-t border-gray-100">
+                                <span className="text-[10px] font-bold text-rose-500 block mb-1">💡 Recomendações de Discipulador (Na mesma RA):</span>
+                                {topRecommendations.length > 0 ? (
+                                  <div className="space-y-1.5 mt-1">
+                                    {topRecommendations.map(rec => (
+                                      <div key={rec.name} className="flex items-center justify-between bg-gray-50 p-1.5 rounded-lg border border-gray-100">
+                                        <div className="text-[10px] text-gray-700 truncate max-w-[120px]" title={rec.name}>
+                                          <div className="font-bold truncate">{rec.name}</div>
+                                          <div className="text-[8px] text-gray-400 font-semibold">({rec.count}/5 discípulos)</div>
+                                        </div>
+                                        <div className="flex items-center gap-1 shrink-0">
+                                          {rec.distance !== null && <span className="text-[9px] text-gray-500 font-bold">{rec.distance} km</span>}
+                                          <button
+                                            onClick={() => handleLinkDiscipleship(m.nome, rec.name)}
+                                            className="px-2 py-0.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[9px] font-black rounded flex items-center gap-0.5 shadow-sm cursor-pointer border-0"
+                                          >
+                                            ⚡ Vincular
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <p className="text-[9px] text-gray-400 font-semibold italic">Nenhum discipulador disponível na mesma RA.</p>
+                                )}
+                              </div>
+                            )}
+
+                            {isDiscipler && (
+                              <div className="mt-2 pt-2 border-t border-gray-100">
+                                <span className="text-[10px] font-bold text-emerald-600 block mb-1">👥 Discípulos ({disciplesCountByDiscipler[m.nome]?.length || 0}):</span>
+                                <div className="max-h-24 overflow-y-auto space-y-0.5">
+                                  {(disciplesCountByDiscipler[m.nome] || []).map(d => (
+                                    <div key={d} className="text-[10px] text-gray-600 font-medium py-0.5 border-b border-gray-50 last:border-0 truncate">
+                                      • {d}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </Popup>
+                      </Marker>
+                    );
+                  })}
+
+                  {/* Discipleship Connections (Polylines) */}
+                  {draftLinks.map((link, idx) => {
+                    const disciple = draftMembers.find(m => m.nome === link.discipulo && m.status === 'Ativo');
+                    const discipler = draftMembers.find(m => m.nome === link.discipulador && m.status === 'Ativo');
+                    if (!disciple || !discipler || !disciple.latitude || !disciple.longitude || !discipler.latitude || !discipler.longitude) return null;
+
+                    const distStr = calculateDistance(discipler.latitude, discipler.longitude, disciple.latitude, disciple.longitude);
+                    const distNum = distStr ? parseFloat(distStr) : 0;
+                    const isDistant = distNum > 8;
+                    const color = isDistant ? '#ef4444' : '#6366f1';
+                    
+                    return (
+                      <Polyline
+                        key={`link_${idx}`}
+                        positions={[[disciple.latitude!, disciple.longitude!], [discipler.latitude!, discipler.longitude!]]}
+                        color={color}
+                        weight={2.5}
+                        dashArray={isDistant ? "5, 5" : undefined}
+                        opacity={0.8}
+                      >
+                        <Popup>
+                          <div className="p-1.5 text-xs">
+                            <div className="font-bold text-gray-800">Vínculo de Discipulado</div>
+                            <div className="mt-1 text-gray-600">
+                              <strong>Líder:</strong> {link.discipulador}<br />
+                              <strong>Discípulo:</strong> {link.discipulo}
+                            </div>
+                            <div className={clsx("mt-1.5 font-extrabold text-[10px]", isDistant ? "text-rose-600" : "text-indigo-600")}>
+                              📏 Distância: {distStr} km {isDistant ? '(Alerta de Deslocamento!)' : '(Excelente)'}
+                            </div>
+                          </div>
+                        </Popup>
+                      </Polyline>
+                    );
+                  })}
+                </>
+              )}
             </MapContainer>
 
             {/* Floating Map Legend overlaid on Leaflet Map */}
@@ -1630,35 +2051,63 @@ export const Simulations: React.FC = () => {
                 <Filter className="w-3.5 h-3.5 text-indigo-500" />
                 Legenda do Mapa
               </div>
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-[#ef4444] border border-white shadow-sm inline-block shrink-0"></span>
-                  <span className="text-gray-600 font-medium text-[11px]">Grupo Caseiro (Pino Vermelho)</span>
+              {activeTab === 'gc' ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-[#ef4444] border border-white shadow-sm inline-block shrink-0"></span>
+                    <span className="text-gray-600 font-medium text-[11px]">Grupo Caseiro (Pino Vermelho)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-[#3b82f6] border border-white shadow-sm inline-block shrink-0"></span>
+                    <span className="text-gray-600 font-medium text-[11px]">Membro Ativo (Pino Azul)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-3.5 h-3.5 rounded-full border-2 border-dashed border-[#7c3aed] bg-[#8b5cf6]/20 inline-block shrink-0"></span>
+                    <span className="text-gray-600 font-medium text-[11px]">Oportunidade (&gt;= 4 Moradores)</span>
+                  </div>
+                  <div className="border-t border-gray-100 my-1.5 pt-1.5 text-[9px] font-bold text-gray-400 uppercase tracking-wider">
+                    Distância ao Grupo (Linhas)
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-5 h-0.5 border-t-2 border-dashed border-[#10b981] inline-block shrink-0"></span>
+                    <span className="text-gray-600 font-medium text-[11px]">Excelente (&lt;= 3 km)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-5 h-0.5 border-t-2 border-dashed border-[#d97706] inline-block shrink-0"></span>
+                    <span className="text-gray-600 font-medium text-[11px]">Intermediária (3 a 5 km)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-5 h-0.5 border-t-2 border-dashed border-[#ef4444] inline-block shrink-0"></span>
+                    <span className="text-gray-600 font-medium text-[11px]">Distante (&gt; 5 km)</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-[#3b82f6] border border-white shadow-sm inline-block shrink-0"></span>
-                  <span className="text-gray-600 font-medium text-[11px]">Membro Ativo (Pino Azul)</span>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-[#10b981] border border-white shadow-sm inline-block shrink-0"></span>
+                    <span className="text-gray-600 font-medium text-[11px]">Discipulador (Pino Verde)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-[#ef4444] border border-white shadow-sm inline-block shrink-0"></span>
+                    <span className="text-gray-600 font-medium text-[11px]">Membro Isolado (Pino Laranja)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-[#3b82f6] border border-white shadow-sm inline-block shrink-0"></span>
+                    <span className="text-gray-600 font-medium text-[11px]">Discípulo (Pino Azul)</span>
+                  </div>
+                  <div className="border-t border-gray-100 my-1.5 pt-1.5 text-[9px] font-bold text-gray-400 uppercase tracking-wider">
+                    Vínculo de Discipulado (Linhas)
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-5 h-0.5 bg-[#6366f1] inline-block shrink-0"></span>
+                    <span className="text-gray-600 font-medium text-[11px]">Vínculo Saudável (&lt;= 8 km)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-5 h-0.5 border-t-2 border-dashed border-[#ef4444] inline-block shrink-0"></span>
+                    <span className="text-gray-600 font-medium text-[11px]">Distante (&gt; 8 km)</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-3.5 h-3.5 rounded-full border-2 border-dashed border-[#7c3aed] bg-[#8b5cf6]/20 inline-block shrink-0"></span>
-                  <span className="text-gray-600 font-medium text-[11px]">Oportunidade (&gt;= 4 Moradores)</span>
-                </div>
-                <div className="border-t border-gray-100 my-1.5 pt-1.5 text-[9px] font-bold text-gray-400 uppercase tracking-wider">
-                  Distância ao Grupo (Linhas)
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-5 h-0.5 border-t-2 border-dashed border-[#10b981] inline-block shrink-0"></span>
-                  <span className="text-gray-600 font-medium text-[11px]">Excelente (&lt;= 3 km)</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-5 h-0.5 border-t-2 border-dashed border-[#d97706] inline-block shrink-0"></span>
-                  <span className="text-gray-600 font-medium text-[11px]">Intermediária (3 a 5 km)</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-5 h-0.5 border-t-2 border-dashed border-[#ef4444] inline-block shrink-0"></span>
-                  <span className="text-gray-600 font-medium text-[11px]">Distante (&gt; 5 km)</span>
-                </div>
-              </div>
+              )}
             </div>
           </div>
         )}
@@ -1673,7 +2122,7 @@ export const Simulations: React.FC = () => {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100">
             <div className="flex gap-4">
               <button 
-                onClick={() => setActiveTab('gc')}
+                onClick={() => handleTabChange('gc')}
                 className={clsx(
                   "pb-4 px-2 text-sm font-bold border-b-2 transition-all flex items-center gap-2",
                   activeTab === 'gc' ? "border-primary-600 text-primary-600" : "border-transparent text-gray-400 hover:text-gray-600"
@@ -1682,7 +2131,7 @@ export const Simulations: React.FC = () => {
                 <Home className="w-4 h-4" /> Simulador de GC
               </button>
               <button 
-                onClick={() => setActiveTab('discipleship')}
+                onClick={() => handleTabChange('discipleship')}
                 className={clsx(
                   "pb-4 px-2 text-sm font-bold border-b-2 transition-all flex items-center gap-2",
                   activeTab === 'discipleship' ? "border-primary-600 text-primary-600" : "border-transparent text-gray-400 hover:text-gray-600"
@@ -2362,136 +2811,137 @@ export const Simulations: React.FC = () => {
              </div>
            )}
 
-            <div className="bg-gray-900 rounded-3xl p-6 text-white shadow-2xl overflow-hidden relative">
-               <div className={clsx("relative z-10", isTerritorialInsightsExpanded ? "space-y-4" : "space-y-0")}>
-                 <div 
-                   onClick={() => setIsTerritorialInsightsExpanded(!isTerritorialInsightsExpanded)}
-                   className="flex items-center justify-between gap-2 text-indigo-400 text-xs font-bold uppercase tracking-widest cursor-pointer select-none group/hdr"
-                 >
-                    <span className="flex items-center gap-2">
-                       <Brain className="w-4 h-4 animate-bounce shrink-0" /> Alertas & Otimizações Territoriais
-                       <span className="text-[10px] bg-indigo-500/25 text-indigo-200 font-bold px-1.5 py-0.5 rounded-full border border-indigo-500/10">
-                         {activeInsights.length}
-                       </span>
-                    </span>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {(ignoredAlerts.some(k => k.startsWith('expansion') || k.startsWith('consolidation')) || minimizedAlerts.some(k => k.startsWith('expansion') || k.startsWith('consolidation'))) && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setIgnoredAlerts(prev => prev.filter(k => !k.startsWith('expansion') && !k.startsWith('consolidation')));
-                            setMinimizedAlerts(prev => prev.filter(k => !k.startsWith('expansion') && !k.startsWith('consolidation')));
-                          }}
-                          className="text-[9px] font-bold text-indigo-300 hover:text-indigo-200 hover:underline flex items-center gap-1 cursor-pointer transition-all bg-white/5 hover:bg-white/10 px-2 py-0.5 rounded-lg border border-white/10 active:scale-95 z-20"
-                          title="Restaurar alertas territoriais ocultados ou minimizados"
-                        >
-                          Restaurar
-                        </button>
-                      )}
-                      <ChevronDown className={clsx("w-4 h-4 text-gray-400 group-hover/hdr:text-white transition-all duration-200", isTerritorialInsightsExpanded && "rotate-180")} />
-                    </div>
-                 </div>
-                 
-                 {isTerritorialInsightsExpanded && (
-                   <>
-                     <div className="flex flex-col gap-1 bg-white/5 border border-white/10 rounded-2xl p-3 text-xs leading-relaxed animate-in fade-in duration-200">
-                       <div className="flex justify-between font-bold text-gray-300">
-                         <span>Mínimo de Membros/GC:</span>
-                         <span className="text-indigo-300">{territorialInsights.minMembersInAnyGC} membros/GC</span>
+            {activeTab === 'gc' && (
+              <div className="bg-gray-900 rounded-3xl p-6 text-white shadow-2xl overflow-hidden relative">
+                 <div className={clsx("relative z-10", isTerritorialInsightsExpanded ? "space-y-4" : "space-y-0")}>
+                   <div 
+                     onClick={() => setIsTerritorialInsightsExpanded(!isTerritorialInsightsExpanded)}
+                     className="flex items-center justify-between gap-2 text-indigo-400 text-xs font-bold uppercase tracking-widest cursor-pointer select-none group/hdr"
+                   >
+                      <span className="flex items-center gap-2">
+                         <Brain className="w-4 h-4 animate-bounce shrink-0" /> Alertas & Otimizações Territoriais
+                         <span className="text-[10px] bg-indigo-500/25 text-indigo-200 font-bold px-1.5 py-0.5 rounded-full border border-indigo-500/10">
+                           {activeInsights.length}
+                         </span>
+                      </span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {(ignoredAlerts.some(k => k.startsWith('expansion') || k.startsWith('consolidation')) || minimizedAlerts.some(k => k.startsWith('expansion') || k.startsWith('consolidation'))) && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setIgnoredAlerts(prev => prev.filter(k => !k.startsWith('expansion') && !k.startsWith('consolidation')));
+                              setMinimizedAlerts(prev => prev.filter(k => !k.startsWith('expansion') && !k.startsWith('consolidation')));
+                            }}
+                            className="text-[9px] font-bold text-indigo-300 hover:text-indigo-200 hover:underline flex items-center gap-1 cursor-pointer transition-all bg-white/5 hover:bg-white/10 px-2 py-0.5 rounded-lg border border-white/10 active:scale-95 z-20"
+                            title="Restaurar alertas territoriais ocultados ou minimizados"
+                          >
+                            Restaurar
+                          </button>
+                        )}
+                        <ChevronDown className={clsx("w-4 h-4 text-gray-400 group-hover/hdr:text-white transition-all duration-200", isTerritorialInsightsExpanded && "rotate-180")} />
+                      </div>
+                   </div>
+                   
+                   {isTerritorialInsightsExpanded && (
+                     <>
+                       <div className="flex flex-col gap-1 bg-white/5 border border-white/10 rounded-2xl p-3 text-xs leading-relaxed animate-in fade-in duration-200">
+                         <div className="flex justify-between font-bold text-gray-300">
+                           <span>Mínimo de Membros/GC:</span>
+                           <span className="text-indigo-300">{territorialInsights.minMembersInAnyGC} membros/GC</span>
+                         </div>
+                         <div className="flex justify-between text-[10px] text-gray-400 font-semibold">
+                           <span>Total de GCs Ativos:</span>
+                           <span>{territorialInsights.activeGCsCount} células</span>
+                         </div>
+                         <p className="text-[9px] text-gray-400 mt-1 border-t border-white/5 pt-1">
+                           Análise automatizada de alocação: detecta desequilíbrios territoriais, membros dispersos e oportunidades de criação de novos grupos baseados na proximidade geográfica.
+                         </p>
                        </div>
-                       <div className="flex justify-between text-[10px] text-gray-400 font-semibold">
-                         <span>Total de GCs Ativos:</span>
-                         <span>{territorialInsights.activeGCsCount} células</span>
-                       </div>
-                       <p className="text-[9px] text-gray-400 mt-1 border-t border-white/5 pt-1">
-                         Análise automatizada de alocação: detecta desequilíbrios territoriais, membros dispersos e oportunidades de criação de novos grupos baseados na proximidade geográfica.
-                       </p>
-                     </div>
 
-                     <div className="space-y-4 animate-in fade-in duration-200">
-                        {activeInsights.length > 0 ? activeInsights.map((insight, i) => {
-                          const isConsolidation = insight.type === 'consolidation';
-                          const key = `${insight.type}_${insight.ra}`;
-                          const isMinimized = minimizedAlerts.includes(key);
+                       <div className="space-y-4 animate-in fade-in duration-200">
+                          {activeInsights.length > 0 ? activeInsights.map((insight, i) => {
+                            const isConsolidation = insight.type === 'consolidation';
+                            const key = `${insight.type}_${insight.ra}`;
+                            const isMinimized = minimizedAlerts.includes(key);
 
-                          if (isMinimized) {
+                            if (isMinimized) {
+                              return (
+                                <div 
+                                  key={key} 
+                                  className={clsx(
+                                    "rounded-2xl p-3 border transition-all cursor-default group flex items-center justify-between gap-3 animate-in fade-in duration-200",
+                                    isConsolidation
+                                      ? "bg-amber-950/10 border-amber-500/10 hover:bg-amber-950/15"
+                                      : "bg-white/5 border-white/5 hover:bg-white/10"
+                                  )}
+                                >
+                                   <div className="flex items-center gap-2 min-w-0">
+                                      {isConsolidation ? (
+                                        <Network className="w-3.5 h-3.5 text-amber-400/60 shrink-0" />
+                                      ) : (
+                                        <MapPin className="w-3.5 h-3.5 text-emerald-400/60 shrink-0" />
+                                      )}
+                                      <span className="text-xs font-bold text-gray-300 truncate">{insight.title}</span>
+                                      <span className="text-[8px] uppercase font-semibold text-gray-500 bg-white/5 px-1.5 py-0.2 rounded shrink-0">Minimizado</span>
+                                   </div>
+                                   
+                                   <div className="flex items-center gap-1 shrink-0">
+                                     <button 
+                                       onClick={() => toggleMinimizeAlert(key)}
+                                       className="text-gray-400 hover:text-white p-1 hover:bg-white/5 rounded-lg transition-all cursor-pointer"
+                                       title="Maximizar Alerta"
+                                     >
+                                       <ChevronDown className="w-3.5 h-3.5" />
+                                     </button>
+                                     <button 
+                                       onClick={() => toggleIgnoreAlert(key)}
+                                       className="text-gray-400 hover:text-rose-400 p-1 hover:bg-white/5 rounded-lg transition-all cursor-pointer"
+                                       title="Ignorar Alerta"
+                                     >
+                                       <EyeOff className="w-3.5 h-3.5" />
+                                     </button>
+                                   </div>
+                                </div>
+                              );
+                            }
+
                             return (
                               <div 
                                 key={key} 
                                 className={clsx(
-                                  "rounded-2xl p-3 border transition-all cursor-default group flex items-center justify-between gap-3 animate-in fade-in duration-200",
+                                  "rounded-2xl p-4 border transition-all cursor-default group relative animate-in fade-in duration-200",
                                   isConsolidation
-                                    ? "bg-amber-950/10 border-amber-500/10 hover:bg-amber-950/15"
-                                    : "bg-white/5 border-white/5 hover:bg-white/10"
+                                    ? "bg-amber-950/20 border-amber-500/25 hover:bg-amber-950/30"
+                                    : "bg-white/10 border-white/10 hover:bg-white/20"
                                 )}
                               >
-                                 <div className="flex items-center gap-2 min-w-0">
-                                    {isConsolidation ? (
-                                      <Network className="w-3.5 h-3.5 text-amber-400/60 shrink-0" />
-                                    ) : (
-                                      <MapPin className="w-3.5 h-3.5 text-emerald-400/60 shrink-0" />
-                                    )}
-                                    <span className="text-xs font-bold text-gray-300 truncate">{insight.title}</span>
-                                    <span className="text-[8px] uppercase font-semibold text-gray-500 bg-white/5 px-1.5 py-0.2 rounded shrink-0">Minimizado</span>
-                                 </div>
-                                 
-                                 <div className="flex items-center gap-1 shrink-0">
-                                   <button 
-                                     onClick={() => toggleMinimizeAlert(key)}
-                                     className="text-gray-400 hover:text-white p-1 hover:bg-white/5 rounded-lg transition-all cursor-pointer"
-                                     title="Maximizar Alerta"
-                                   >
-                                     <ChevronDown className="w-3.5 h-3.5" />
-                                   </button>
-                                   <button 
-                                     onClick={() => toggleIgnoreAlert(key)}
-                                     className="text-gray-400 hover:text-rose-400 p-1 hover:bg-white/5 rounded-lg transition-all cursor-pointer"
-                                     title="Ignorar Alerta"
-                                   >
-                                     <EyeOff className="w-3.5 h-3.5" />
-                                   </button>
-                                 </div>
-                              </div>
-                            );
-                          }
-
-                          return (
-                            <div 
-                              key={key} 
-                              className={clsx(
-                                "rounded-2xl p-4 border transition-all cursor-default group relative animate-in fade-in duration-200",
-                                isConsolidation
-                                  ? "bg-amber-950/20 border-amber-500/25 hover:bg-amber-950/30"
-                                  : "bg-white/10 border-white/10 hover:bg-white/20"
-                              )}
-                            >
-                               <div className="flex justify-between items-start gap-4 mb-1">
-                                 <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                                    {isConsolidation ? (
-                                      <Network className="w-4 h-4 text-amber-400 animate-pulse" />
-                                    ) : (
-                                      <MapPin className="w-4 h-4 text-emerald-400" />
-                                    )}
-                                    {insight.title}
-                                 </h4>
-                                 <div className="flex items-center gap-1 shrink-0 opacity-60 hover:opacity-100 transition-opacity">
-                                   <button 
-                                     onClick={() => toggleMinimizeAlert(key)}
-                                     className="text-gray-400 hover:text-white p-1 hover:bg-white/5 rounded-lg transition-all cursor-pointer"
-                                     title="Minimizar Alerta"
-                                   >
-                                     <ChevronUp className="w-3.5 h-3.5" />
-                                   </button>
-                                   <button 
-                                     onClick={() => toggleIgnoreAlert(key)}
-                                     className="text-gray-400 hover:text-rose-400 p-1 hover:bg-white/5 rounded-lg transition-all cursor-pointer"
-                                     title="Ignorar Alerta"
-                                   >
-                                     <EyeOff className="w-3.5 h-3.5" />
-                                   </button>
-                                 </div>
-                               </div>
-                               <p className="text-xs text-gray-300 leading-relaxed mb-3">{insight.description}</p>
+                                <div className="flex justify-between items-start gap-2 mb-2">
+                                  <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                                     {isConsolidation ? (
+                                       <Network className="w-4 h-4 text-amber-400 animate-pulse" />
+                                     ) : (
+                                       <MapPin className="w-4 h-4 text-emerald-400" />
+                                     )}
+                                     {insight.title}
+                                  </h4>
+                                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button 
+                                      onClick={() => toggleMinimizeAlert(key)}
+                                      className="text-gray-400 hover:text-white p-1 hover:bg-white/5 rounded-lg transition-all cursor-pointer"
+                                      title="Minimizar Alerta"
+                                    >
+                                      <ChevronUp className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button 
+                                      onClick={() => toggleIgnoreAlert(key)}
+                                      className="text-gray-400 hover:text-rose-400 p-1 hover:bg-white/5 rounded-lg transition-all cursor-pointer"
+                                      title="Ignorar Alerta"
+                                    >
+                                      <EyeOff className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                                <p className="text-xs text-gray-300 leading-relaxed mb-3">{insight.description}</p>
                                <div 
                                  className={clsx(
                                    "text-[10px] font-bold uppercase tracking-tighter px-2 py-1 rounded inline-block",
@@ -2525,7 +2975,7 @@ export const Simulations: React.FC = () => {
                                              📍 Moradores de ${insight.ra} em GCs Externos (${insight.scatteredResidents.length})
                                            </div>
                                            <div className="space-y-1">
-                                             {insight.scatteredResidents.map((m) => (
+                                             {insight.scatteredResidents.map((m: any) => (
                                                <div key={m.nome} className="text-gray-300 py-0.5 border-b border-white/5 last:border-0 pl-1">
                                                  • <strong className="text-white">{m.nome}</strong> ({m.tipo})
                                                  <span className="text-[9px] text-gray-400 block ml-2">📍 Bairro: {m.bairro} ➔ GC Atual: <strong className="text-indigo-300">{m.gc}</strong></span>
@@ -2541,7 +2991,7 @@ export const Simulations: React.FC = () => {
                                              ⚠️ Membros Externos nos GCs de ${insight.ra} (${insight.externalParticipants.length})
                                            </div>
                                            <div className="space-y-1">
-                                             {insight.externalParticipants.map((m) => (
+                                             {insight.externalParticipants.map((m: any) => (
                                                <div key={m.nome} className="text-gray-300 py-0.5 border-b border-white/5 last:border-0 pl-1">
                                                  • <strong className="text-white">{m.nome}</strong> ({m.tipo})
                                                  <span className="text-[9px] text-gray-400 block ml-2">🏠 Reside em: {m.residenceRA} ({m.bairro}) ➔ GC Local: <strong className="text-emerald-300">{m.gc}</strong></span>
@@ -2568,7 +3018,7 @@ export const Simulations: React.FC = () => {
                                      </button>
                                      {expandedInsightIndex === i && (
                                        <div className="mt-2 p-2 bg-black/20 rounded-xl space-y-1 max-h-36 overflow-y-auto border border-white/5 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
-                                         {insight.memberNames.map((name) => (
+                                         {insight.memberNames.map((name: string) => (
                                            <div key={name} className="text-[10px] text-gray-300 font-medium py-0.5 border-b border-white/5 last:border-0">{name}</div>
                                          ))}
                                        </div>
@@ -2584,16 +3034,224 @@ export const Simulations: React.FC = () => {
                              <p className="text-xs font-semibold">Nenhuma localidade com necessidade ou desvio territorial detectado.</p>
                           </div>
                         )}
-                     </div>
-                   </>
-                 )}
+                      </div>
+                      </>
+                    )}
+                  </div>
+                  <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-primary-600/20 rounded-full blur-3xl"></div>
                </div>
-               <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-primary-600/20 rounded-full blur-3xl"></div>
-            </div>
-            
-            {/* Coluna Direita: Auditoria & Diagnósticos de Expansão */}
-            
-              {/* Painel de Auditoria de Alocação */}
+             )}
+
+             {activeTab === 'discipleship' && (
+               <div className="bg-gray-900 rounded-3xl p-6 text-white shadow-2xl overflow-hidden relative">
+                  <div className={clsx("relative z-10", isDiscipleshipInsightsExpanded ? "space-y-4" : "space-y-0")}>
+                    <div 
+                      onClick={() => setIsDiscipleshipInsightsExpanded(!isDiscipleshipInsightsExpanded)}
+                      className="flex items-center justify-between gap-2 text-indigo-400 text-xs font-bold uppercase tracking-widest cursor-pointer select-none group/hdr"
+                    >
+                       <span className="flex items-center gap-2">
+                          <Brain className="w-4 h-4 animate-bounce shrink-0" /> Alertas & Otimizações de Discipulado
+                          <span className="text-[10px] bg-indigo-500/25 text-indigo-200 font-bold px-1.5 py-0.5 rounded-full border border-indigo-500/10">
+                            {activeIsolatedMembers.length + activeOverloadedDisciplers.length + activeDisplacedDisciples.length}
+                          </span>
+                       </span>
+                       <div className="flex items-center gap-2 shrink-0">
+                         {(ignoredAlerts.some(k => k.startsWith('disc_')) || minimizedAlerts.some(k => k.startsWith('disc_'))) && (
+                           <button
+                             onClick={(e) => {
+                               e.stopPropagation();
+                               setIgnoredAlerts(prev => prev.filter(k => !k.startsWith('disc_')));
+                               setMinimizedAlerts(prev => prev.filter(k => !k.startsWith('disc_')));
+                             }}
+                             className="text-[9px] font-bold text-indigo-300 hover:text-indigo-200 hover:underline flex items-center gap-1 cursor-pointer transition-all bg-white/5 hover:bg-white/10 px-2 py-0.5 rounded-lg border border-white/10 active:scale-95 z-20"
+                             title="Restaurar alertas de discipulado ocultados ou minimizados"
+                           >
+                             Restaurar
+                           </button>
+                         )}
+                         <ChevronDown className={clsx("w-4 h-4 text-gray-400 group-hover/hdr:text-white transition-all duration-200", isDiscipleshipInsightsExpanded && "rotate-180")} />
+                       </div>
+                    </div>
+                    
+                    {isDiscipleshipInsightsExpanded && (
+                      <>
+                        <div className="flex flex-col gap-1 bg-white/5 border border-white/10 rounded-2xl p-3 text-xs leading-relaxed animate-in fade-in duration-200">
+                          <div className="flex justify-between font-bold text-gray-300">
+                            <span>Total de Membros Ativos:</span>
+                            <span className="text-indigo-300">{draftMembers.filter(m => m.status === 'Ativo').length} membros</span>
+                          </div>
+                          <div className="flex justify-between text-[10px] text-gray-400 font-semibold">
+                            <span>Vínculos de Discipulado:</span>
+                            <span>{draftLinks.length} vínculos</span>
+                          </div>
+                          <p className="text-[9px] text-gray-400 mt-1 border-t border-white/5 pt-1">
+                            Análise em tempo real do ecossistema de discipulado: monitora membros sem acompanhamento espiritual (isolados), discipuladores sobrecarregados e deslocamentos excessivos.
+                          </p>
+                        </div>
+
+                        <div className="space-y-4 animate-in fade-in duration-200">
+                           {/* 1. Membros Isolados Alert */}
+                           {activeIsolatedMembers.length > 0 && (() => {
+                             const key = 'disc_isolated_summary';
+                             const isMinimized = minimizedAlerts.includes(key);
+                             if (isMinimized) {
+                               return (
+                                 <div className="rounded-2xl p-3 border transition-all cursor-default group flex items-center justify-between gap-3 animate-in fade-in duration-200 bg-white/5 border-white/5 hover:bg-white/10">
+                                   <div className="flex items-center gap-2 min-w-0">
+                                      <AlertTriangle className="w-3.5 h-3.5 text-amber-400/60 shrink-0" />
+                                      <span className="text-xs font-bold text-gray-300 truncate">Membros Ativos Isolados</span>
+                                      <span className="text-[8px] uppercase font-semibold text-gray-500 bg-white/5 px-1.5 py-0.2 rounded shrink-0">Minimizado</span>
+                                   </div>
+                                   <div className="flex items-center gap-1 shrink-0">
+                                     <button 
+                                       onClick={() => toggleMinimizeAlert(key)}
+                                       className="text-gray-400 hover:text-white p-1 hover:bg-white/5 rounded-lg transition-all cursor-pointer"
+                                     >
+                                       <ChevronDown className="w-3.5 h-3.5" />
+                                     </button>
+                                   </div>
+                                 </div>
+                               );
+                             }
+                             return (
+                               <div className="rounded-2xl p-4 border transition-all cursor-default group relative animate-in fade-in duration-200 bg-white/10 border-white/10 hover:bg-white/20">
+                                 <div className="flex justify-between items-start gap-2 mb-2">
+                                   <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                                      <AlertTriangle className="w-4 h-4 text-amber-400 animate-pulse" />
+                                      {activeIsolatedMembers.length} Membros Isolados
+                                   </h4>
+                                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                     <button 
+                                       onClick={() => toggleMinimizeAlert(key)}
+                                       className="text-gray-400 hover:text-white p-1 hover:bg-white/5 rounded-lg transition-all cursor-pointer"
+                                     >
+                                       <ChevronUp className="w-3.5 h-3.5" />
+                                     </button>
+                                   </div>
+                                 </div>
+                                 <p className="text-xs text-gray-300 leading-relaxed mb-3">
+                                   Existem {activeIsolatedMembers.length} membros ativos sem vínculo de discipulado. Sugere-se vinculá-los a discipuladores na mesma região administrativa para garantir o cuidado.
+                                 </p>
+                                 <div className="text-[10px] font-bold uppercase tracking-tighter px-2 py-1 rounded inline-block text-amber-300 bg-amber-500/10">
+                                   Ação: Vincular via Auditoria de Discipulado
+                                 </div>
+                               </div>
+                             );
+                           })()}
+
+                           {/* 2. Discipuladores Sobrecarregados Alert */}
+                           {activeOverloadedDisciplers.length > 0 && (() => {
+                             const key = 'disc_overloaded_summary';
+                             const isMinimized = minimizedAlerts.includes(key);
+                             if (isMinimized) {
+                               return (
+                                 <div className="rounded-2xl p-3 border transition-all cursor-default group flex items-center justify-between gap-3 animate-in fade-in duration-200 bg-white/5 border-white/5 hover:bg-white/10">
+                                   <div className="flex items-center gap-2 min-w-0">
+                                      <AlertTriangle className="w-3.5 h-3.5 text-rose-400/60 shrink-0" />
+                                      <span className="text-xs font-bold text-gray-300 truncate">Líderes Sobrecarregados</span>
+                                      <span className="text-[8px] uppercase font-semibold text-gray-500 bg-white/5 px-1.5 py-0.2 rounded shrink-0">Minimizado</span>
+                                   </div>
+                                   <div className="flex items-center gap-1 shrink-0">
+                                     <button 
+                                       onClick={() => toggleMinimizeAlert(key)}
+                                       className="text-gray-400 hover:text-white p-1 hover:bg-white/5 rounded-lg transition-all cursor-pointer"
+                                     >
+                                       <ChevronDown className="w-3.5 h-3.5" />
+                                     </button>
+                                   </div>
+                                 </div>
+                               );
+                             }
+                             return (
+                               <div className="rounded-2xl p-4 border transition-all cursor-default group relative animate-in fade-in duration-200 bg-white/10 border-white/10 hover:bg-white/20">
+                                 <div className="flex justify-between items-start gap-2 mb-2">
+                                   <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                                      <AlertTriangle className="w-4 h-4 text-rose-400 animate-pulse" />
+                                      {activeOverloadedDisciplers.length} Líderes Sobrecarregados
+                                   </h4>
+                                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                     <button 
+                                       onClick={() => toggleMinimizeAlert(key)}
+                                       className="text-gray-400 hover:text-white p-1 hover:bg-white/5 rounded-lg transition-all cursor-pointer"
+                                     >
+                                       <ChevronUp className="w-3.5 h-3.5" />
+                                     </button>
+                                   </div>
+                                 </div>
+                                 <p className="text-xs text-gray-300 leading-relaxed mb-3">
+                                   {activeOverloadedDisciplers.length} discipuladores possuem mais do que o limite recomendado de 5 discípulos ativos (Excesso de Cuidado).
+                                 </p>
+                                 <div className="text-[10px] font-bold uppercase tracking-tighter px-2 py-1 rounded inline-block text-rose-300 bg-rose-500/10">
+                                   Ação: Descentralizar Vínculos
+                                 </div>
+                               </div>
+                             );
+                           })()}
+
+                           {/* 3. Vínculos Distantes Alert */}
+                           {activeDisplacedDisciples.length > 0 && (() => {
+                             const key = 'disc_displaced_summary';
+                             const isMinimized = minimizedAlerts.includes(key);
+                             if (isMinimized) {
+                               return (
+                                 <div className="rounded-2xl p-3 border transition-all cursor-default group flex items-center justify-between gap-3 animate-in fade-in duration-200 bg-white/5 border-white/5 hover:bg-white/10">
+                                   <div className="flex items-center gap-2 min-w-0">
+                                      <MapPin className="w-3.5 h-3.5 text-indigo-400/60 shrink-0" />
+                                      <span className="text-xs font-bold text-gray-300 truncate">Vínculos Distantes (&gt; 8 km)</span>
+                                      <span className="text-[8px] uppercase font-semibold text-gray-500 bg-white/5 px-1.5 py-0.2 rounded shrink-0">Minimizado</span>
+                                   </div>
+                                   <div className="flex items-center gap-1 shrink-0">
+                                     <button 
+                                       onClick={() => toggleMinimizeAlert(key)}
+                                       className="text-gray-400 hover:text-white p-1 hover:bg-white/5 rounded-lg transition-all cursor-pointer"
+                                     >
+                                       <ChevronDown className="w-3.5 h-3.5" />
+                                     </button>
+                                   </div>
+                                 </div>
+                               );
+                             }
+                             return (
+                               <div className="rounded-2xl p-4 border transition-all cursor-default group relative animate-in fade-in duration-200 bg-white/10 border-white/10 hover:bg-white/20">
+                                 <div className="flex justify-between items-start gap-2 mb-2">
+                                   <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                                      <MapPin className="w-4 h-4 text-indigo-400" />
+                                      {activeDisplacedDisciples.length} Vínculos Distantes
+                                   </h4>
+                                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                     <button 
+                                       onClick={() => toggleMinimizeAlert(key)}
+                                       className="text-gray-400 hover:text-white p-1 hover:bg-white/5 rounded-lg transition-all cursor-pointer"
+                                     >
+                                       <ChevronUp className="w-3.5 h-3.5" />
+                                     </button>
+                                   </div>
+                                 </div>
+                                 <p className="text-xs text-gray-300 leading-relaxed mb-3">
+                                   Detectamos {activeDisplacedDisciples.length} vínculos de discipulado onde a distância entre líder e discípulo supera 8 km, dificultando encontros presenciais recorrentes.
+                                 </p>
+                                 <div className="text-[10px] font-bold uppercase tracking-tighter px-2 py-1 rounded inline-block text-indigo-300 bg-indigo-500/10">
+                                   Ação: Reaproximar Espacialmente
+                                 </div>
+                               </div>
+                             );
+                           })()}
+
+                           {activeIsolatedMembers.length === 0 && activeOverloadedDisciplers.length === 0 && activeDisplacedDisciples.length === 0 && (
+                             <div className="text-center py-8 opacity-50">
+                                <CheckCircle2 className="w-10 h-10 mx-auto mb-2 text-emerald-400 animate-pulse" />
+                                <p className="text-xs font-semibold">Tudo verde! Rede de discipulado 100% equilibrada, cuidada e integrada espacialmente.</p>
+                             </div>
+                           )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-primary-600/20 rounded-full blur-3xl"></div>
+               </div>
+             )}
+
+             {activeTab === 'gc' ? (
               <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm space-y-4 animate-in fade-in duration-300">
               <div className="flex items-center justify-between">
                 <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
@@ -2910,7 +3568,7 @@ export const Simulations: React.FC = () => {
                               <div className="flex items-center gap-1.5 flex-wrap shrink-0">
                                 <button
                                   onClick={() => handleLocalizeGC(gc.gc)}
-                                  className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline cursor-pointer"
+                                  className="text-[10px] font-bold text-indigo-600 hover:text-indigo-850 hover:underline cursor-pointer"
                                 >
                                   📍 Localizar
                                 </button>
@@ -2919,7 +3577,7 @@ export const Simulations: React.FC = () => {
                                     setSelectedTarget(gc.gc);
                                     window.scrollTo({ top: 300, behavior: 'smooth' });
                                   }}
-                                  className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline cursor-pointer"
+                                  className="text-[10px] font-bold text-indigo-600 hover:text-indigo-850 hover:underline cursor-pointer"
                                 >
                                   Destinar
                                 </button>
@@ -3144,6 +3802,349 @@ export const Simulations: React.FC = () => {
                 </div>
               </div>
             </div>
+            ) : (
+              <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm space-y-4 animate-in fade-in duration-300">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                    <UserCheck className="w-4 h-4 text-primary-500" /> Auditoria da Rede de Discipulado
+                  </h4>
+                  <span className="text-[10px] bg-primary-50 text-primary-700 font-extrabold px-2 py-0.5 rounded-full border border-primary-100 animate-pulse flex items-center gap-1.5">
+                    {activeIsolatedMembers.length + activeOverloadedDisciplers.length + activeDisplacedDisciples.length} pendências
+                    {(ignoredAlerts.some(k => k.startsWith('disc_')) || minimizedAlerts.some(k => k.startsWith('disc_'))) && (
+                      <button
+                        onClick={() => {
+                          const newIgnored = ignoredAlerts.filter(k => !k.startsWith('disc_'));
+                          const newMinimized = minimizedAlerts.filter(k => !k.startsWith('disc_'));
+                          setIgnoredAlerts(newIgnored);
+                          setMinimizedAlerts(newMinimized);
+                          localStorage.setItem('ignoredAlerts', JSON.stringify(newIgnored));
+                          localStorage.setItem('minimizedAlerts', JSON.stringify(newMinimized));
+                        }}
+                        className="text-[9px] font-bold text-primary-700 hover:text-primary-950 hover:underline border-l border-primary-200 pl-1.5 ml-1 cursor-pointer transition-all active:scale-95"
+                        title="Restaurar todos os alertas de auditoria de discipulado ocultados ou minimizados"
+                      >
+                        Restaurar
+                      </button>
+                    )}
+                  </span>
+                </div>
+
+                <div className="space-y-3">
+                  {/* 1. Membros Ativos Isolados */}
+                  <div className="border border-gray-100 rounded-2xl overflow-hidden">
+                    <button 
+                      onClick={() => setIsDiscAuditIsolatedExpanded(!isDiscAuditIsolatedExpanded)}
+                      className="w-full flex items-center justify-between p-3.5 bg-gray-50/50 hover:bg-gray-50 text-left transition-all cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 text-amber-500" />
+                        <span className="text-xs font-bold text-gray-700">Membros Ativos Isolados</span>
+                        <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-1.5 py-0.5 rounded-full">
+                          {activeIsolatedMembers.length}
+                        </span>
+                      </div>
+                      <ChevronDown className={clsx("w-4 h-4 text-gray-400 transition-transform", isDiscAuditIsolatedExpanded && "rotate-180")} />
+                    </button>
+                    
+                    {isDiscAuditIsolatedExpanded && (
+                      <div className="p-3 bg-white space-y-3 max-h-72 overflow-y-auto divide-y divide-gray-50 scrollbar-thin">
+                        {activeIsolatedMembers.length > 0 ? (
+                          activeIsolatedMembers.map((m: any) => {
+                            const key = `disc_isolated_${m.id}`;
+                            const isMinimized = minimizedAlerts.includes(key);
+                            
+                            if (isMinimized) {
+                              return (
+                                <div key={key} className="py-2 first:pt-0 flex items-center justify-between gap-2 text-xs border-b border-gray-50 last:border-0 animate-in fade-in duration-150">
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <span className="text-xs font-black text-gray-800 truncate">{m.name}</span>
+                                    <span className="text-[8px] bg-gray-100 text-gray-500 px-1 py-0.2 rounded font-bold uppercase shrink-0">Minimizado</span>
+                                  </div>
+                                  <div className="flex items-center gap-1 shrink-0 opacity-60 hover:opacity-100 transition-opacity">
+                                    <button 
+                                      onClick={() => toggleMinimizeAlert(key)}
+                                      className="text-gray-400 hover:text-indigo-600 p-0.5 hover:bg-gray-100 rounded transition-all cursor-pointer"
+                                      title="Maximizar"
+                                    >
+                                      <ChevronDown className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button 
+                                      onClick={() => toggleIgnoreAlert(key)}
+                                      className="text-gray-400 hover:text-rose-500 p-0.5 hover:bg-gray-100 rounded transition-all cursor-pointer"
+                                      title="Ignorar"
+                                    >
+                                      <EyeOff className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            }
+                            
+                            return (
+                              <div key={key} className="pt-2 first:pt-0 space-y-1 group relative animate-in fade-in duration-150">
+                                <div className="flex justify-between items-start gap-2">
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <span className="text-xs font-black text-gray-800 truncate">{m.name}</span>
+                                    <button
+                                      onClick={() => handleLocalizeMember(m.id)}
+                                      className="text-[9px] font-semibold text-indigo-600 hover:text-indigo-850 hover:underline cursor-pointer flex items-center gap-0.5 shrink-0"
+                                      title="Localizar este membro no mapa"
+                                    >
+                                      📍 Localizar
+                                    </button>
+                                  </div>
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <span className="text-[9px] bg-amber-50 text-amber-700 px-1.5 py-0.2 rounded font-bold uppercase border border-amber-100">
+                                      {m.ra}
+                                    </span>
+                                    <div className="flex items-center gap-0.5 opacity-60 hover:opacity-100 transition-opacity">
+                                      <button 
+                                        onClick={() => toggleMinimizeAlert(key)}
+                                        className="text-gray-400 hover:text-indigo-600 p-0.5 hover:bg-gray-100 rounded transition-all cursor-pointer"
+                                        title="Minimizar"
+                                      >
+                                        <ChevronUp className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button 
+                                        onClick={() => toggleIgnoreAlert(key)}
+                                        className="text-gray-400 hover:text-rose-500 p-0.5 hover:bg-gray-100 rounded transition-all cursor-pointer"
+                                        title="Ignorar"
+                                      >
+                                        <EyeOff className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                                <p className="text-[10px] text-gray-500 leading-relaxed">
+                                  Reside em <span className="font-semibold text-gray-700">{m.bairro}</span>. Sem discipulador vinculado.
+                                </p>
+                                {m.recommendations && m.recommendations.length > 0 ? (
+                                  <div className="mt-2 p-2 bg-indigo-50/30 rounded-xl space-y-1.5 border border-indigo-50/50">
+                                    <span className="text-[9px] font-bold text-indigo-800 block mb-1">
+                                      💡 Líderes sugeridos no mesmo RA ({m.ra}):
+                                    </span>
+                                    <div className="space-y-1">
+                                      {m.recommendations.map((rec: any) => (
+                                        <div key={rec.name} className="flex items-center justify-between text-[10px] bg-white px-2 py-1 rounded-lg border border-gray-100 hover:border-indigo-150 transition-all">
+                                          <div className="flex items-center gap-1.5">
+                                            <span className="font-bold text-gray-700">{rec.name}</span>
+                                            <span className="text-[8px] bg-gray-100 text-gray-500 px-1 py-0.2 rounded font-semibold">
+                                              {rec.count} disc.
+                                            </span>
+                                            {rec.distance !== null && (
+                                              <span className="text-[8px] text-indigo-600 font-extrabold">
+                                                {rec.distance.toFixed(1)} km
+                                              </span>
+                                            )}
+                                          </div>
+                                          <button
+                                            onClick={() => handleLinkDiscipleship(m.name, rec.name)}
+                                            className="text-[9px] bg-indigo-600 text-white font-extrabold px-2 py-0.5 rounded hover:bg-indigo-700 active:scale-95 transition-all cursor-pointer flex items-center gap-0.5"
+                                          >
+                                            ⚡ Vincular
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <p className="text-[9px] text-gray-400 italic">Nenhum discipulador disponível no mesmo RA ({m.ra}).</p>
+                                )}
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <p className="text-[11px] text-gray-400 text-center py-2 animate-in fade-in duration-150">Nenhum membro ativo isolado detectado.</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 2. Discipuladores Sobrecarregados */}
+                  <div className="border border-gray-100 rounded-2xl overflow-hidden">
+                    <button 
+                      onClick={() => setIsDiscAuditOverloadedExpanded(!isDiscAuditOverloadedExpanded)}
+                      className="w-full flex items-center justify-between p-3.5 bg-gray-50/50 hover:bg-gray-50 text-left transition-all cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className="w-4 h-4 text-rose-500" />
+                        <span className="text-xs font-bold text-gray-700">Discipuladores Sobrecarregados (&gt; 5)</span>
+                        <span className="text-[10px] bg-rose-100 text-rose-800 font-bold px-1.5 py-0.5 rounded-full">
+                          {activeOverloadedDisciplers.length}
+                        </span>
+                      </div>
+                      <ChevronDown className={clsx("w-4 h-4 text-gray-400 transition-transform", isDiscAuditOverloadedExpanded && "rotate-180")} />
+                    </button>
+                    
+                    {isDiscAuditOverloadedExpanded && (
+                      <div className="p-3 bg-white space-y-2 max-h-56 overflow-y-auto divide-y divide-gray-50 scrollbar-thin">
+                        {activeOverloadedDisciplers.length > 0 ? (
+                          activeOverloadedDisciplers.map((d: any) => {
+                            const key = `disc_overloaded_${d.name}`;
+                            const isMinimized = minimizedAlerts.includes(key);
+                            
+                            if (isMinimized) {
+                              return (
+                                <div key={key} className="pt-2 first:pt-0 flex items-center justify-between text-xs animate-in fade-in duration-150">
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <span className="font-semibold text-gray-700 truncate">{d.name}</span>
+                                    <span className="font-black text-rose-600 shrink-0">{d.count} discípulos</span>
+                                    <span className="text-[8px] bg-gray-100 text-gray-500 px-1 py-0.2 rounded font-bold uppercase shrink-0">Minimizado</span>
+                                  </div>
+                                  <div className="flex items-center gap-1 shrink-0 opacity-60 hover:opacity-100 transition-opacity">
+                                    <button 
+                                      onClick={() => toggleMinimizeAlert(key)}
+                                      className="text-gray-400 hover:text-indigo-600 p-0.5 hover:bg-gray-100 rounded transition-all cursor-pointer"
+                                      title="Maximizar"
+                                    >
+                                      <ChevronDown className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button 
+                                      onClick={() => toggleIgnoreAlert(key)}
+                                      className="text-gray-400 hover:text-rose-500 p-0.5 hover:bg-gray-100 rounded transition-all cursor-pointer"
+                                      title="Ignorar"
+                                    >
+                                      <EyeOff className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <div key={key} className="pt-2 first:pt-0 flex flex-col gap-1 text-xs group relative animate-in fade-in duration-150">
+                                <div className="flex justify-between items-center">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <span className="font-bold text-gray-800 truncate">{d.name}</span>
+                                    <span className="font-black text-rose-650 shrink-0 bg-rose-50 border border-rose-100 px-1.5 py-0.2 rounded-full text-[9px]">{d.count} discípulos</span>
+                                  </div>
+                                  <div className="flex items-center gap-0.5 opacity-60 hover:opacity-100 transition-opacity">
+                                    <button 
+                                      onClick={() => toggleMinimizeAlert(key)}
+                                      className="text-gray-400 hover:text-indigo-600 p-0.5 hover:bg-gray-100 rounded transition-all cursor-pointer"
+                                      title="Minimizar"
+                                    >
+                                      <ChevronUp className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button 
+                                      onClick={() => toggleIgnoreAlert(key)}
+                                      className="text-gray-400 hover:text-rose-500 p-0.5 hover:bg-gray-100 rounded transition-all cursor-pointer"
+                                      title="Ignorar"
+                                    >
+                                      <EyeOff className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                                <div className="text-[10px] text-gray-500 mt-1 pl-2 border-l-2 border-rose-200">
+                                  <span className="font-bold block text-gray-650 mb-0.5">Discípulos:</span>
+                                  <p className="leading-relaxed">{d.disciples.join(', ')}</p>
+                                </div>
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <p className="text-[11px] text-gray-400 text-center py-2 animate-in fade-in duration-150">Nenhum discipulador sobrecarregado (&gt; 5 discípulos).</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 3. Vínculos Distantes */}
+                  <div className="border border-gray-100 rounded-2xl overflow-hidden">
+                    <button 
+                      onClick={() => setIsDiscAuditDisplacedExpanded(!isDiscAuditDisplacedExpanded)}
+                      className="w-full flex items-center justify-between p-3.5 bg-gray-50/50 hover:bg-gray-50 text-left transition-all cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2">
+                        <MapPin className="w-4 h-4 text-indigo-500" />
+                        <span className="text-xs font-bold text-gray-700">Vínculos Distantes (&gt; 8 km)</span>
+                        <span className="text-[10px] bg-indigo-100 text-indigo-800 font-bold px-1.5 py-0.5 rounded-full">
+                          {activeDisplacedDisciples.length}
+                        </span>
+                      </div>
+                      <ChevronDown className={clsx("w-4 h-4 text-gray-400 transition-transform", isDiscAuditDisplacedExpanded && "rotate-180")} />
+                    </button>
+                    
+                    {isDiscAuditDisplacedExpanded && (
+                      <div className="p-3 bg-white space-y-2 max-h-56 overflow-y-auto divide-y divide-gray-50 scrollbar-thin">
+                        {activeDisplacedDisciples.length > 0 ? (
+                          activeDisplacedDisciples.map((d: any) => {
+                            const key = `disc_displaced_${d.discipleId}`;
+                            const isMinimized = minimizedAlerts.includes(key);
+                            
+                            if (isMinimized) {
+                              return (
+                                <div key={key} className="pt-2 first:pt-0 flex items-center justify-between text-xs animate-in fade-in duration-150">
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <span className="font-semibold text-gray-700 truncate">{d.discipleName} ➔ {d.disciplerName}</span>
+                                    <span className="font-black text-indigo-655 shrink-0">{d.distance.toFixed(1)} km</span>
+                                    <span className="text-[8px] bg-gray-100 text-gray-500 px-1 py-0.2 rounded font-bold uppercase shrink-0">Minimizado</span>
+                                  </div>
+                                  <div className="flex items-center gap-1 shrink-0 opacity-60 hover:opacity-100 transition-opacity">
+                                    <button 
+                                      onClick={() => toggleMinimizeAlert(key)}
+                                      className="text-gray-400 hover:text-indigo-600 p-0.5 hover:bg-gray-100 rounded transition-all cursor-pointer"
+                                      title="Maximizar"
+                                    >
+                                      <ChevronDown className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button 
+                                      onClick={() => toggleIgnoreAlert(key)}
+                                      className="text-gray-400 hover:text-rose-500 p-0.5 hover:bg-gray-100 rounded transition-all cursor-pointer"
+                                      title="Ignorar"
+                                    >
+                                      <EyeOff className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <div key={key} className="pt-2 first:pt-0 space-y-1 group relative animate-in fade-in duration-150 text-xs">
+                                <div className="flex justify-between items-start gap-2">
+                                  <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                                    <span className="font-bold text-gray-800 truncate">{d.discipleName}</span>
+                                    <span className="text-gray-400">➔</span>
+                                    <span className="font-semibold text-gray-650 truncate">{d.disciplerName}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <span className="text-[9px] bg-rose-50 text-rose-700 border border-rose-100 px-1.5 py-0.2 rounded font-extrabold uppercase animate-pulse">
+                                      {d.distance.toFixed(1)} km
+                                    </span>
+                                    <div className="flex items-center gap-0.5 opacity-60 hover:opacity-100 transition-opacity">
+                                      <button 
+                                        onClick={() => toggleMinimizeAlert(key)}
+                                        className="text-gray-400 hover:text-indigo-600 p-0.5 hover:bg-gray-100 rounded transition-all cursor-pointer"
+                                        title="Minimizar"
+                                      >
+                                        <ChevronUp className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button 
+                                        onClick={() => toggleIgnoreAlert(key)}
+                                        className="text-gray-400 hover:text-rose-500 p-0.5 hover:bg-gray-100 rounded transition-all cursor-pointer"
+                                        title="Ignorar"
+                                      >
+                                        <EyeOff className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                                <p className="text-[10px] text-gray-500 leading-relaxed">
+                                  Deslocamento espacial crítico detectado. Discípulo em <span className="font-semibold text-gray-700">{d.discipleRA}</span> e Discipulador em <span className="font-semibold text-gray-700">{d.disciplerRA}</span>.
+                                </p>
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <p className="text-[11px] text-gray-400 text-center py-2 animate-in fade-in duration-150">Nenhum vínculo com desvio de distância crítico (&gt; 8 km).</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* 3. Summary of Changes */}
             <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm">
@@ -3151,53 +4152,98 @@ export const Simulations: React.FC = () => {
                   <AlertTriangle className="w-4 h-4 text-amber-500" /> Resumo do Cenário Draft
                </h4>
                <div className="space-y-6">
-                  <div>
-                     <div className="flex justify-between text-sm mb-2 font-medium">
-                        <span className="text-gray-500">Membros Alocados Fora da Base Real</span>
-                        <span className="font-extrabold text-indigo-600">
-                           {impactStats.changes}
-                        </span>
-                     </div>
-                     <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-indigo-500 transition-all duration-500"
-                          style={{ width: `${Math.min((impactStats.changes / draftMembers.length) * 100 * 5, 100)}%` }}
-                        />
-                     </div>
-                  </div>
-                   {impactStats.movedMembers && impactStats.movedMembers.length > 0 ? (
-                     <div className="space-y-2.5 pt-4 border-t border-gray-50">
-                       <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Mapeamento de Transferências (De ➔ Para)</label>
-                       <div className="space-y-2 max-h-60 overflow-y-auto pr-1 scrollbar-thin">
-                         {impactStats.movedMembers.map(m => (
-                           <div key={m.id} className="p-2.5 bg-gray-50 border border-gray-100 rounded-xl space-y-1.5 hover:bg-gray-100/70 transition-all">
-                             <div className="flex justify-between items-center">
-                               <span className="text-xs font-bold text-gray-800">{m.nome}</span>
-                               {m.bairro && (
-                                 <span className="text-[8px] bg-indigo-50 text-indigo-700 font-extrabold px-1.5 py-0.5 rounded">
-                                   📍 {m.bairro}
-                                 </span>
-                               )}
-                             </div>
-                             <div className="flex items-center gap-1.5 text-[10px] text-gray-500 font-semibold">
-                               <span className="bg-red-50 text-red-700 px-1.5 py-0.5 rounded border border-red-100 line-through truncate max-w-[150px]">{m.de}</span>
-                               <span className="text-gray-400 font-bold">➔</span>
-                               <span className="bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded border border-emerald-100 font-extrabold truncate max-w-[150px]">{m.para}</span>
-                             </div>
+                  {activeTab === 'gc' ? (
+                    <>
+                      <div>
+                         <div className="flex justify-between text-sm mb-2 font-medium">
+                            <span className="text-gray-500">Membros Alocados Fora da Base Real</span>
+                            <span className="font-extrabold text-indigo-600">
+                               {impactStats.changes}
+                            </span>
+                         </div>
+                         <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-indigo-500 transition-all duration-500"
+                              style={{ width: `${Math.min((impactStats.changes / draftMembers.length) * 100 * 5, 100)}%` }}
+                            />
+                         </div>
+                      </div>
+                       {impactStats.movedMembers && impactStats.movedMembers.length > 0 ? (
+                         <div className="space-y-2.5 pt-4 border-t border-gray-50">
+                           <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Mapeamento de Transferências (De ➔ Para)</label>
+                           <div className="space-y-2 max-h-60 overflow-y-auto pr-1 scrollbar-thin">
+                             {impactStats.movedMembers.map(m => (
+                               <div key={m.id} className="p-2.5 bg-gray-50 border border-gray-100 rounded-xl space-y-1.5 hover:bg-gray-100/70 transition-all">
+                                 <div className="flex justify-between items-center">
+                                   <span className="text-xs font-bold text-gray-800">{m.nome}</span>
+                                   {m.bairro && (
+                                     <span className="text-[8px] bg-indigo-50 text-indigo-700 font-extrabold px-1.5 py-0.5 rounded">
+                                       📍 {m.bairro}
+                                     </span>
+                                   )}
+                                 </div>
+                                 <div className="flex items-center gap-1.5 text-[10px] text-gray-500 font-semibold">
+                                   <span className="bg-red-50 text-red-700 px-1.5 py-0.5 rounded border border-red-100 line-through truncate max-w-[150px]">{m.de}</span>
+                                   <span className="text-gray-400 font-bold">➔</span>
+                                   <span className="bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded border border-emerald-100 font-extrabold truncate max-w-[150px]">{m.para}</span>
+                                 </div>
+                               </div>
+                             ))}
                            </div>
-                         ))}
-                       </div>
-                     </div>
-                   ) : (
-                     <div className="text-center py-4 bg-gray-50/50 border border-dashed border-gray-200 rounded-2xl">
-                       <p className="text-[11px] text-gray-400 font-bold">Nenhuma alteração simulada ainda</p>
-                       <p className="text-[9px] text-gray-400 font-medium">Mova membros entre os GCs para ver o resumo de transferência aqui.</p>
-                     </div>
-                   )}
+                         </div>
+                       ) : (
+                         <div className="text-center py-4 bg-gray-50/50 border border-dashed border-gray-200 rounded-2xl">
+                           <p className="text-[11px] text-gray-400 font-bold">Nenhuma alteração simulada ainda</p>
+                           <p className="text-[9px] text-gray-400 font-medium">Mova membros entre os GCs para ver o resumo de transferência aqui.</p>
+                         </div>
+                       )}
+                    </>
+                  ) : (
+                    <>
+                      <div>
+                         <div className="flex justify-between text-sm mb-2 font-medium">
+                            <span className="text-gray-500">Vínculos de Discipulado Alterados</span>
+                            <span className="font-extrabold text-primary-600">
+                               {discipleshipImpactStats.changes}
+                            </span>
+                         </div>
+                         <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-primary-500 transition-all duration-500"
+                              style={{ width: `${Math.min((discipleshipImpactStats.changes / Math.max(draftLinks.length, 1)) * 100, 100)}%` }}
+                            />
+                         </div>
+                      </div>
+                       {discipleshipImpactStats.movedLinks && discipleshipImpactStats.movedLinks.length > 0 ? (
+                         <div className="space-y-2.5 pt-4 border-t border-gray-50">
+                           <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Mapeamento de Novos Vínculos (De ➔ Para)</label>
+                           <div className="space-y-2 max-h-60 overflow-y-auto pr-1 scrollbar-thin">
+                             {discipleshipImpactStats.movedLinks.map((ml, idx) => (
+                               <div key={`${ml.discipulo}_${idx}`} className="p-2.5 bg-gray-50 border border-gray-100 rounded-xl space-y-1.5 hover:bg-gray-100/70 transition-all">
+                                 <div className="flex justify-between items-center">
+                                   <span className="text-xs font-bold text-gray-800">{ml.discipulo}</span>
+                                 </div>
+                                 <div className="flex items-center gap-1.5 text-[10px] text-gray-500 font-semibold">
+                                   <span className="bg-red-50 text-red-700 px-1.5 py-0.5 rounded border border-red-100 line-through truncate max-w-[150px]">{ml.de}</span>
+                                   <span className="text-gray-400 font-bold">➔</span>
+                                   <span className="bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded border border-emerald-100 font-extrabold truncate max-w-[150px]">{ml.para}</span>
+                                 </div>
+                               </div>
+                             ))}
+                           </div>
+                         </div>
+                       ) : (
+                         <div className="text-center py-4 bg-gray-50/50 border border-dashed border-gray-200 rounded-2xl">
+                           <p className="text-[11px] text-gray-400 font-bold">Nenhum vínculo simulado ainda</p>
+                           <p className="text-[9px] text-gray-400 font-medium">Vincule membros a líderes na lista de auditoria de discipulado para ver o resumo de novos vínculos aqui.</p>
+                         </div>
+                       )}
+                    </>
+                  )}
 
                   <div className="pt-4 border-t border-gray-50">
                      <p className="text-xs text-gray-500 leading-relaxed">
-                       <strong>Nota de Auxílio:</strong> Se as mudanças planejadas estiverem satisfatórias, você pode exportar este plano em formato PDF/Excel usando o botão "Salvar Modelo" para apresentá-lo na próxima reunião de liderança.
+                        <strong>Nota de Auxílio:</strong> Se as mudanças planejadas estiverem satisfatórias, você pode exportar este plano em formato PDF/Excel usando o botão "Salvar Modelo" para apresentá-lo na próxima reunião de liderança.
                      </p>
                   </div>
                </div>
@@ -3670,7 +4716,11 @@ export const Simulations: React.FC = () => {
 
               <div className="flex items-center justify-between text-xs">
                 <span className="font-bold text-gray-700 flex items-center gap-2">
-                  📊 3. Transmitir lote de {impactStats.changes} remanejamentos
+                  {activeTab === 'gc' ? (
+                    <>📊 3. Transmitir lote de {impactStats.changes} remanejamentos</>
+                  ) : (
+                    <>📊 3. Transmitir lote de {discipleshipImpactStats.changes} novos vínculos</>
+                  )}
                 </span>
                 {proverComplete ? (
                   <span className="text-[10px] text-emerald-600 font-extrabold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">HOMOLOGADO</span>
@@ -3696,7 +4746,11 @@ export const Simulations: React.FC = () => {
             {proverComplete ? (
               <div className="space-y-4">
                 <div className="p-3 bg-emerald-50 text-emerald-800 text-[11px] leading-relaxed font-bold border border-emerald-100 rounded-xl">
-                  🎉 Lote de Simulação Homologado com Sucesso! Os remanejamentos e novas células foram enviados e integrados à moderação administrativa do PROVER. As mudanças estarão ativas em instantes.
+                  {activeTab === 'gc' ? (
+                    "🎉 Lote de Simulação Homologado com Sucesso! Os remanejamentos e novas células foram enviados e integrados à moderação administrativa do PROVER. As mudanças estarão ativas em instantes."
+                  ) : (
+                    "🎉 Lote de Simulação de Discipulado Homologado com Sucesso! Os novos vínculos de discipulado foram enviados e integrados à moderação administrativa do PROVER. As mudanças estarão ativas em instantes."
+                  )}
                 </div>
                 <button
                   onClick={() => setProverModalOpen(false)}
