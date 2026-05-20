@@ -78,6 +78,7 @@ export const AdminUsers: React.FC = () => {
   const [syncMessage, setSyncMessage] = useState('');
   const [syncProgress, setSyncProgress] = useState(0);
   const [currentStepText, setCurrentStepText] = useState('');
+  const [lastSyncTime, setLastSyncTime] = useState<string>('Buscando...');
 
   useEffect(() => {
     let interval: any;
@@ -96,6 +97,7 @@ export const AdminUsers: React.FC = () => {
         if (currentProgress >= 100) {
           setCurrentStepText('Banco de dados atualizado com sucesso!');
           clearInterval(interval);
+          fetchLastSyncTime();
         } else if (currentProgress < 15) {
           setCurrentStepText('Iniciando servidores na nuvem...');
         } else if (currentProgress < 40) {
@@ -136,6 +138,50 @@ export const AdminUsers: React.FC = () => {
       }
     } catch (error) {
       console.error('Error fetching GCs:', error);
+    }
+  };
+
+  const fetchLastSyncTime = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('membros')
+        .select('data_atualizacao')
+        .order('data_atualizacao', { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+
+      if (data && data.length > 0 && data[0].data_atualizacao) {
+        const dateStr = data[0].data_atualizacao;
+        const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/);
+        if (match) {
+          const [_, y, m, d, hr, min] = match;
+          const now = new Date();
+          const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+          const dbDateOnly = `${y}-${m}-${d}`;
+          
+          if (dbDateOnly === todayStr) {
+            setLastSyncTime(`Hoje, às ${hr}:${min}`);
+          } else {
+            const yesterday = new Date();
+            yesterday.setDate(now.getDate() - 1);
+            const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+            
+            if (dbDateOnly === yesterdayStr) {
+              setLastSyncTime(`Ontem, às ${hr}:${min}`);
+            } else {
+              setLastSyncTime(`${d}/${m}/${y} às ${hr}:${min}`);
+            }
+          }
+        } else {
+          setLastSyncTime(dateStr);
+        }
+      } else {
+        setLastSyncTime('Sem dados');
+      }
+    } catch (err) {
+      console.error('Erro ao buscar última sincronia:', err);
+      setLastSyncTime('Não disponível');
     }
   };
 
@@ -196,6 +242,7 @@ export const AdminUsers: React.FC = () => {
     fetchUsers(); 
     fetchRolesConfig();
     fetchGCs();
+    fetchLastSyncTime();
   }, []);
 
   const handleDeleteUser = async (userId: string, userName: string) => {
@@ -848,7 +895,7 @@ export const AdminUsers: React.FC = () => {
                     <div className="flex justify-between text-sm">
                        <span className="text-gray-500">Última Sincronia</span>
                         <span className={clsx("font-medium transition-colors duration-500", syncProgress === 100 ? "text-green-600 font-bold" : "text-gray-900")}>
-                           {syncProgress === 100 ? 'Agora mesmo' : 'Hoje, há 2 horas'}
+                           {syncProgress === 100 ? 'Agora mesmo' : lastSyncTime}
                         </span>
                      </div>
                      <div className="flex justify-between text-sm">

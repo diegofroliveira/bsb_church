@@ -149,9 +149,9 @@ export const Dashboard: React.FC = () => {
     const totalCelulas = rawCelulas.length;
     const totalDiscipuladores = discSet.size;
     
-    const tiposMembrosLocalidade = ['MEMBRO', 'DIÁCONO', 'PRESBÍTERO', 'AGREGADO', 'LÍDER'];
+    const tiposMembrosLocalidade = ['MEMBRO', 'LÍDER', 'LIDER', 'DISCIPULADOR', 'DIÁCONO', 'DIACONO', 'PASTOR', 'PRESBÍTERO', 'PRESBITERO'];
     const membrosLocalidade = filteredMembros.filter(m => 
-        tiposMembrosLocalidade.includes((m.tipo_de_pessoa || '').toUpperCase()) && 
+        tiposMembrosLocalidade.includes((m.tipo_de_pessoa || '').toUpperCase().trim()) && 
         m.status === 'Ativo'
     ).length;
 
