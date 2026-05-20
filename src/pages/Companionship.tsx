@@ -31,11 +31,22 @@ interface Member {
   latitude: number | null;
   longitude: number | null;
   foto?: string;
+  estado_civil?: string | null;
+  nascimento?: string | null;
+  discipuladorNome?: string | null; // nome do discipulador desta pessoa
 }
 
 interface SimulatedPair {
   memberIds: string[];
   distance: number;
+  compatScore: number; // 0-100 pontuação geral de compatibilidade
+  scoreBreakdown: {
+    maturidade: number;    // 0-35
+    estadoCivil: number;   // 0-25
+    redeDisc: number;      // 0-20
+    faixaEtaria: number;   // 0-10
+    distancia: number;     // 0-10
+  };
 }
 
 export const Companionship: React.FC = () => {
@@ -86,19 +97,37 @@ export const Companionship: React.FC = () => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        // 1. Carregar membros
-        const { data: dbMembers, error: membersError } = await supabase
-          .from('membros')
-          .select('id, nome, apelido, tipo_de_pessoa, sexo, bairro, grupos_caseiros, latitude, longitude, foto')
-          .eq('status', 'Ativo');
+        // 1. Carregar membros com campos de compatibilidade
+        const [membrosRes, discipuladoRes] = await Promise.all([
+          supabase
+            .from('membros')
+            .select('id, nome, apelido, tipo_de_pessoa, sexo, bairro, grupos_caseiros, latitude, longitude, foto, estado_civil, nascimento')
+            .eq('status', 'Ativo'),
+          supabase
+            .from('discipulado')
+            .select('discipulador, discipulo')
+        ]);
 
-        if (membersError) throw membersError;
+        if (membrosRes.error) throw membrosRes.error;
 
-        // Filtrar membros elegíveis
-        const filteredMembers = (dbMembers || []).filter(m => {
+        // Mapa: nome do discípulo -> nome do discipulador
+        const discipuladorDe: Record<string, string> = {};
+        if (!discipuladoRes.error && discipuladoRes.data) {
+          for (const d of discipuladoRes.data) {
+            if (d.discipulo && d.discipulador) {
+              discipuladorDe[d.discipulo.trim().toUpperCase()] = d.discipulador.trim();
+            }
+          }
+        }
+
+        // Filtrar membros elegíveis e enriquecer com discipulador
+        const filteredMembers = (membrosRes.data || []).filter(m => {
           const type = (m.tipo_de_pessoa || '').toUpperCase().trim();
           return ELIGIBLE_TYPES.includes(type);
-        });
+        }).map(m => ({
+          ...m,
+          discipuladorNome: discipuladorDe[m.nome.trim().toUpperCase()] || null,
+        }));
         setMembers(filteredMembers);
 
         // 2. Carregar companheirismos dos perfis do Supabase (com fallback no localStorage)
@@ -356,15 +385,109 @@ export const Companionship: React.FC = () => {
       .sort((a, b) => a.distance - b.distance);
   };
 
-  // ----------------------------------------------------
-  // MOTOR DO SIMULADOR GEOGRÁFICO EM MASSA (YOLO ENGINE)
-  // ----------------------------------------------------
+  // -----------------------------------------------------------------------
+  // MOTOR DE COMPATIBILIDADE MULTI-CRITÉRIO (Pilares do Companheirismo)
+  // -----------------------------------------------------------------------
+
+  // Hierarquia de maturidade espiritual (0=mais novo, maior=mais maduro)
+  const MATURITY_RANK: Record<string, number> = {
+    'MEMBRO': 1,
+    'LIDER': 2, 'LÍDER': 2,
+    'DIACONO': 3, 'DIÁCONO': 3,
+    'DISCIPULADOR': 4,
+    'PRESBITERO': 5, 'PRESBÍTERO': 5,
+    'PASTOR': 6,
+  };
+
+  // Normaliza estado civil para grupos comparáveis
+  const normalizeMarital = (ec: string | null | undefined): string => {
+    if (!ec) return 'DESCONHECIDO';
+    const upper = ec.toUpperCase().trim();
+    if (upper.includes('SOLTEIR')) return 'SOLTEIRO';
+    if (upper.includes('CASAD')) return 'CASADO';
+    if (upper.includes('DIVORCI') || upper.includes('SEPAR')) return 'DIVORCIADO';
+    if (upper.includes('VIUV')) return 'VIUVO';
+    return upper;
+  };
+
+  // Calcula idade a partir de nascimento (string YYYY-MM-DD ou null)
+  const getAge = (nascimento: string | null | undefined): number | null => {
+    if (!nascimento) return null;
+    const birth = new Date(nascimento);
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+    return isNaN(age) ? null : age;
+  };
+
+  // Pontua compatibilidade entre dois membros (0-100)
+  const calculateCompatibilityScore = (
+    m1: Member, m2: Member, distKm: number | null
+  ): SimulatedPair['scoreBreakdown'] & { total: number } => {
+    // --- MATURIDADE ESPIRITUAL (0-35 pts) ---
+    const r1 = MATURITY_RANK[(m1.tipo_de_pessoa || '').toUpperCase().trim()] ?? 1;
+    const r2 = MATURITY_RANK[(m2.tipo_de_pessoa || '').toUpperCase().trim()] ?? 1;
+    const rankDiff = Math.abs(r1 - r2);
+    // Mesmo nível = 35, 1 nível diferença = 22, 2 = 10, 3+ = 0
+    const maturidade = rankDiff === 0 ? 35 : rankDiff === 1 ? 22 : rankDiff === 2 ? 10 : 0;
+
+    // --- ESTADO CIVIL (0-25 pts) ---
+    const ec1 = normalizeMarital(m1.estado_civil);
+    const ec2 = normalizeMarital(m2.estado_civil);
+    const estadoCivil = ec1 === ec2 && ec1 !== 'DESCONHECIDO' ? 25 :
+      (ec1 === 'DESCONHECIDO' || ec2 === 'DESCONHECIDO') ? 12 : 0;
+
+    // --- REDE DE DISCIPULADO (0-20 pts) ---
+    // Mesmo discipulador = 20, um é discipulador do outro (hierarquia) = 5 (penalidade leve)
+    const disc1 = m1.discipuladorNome?.trim().toUpperCase() || null;
+    const disc2 = m2.discipuladorNome?.trim().toUpperCase() || null;
+    const nome1 = m1.nome.trim().toUpperCase();
+    const nome2 = m2.nome.trim().toUpperCase();
+    let redeDisc = 0;
+    if (disc1 && disc2 && disc1 === disc2) {
+      redeDisc = 20; // Mesmo discipulador — andam juntos no núcleo!
+    } else if (disc1 === nome2 || disc2 === nome1) {
+      redeDisc = 3; // Um discipula o outro — relação vertical, não ideal para companheirismo
+    } else if (disc1 && disc2) {
+      redeDisc = 5; // Discipuladores diferentes mas ambos têm rede
+    }
+
+    // --- FAIXA ETÁRIA (0-10 pts) ---
+    const age1 = getAge(m1.nascimento);
+    const age2 = getAge(m2.nascimento);
+    let faixaEtaria = 5; // neutro se não soubermos
+    if (age1 !== null && age2 !== null) {
+      const ageDiff = Math.abs(age1 - age2);
+      faixaEtaria = ageDiff <= 3 ? 10 : ageDiff <= 7 ? 8 : ageDiff <= 12 ? 5 : ageDiff <= 18 ? 2 : 0;
+    }
+
+    // --- DISTÂNCIA GEOGRÁFICA (0-10 pts) ---
+    let distancia = 0;
+    if (distKm === null) {
+      distancia = 2; // Sem coordenadas, pontuação neutra baixa
+    } else if (distKm <= 2) {
+      distancia = 10;
+    } else if (distKm <= 5) {
+      distancia = 8;
+    } else if (distKm <= 8) {
+      distancia = 6;
+    } else if (distKm <= 15) {
+      distancia = 4;
+    } else {
+      distancia = 0; // Fora do limite
+    }
+
+    const total = maturidade + estadoCivil + redeDisc + faixaEtaria + distancia;
+    return { maturidade, estadoCivil, redeDisc, faixaEtaria, distancia, total };
+  };
+
   const handleGenerateSimulation = () => {
     setIsLoading(true);
-    
-    // Obter todos os membros sem companheirismo que têm coordenadas
-    const pool = members.filter(m => !isMemberLinked(m.id) && m.latitude !== null && m.longitude !== null);
-    
+
+    // Pool: membros elegíveis sem vínculo ativo
+    const pool = members.filter(m => !isMemberLinked(m.id));
+
     const simulated: SimulatedPair[] = [];
     const unmatched: string[] = [];
     const visited = new Set<string>();
@@ -373,60 +496,68 @@ export const Companionship: React.FC = () => {
 
     for (const s of sexes) {
       const sexPool = pool.filter(m => m.sexo === s);
-      
+
       for (let i = 0; i < sexPool.length; i++) {
         const m1 = sexPool[i];
         if (visited.has(m1.id)) continue;
 
         let bestPartner: Member | null = null;
+        let bestScore = -Infinity;
         let bestDist = Infinity;
+        let bestBreakdown: SimulatedPair['scoreBreakdown'] | null = null;
 
-        // Procurar o vizinho mais próximo não visitado do mesmo sexo
         for (let j = i + 1; j < sexPool.length; j++) {
           const m2 = sexPool[j];
           if (visited.has(m2.id)) continue;
 
           const dist = calculateDistance(m1.latitude, m1.longitude, m2.latitude, m2.longitude);
-          if (dist !== null && dist < bestDist && dist <= simMaxDistance) {
-            bestDist = dist;
+
+          // Se ambos têm coordenadas, aplicar limite de distância
+          if (m1.latitude !== null && m2.latitude !== null && dist !== null && dist > simMaxDistance) continue;
+
+          const breakdown = calculateCompatibilityScore(m1, m2, dist);
+          if (breakdown.total > bestScore) {
+            bestScore = breakdown.total;
             bestPartner = m2;
+            bestDist = dist ?? 0;
+            bestBreakdown = { maturidade: breakdown.maturidade, estadoCivil: breakdown.estadoCivil, redeDisc: breakdown.redeDisc, faixaEtaria: breakdown.faixaEtaria, distancia: breakdown.distancia };
           }
         }
 
-        if (bestPartner) {
+        if (bestPartner && bestBreakdown) {
           visited.add(m1.id);
           visited.add(bestPartner.id);
           simulated.push({
             memberIds: [m1.id, bestPartner.id],
-            distance: bestDist
+            distance: bestDist,
+            compatScore: bestScore,
+            scoreBreakdown: bestBreakdown
           });
         } else {
-          unmatched.push(m1.id);
+          // Membro sem parceiro compatível — vai para órfãos
+          if (!visited.has(m1.id)) unmatched.push(m1.id);
         }
       }
 
-      // Adicionar à lista de órfãos quem não tem coordenadas ou restou na filtragem
-      const unmatchedBySex = sexPool.filter(m => !visited.has(m.id));
-      unmatchedBySex.forEach(m => {
+      // Capturar quem não foi visitado
+      sexPool.filter(m => !visited.has(m.id)).forEach(m => {
         if (!unmatched.includes(m.id)) unmatched.push(m.id);
       });
     }
 
-    // Gerar Trios se permitido (para não deixar ninguém isolado na proximidade)
+    // Formação de Trios para órfãos com coordenadas
+    let finalUnmatched = [...unmatched];
     if (simAllowTrios && unmatched.length > 0) {
       const remainingUnmatched: string[] = [];
 
       for (const unmatchedId of unmatched) {
         const unmatchedMember = members.find(m => m.id === unmatchedId);
-        if (!unmatchedMember || unmatchedMember.latitude === null || unmatchedMember.longitude === null) {
-          remainingUnmatched.push(unmatchedId);
-          continue;
-        }
+        if (!unmatchedMember) { remainingUnmatched.push(unmatchedId); continue; }
 
+        // Encontrar a dupla existente com maior score de compatibilidade para absorver este órfão
         let bestPairIdx = -1;
-        let bestPairDist = Infinity;
+        let bestPairScore = -Infinity;
 
-        // Achar a dupla mais próxima do mesmo sexo que ainda não seja um trio
         for (let i = 0; i < simulated.length; i++) {
           const pair = simulated[i];
           if (pair.memberIds.length >= 3) continue;
@@ -435,39 +566,31 @@ export const Companionship: React.FC = () => {
           if (!pairLeader || pairLeader.sexo !== unmatchedMember.sexo) continue;
 
           const dist = calculateDistance(unmatchedMember.latitude, unmatchedMember.longitude, pairLeader.latitude, pairLeader.longitude);
-          if (dist !== null && dist < bestPairDist && dist <= simMaxDistance) {
-            bestPairDist = dist;
+          if (pairLeader.latitude !== null && unmatchedMember.latitude !== null && dist !== null && dist > simMaxDistance) continue;
+
+          const bd = calculateCompatibilityScore(unmatchedMember, pairLeader, dist);
+          if (bd.total > bestPairScore) {
+            bestPairScore = bd.total;
             bestPairIdx = i;
           }
         }
 
         if (bestPairIdx !== -1) {
           simulated[bestPairIdx].memberIds.push(unmatchedId);
-          // Recalcular distância média
+          // Atualizar score médio do trio
           const p1 = members.find(m => m.id === simulated[bestPairIdx].memberIds[0])!;
           const p2 = members.find(m => m.id === simulated[bestPairIdx].memberIds[1])!;
-          const d1 = calculateDistance(p1.latitude, p1.longitude, p2.latitude, p2.longitude) || 0;
-          const d2 = calculateDistance(p1.latitude, p1.longitude, unmatchedMember.latitude, unmatchedMember.longitude) || 0;
-          simulated[bestPairIdx].distance = parseFloat(((d1 + d2) / 2).toFixed(1));
+          const d12 = calculateDistance(p1.latitude, p1.longitude, p2.latitude, p2.longitude);
+          const d13 = calculateDistance(p1.latitude, p1.longitude, unmatchedMember.latitude, unmatchedMember.longitude);
+          simulated[bestPairIdx].distance = parseFloat((((d12 ?? 0) + (d13 ?? 0)) / 2).toFixed(1));
         } else {
           remainingUnmatched.push(unmatchedId);
         }
       }
-      setSimulatedUnmatched(remainingUnmatched);
-    } else {
-      setSimulatedUnmatched(unmatched);
+      finalUnmatched = remainingUnmatched;
     }
 
-    // Incluir também membros que já não tinham coordenadas de jeito nenhum na lista de órfãos
-    const noCoordsMembers = members.filter(m => !isMemberLinked(m.id) && (m.latitude === null || m.longitude === null));
-    setSimulatedUnmatched(prev => {
-      const merged = [...prev];
-      noCoordsMembers.forEach(m => {
-        if (!merged.includes(m.id)) merged.push(m.id);
-      });
-      return merged;
-    });
-
+    setSimulatedUnmatched(finalUnmatched);
     setSimulatedMatches(simulated);
     setIsSimulationMode(true);
     setIsLoading(false);
@@ -1208,51 +1331,84 @@ export const Companionship: React.FC = () => {
                         const m2 = smMembers[1];
                         const m3 = smMembers[2];
 
+                        const score = sm.compatScore;
+                        const scoreColor = score >= 70 ? 'bg-emerald-500' : score >= 45 ? 'bg-amber-400' : 'bg-red-400';
+                        const scoreTextColor = score >= 70 ? 'text-emerald-700' : score >= 45 ? 'text-amber-700' : 'text-red-700';
+                        const scoreBg = score >= 70 ? 'bg-emerald-50 border-emerald-200' : score >= 45 ? 'bg-amber-50 border-amber-200' : 'bg-red-50 border-red-200';
+                        const scoreLabel = score >= 70 ? 'Alta' : score >= 45 ? 'Média' : 'Baixa';
+
+                        const renderMemberTag = (m: Member) => {
+                          const age = getAge(m.nascimento);
+                          const ec = m.estado_civil ? m.estado_civil.charAt(0).toUpperCase() + m.estado_civil.slice(1).toLowerCase() : null;
+                          return (
+                            <div className="text-center space-y-1">
+                              <div className="h-9 w-9 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs mx-auto border border-blue-100">
+                                {m.foto ? <img src={m.foto} alt={m.nome} className="h-9 w-9 rounded-full object-cover" /> : m.nome.charAt(0)}
+                              </div>
+                              <div className="text-[10px] font-bold text-gray-800 truncate">{m.nome.split(' ')[0]}</div>
+                              <div className="text-[8px] text-gray-500 truncate">{m.tipo_de_pessoa}</div>
+                              {ec && <div className="text-[8px] font-medium text-indigo-600 bg-indigo-50 px-1 rounded-full inline-block">{ec}</div>}
+                              {age !== null && <div className="text-[8px] text-gray-400">{age} anos</div>}
+                            </div>
+                          );
+                        };
+
                         return (
-                          <div key={idx} className="bg-white rounded-xl border border-gray-150 p-4 shadow-sm space-y-3 relative hover:border-amber-400 transition-all flex flex-col justify-between">
+                          <div key={idx} className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm space-y-3 hover:shadow-md transition-all flex flex-col justify-between">
+                            {/* Header: tipo + score */}
                             <div className="flex items-center justify-between">
                               <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-100 rounded-full px-2 py-0.5">
                                 {m3 ? 'Trio Proposto' : 'Dupla Proposta'}
                               </span>
-                              <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full flex items-center gap-1">
-                                <MapPin className="h-3 w-3" /> {sm.distance} km
-                              </span>
+                              <div className={clsx(scoreBg, 'border rounded-full px-2 py-0.5 flex items-center gap-1.5')}>
+                                <div className="w-12 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                                  <div className={clsx(scoreColor, 'h-full rounded-full transition-all')} style={{ width: `${score}%` }} />
+                                </div>
+                                <span className={clsx(scoreTextColor, 'text-[9px] font-bold')}>{score}pts · {scoreLabel}</span>
+                              </div>
                             </div>
 
-                            {/* Detalhe Membros */}
-                            <div className="grid grid-cols-3 gap-2 items-center py-2 bg-gray-50/50 rounded-lg p-2">
-                              {/* Membro 1 */}
-                              <div className="text-center">
-                                <div className="h-8 w-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs mx-auto">
-                                  {m1.nome.charAt(0)}
-                                </div>
-                                <div className="text-[10px] font-bold text-gray-800 truncate mt-1">{m1.nome.split(' ')[0]}</div>
-                                <div className="text-[8px] text-gray-400 font-medium truncate">{m1.bairro || 'Sem Bairro'}</div>
-                              </div>
-                              {/* Handshake */}
+                            {/* Membros */}
+                            <div className="grid grid-cols-3 gap-2 items-center py-2 bg-gray-50/50 rounded-lg px-2">
+                              {renderMemberTag(m1)}
                               <div className="text-center text-gray-300">
                                 <Handshake className="h-5 w-5 mx-auto" />
                               </div>
-                              {/* Membro 2 */}
-                              <div className="text-center">
-                                <div className="h-8 w-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs mx-auto">
-                                  {m2.nome.charAt(0)}
-                                </div>
-                                <div className="text-[10px] font-bold text-gray-800 truncate mt-1">{m2.nome.split(' ')[0]}</div>
-                                <div className="text-[8px] text-gray-400 font-medium truncate">{m2.bairro || 'Sem Bairro'}</div>
-                              </div>
+                              {renderMemberTag(m2)}
 
-                              {/* Membro 3 (trio) */}
                               {m3 && (
-                                <div className="col-span-3 border-t border-dashed border-gray-150 pt-2 flex items-center justify-center gap-2 text-center">
-                                  <div className="h-6 w-6 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-[10px]">
-                                    {m3.nome.charAt(0)}
-                                  </div>
-                                  <div className="text-[10px] font-bold text-gray-800 truncate">{m3.nome.split(' ')[0]}</div>
-                                  <div className="text-[8px] text-gray-400 font-medium bg-gray-100 px-1 rounded">{m3.bairro || 'Sem Bairro'}</div>
+                                <div className="col-span-3 border-t border-dashed border-gray-200 pt-2 flex items-center justify-center gap-2">
+                                  <span className="text-[9px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded-full">+Trio</span>
+                                  {renderMemberTag(m3)}
                                 </div>
                               )}
                             </div>
+
+                            {/* Score Breakdown */}
+                            <div className="grid grid-cols-5 gap-1 pt-1 border-t border-gray-50">
+                              {[
+                                { label: 'Maturidade', val: sm.scoreBreakdown.maturidade, max: 35, color: 'bg-purple-400' },
+                                { label: 'Est. Civil', val: sm.scoreBreakdown.estadoCivil, max: 25, color: 'bg-pink-400' },
+                                { label: 'Rede Disc.', val: sm.scoreBreakdown.redeDisc, max: 20, color: 'bg-emerald-400' },
+                                { label: 'Faixa Et.', val: sm.scoreBreakdown.faixaEtaria, max: 10, color: 'bg-blue-400' },
+                                { label: 'Distância', val: sm.scoreBreakdown.distancia, max: 10, color: 'bg-gray-400' },
+                              ].map(({ label, val, max, color }) => (
+                                <div key={label} className="text-center space-y-0.5">
+                                  <div className="text-[7px] text-gray-400 font-medium leading-tight">{label}</div>
+                                  <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
+                                    <div className={clsx(color, 'h-full rounded-full')} style={{ width: `${(val / max) * 100}%` }} />
+                                  </div>
+                                  <div className="text-[8px] font-bold text-gray-500">{val}<span className="font-normal opacity-60">/{max}</span></div>
+                                </div>
+                              ))}
+                            </div>
+
+                            {/* Info de distância */}
+                            {sm.distance > 0 && (
+                              <div className="flex items-center gap-1 text-[9px] text-gray-400">
+                                <MapPin className="h-3 w-3" /> {sm.distance} km de dist. geográfica
+                              </div>
+                            )}
                           </div>
                         );
                       })}
@@ -1260,13 +1416,13 @@ export const Companionship: React.FC = () => {
                   </div>
 
                   {/* Coluna Direita: Membros que restaram órfãos na simulação */}
-                  <div className="bg-white rounded-2xl border border-gray-150 p-5 shadow-sm lg:col-span-1 flex flex-col max-h-[600px] overflow-hidden">
+                  <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm lg:col-span-1 flex flex-col max-h-[600px] overflow-hidden">
                     <div className="space-y-1 mb-4">
                       <h4 className="text-xs font-bold text-red-700 uppercase tracking-wider flex items-center gap-1.5">
-                        <AlertTriangle className="h-4.5 w-4.5 text-red-500" /> Órfãos na Simulação ({simulatedUnmatched.length})
+                        <AlertTriangle className="h-4 w-4 text-red-500" /> Sem Par Compatível ({simulatedUnmatched.length})
                       </h4>
                       <p className="text-[10px] text-gray-500">
-                        Estes membros excedem o limite de {simMaxDistance}km de distância para vizinhos de mesmo sexo ou não possuem coordenadas cadastradas.
+                        Sem parceiro de mesmo sexo com perfil compatível dentro de {simMaxDistance}km, ou sem coordenadas cadastradas.
                       </p>
                     </div>
 
@@ -1274,22 +1430,31 @@ export const Companionship: React.FC = () => {
                       {simulatedUnmatched.map(id => {
                         const m = members.find(member => member.id === id);
                         if (!m) return null;
+                        const hasCoords = m.latitude !== null && m.longitude !== null;
+                        const age = getAge(m.nascimento);
                         return (
-                          <div key={id} className="p-3 bg-gray-50 rounded-xl flex items-center gap-3 border border-gray-100">
-                            <div className="h-8 w-8 rounded-full bg-red-50 text-red-600 flex items-center justify-center font-bold text-xs shrink-0">
+                          <div key={id} className="p-3 bg-gray-50 rounded-xl flex items-start gap-3 border border-gray-100">
+                            <div className={clsx(
+                              hasCoords ? 'bg-amber-50 text-amber-600' : 'bg-red-50 text-red-600',
+                              'h-8 w-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0'
+                            )}>
                               {m.nome.charAt(0)}
                             </div>
                             <div className="min-w-0 flex-1">
                               <div className="text-xs font-bold text-gray-900 truncate">{m.nome}</div>
-                              <div className="text-[9px] text-gray-500 truncate mt-0.5">
-                                Sexo: {m.sexo} • Bairro: {m.bairro || 'Sem Coordenadas 📍'}
+                              <div className="text-[9px] text-gray-500 mt-0.5 flex flex-wrap gap-1">
+                                <span className="bg-gray-100 px-1 rounded">{m.tipo_de_pessoa}</span>
+                                {m.estado_civil && <span className="bg-indigo-50 text-indigo-600 px-1 rounded">{m.estado_civil}</span>}
+                                {age !== null && <span className="bg-blue-50 text-blue-600 px-1 rounded">{age}a</span>}
+                                {!hasCoords && <span className="bg-red-50 text-red-600 px-1 rounded">📍 Sem coords</span>}
                               </div>
+                              <div className="text-[8px] text-gray-400 mt-0.5">{m.bairro || 'Bairro não informado'}</div>
                             </div>
                           </div>
                         );
                       })}
                       {simulatedUnmatched.length === 0 && (
-                        <div className="text-center py-12 text-gray-400 text-xs italic">Nenhum membro órfão! Todos foram pareados perfeitamente.</div>
+                        <div className="text-center py-12 text-gray-400 text-xs italic">Nenhum membro órfão! Todos foram pareados.</div>
                       )}
                     </div>
                   </div>
