@@ -33,19 +33,20 @@ interface Member {
   foto?: string;
   estado_civil?: string | null;
   nascimento?: string | null;
-  discipuladorNome?: string | null; // nome do discipulador desta pessoa
+  discipuladorNome?: string | null;
+  gcRole?: 'LIDER' | 'AUXILIAR' | null; // papel de liderança no GC
 }
 
 interface SimulatedPair {
   memberIds: string[];
   distance: number;
-  compatScore: number; // 0-100 pontuação geral de compatibilidade
+  compatScore: number; // 0-100
   scoreBreakdown: {
-    maturidade: number;    // 0-35
-    estadoCivil: number;   // 0-25
-    redeDisc: number;      // 0-20
+    maturidade: number;    // 0-28
+    estadoCivil: number;   // 0-22
+    redeDisc: number;      // 0-15
     faixaEtaria: number;   // 0-10
-    distancia: number;     // 0-10
+    distancia: number;     // 0-25 (maior peso — companheirismo requer presença física regular)
   };
 }
 
@@ -97,15 +98,18 @@ export const Companionship: React.FC = () => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        // 1. Carregar membros com campos de compatibilidade
-        const [membrosRes, discipuladoRes] = await Promise.all([
+        // 1. Carregar membros, discipulado e células em paralelo
+        const [membrosRes, discipuladoRes, celulasRes] = await Promise.all([
           supabase
             .from('membros')
             .select('id, nome, apelido, tipo_de_pessoa, sexo, bairro, grupos_caseiros, latitude, longitude, foto, estado_civil, nascimento')
             .eq('status', 'Ativo'),
           supabase
             .from('discipulado')
-            .select('discipulador, discipulo')
+            .select('discipulador, discipulo'),
+          supabase
+            .from('celulas')
+            .select('grupo_caseiro, lider, auxiliar')
         ]);
 
         if (membrosRes.error) throw membrosRes.error;
@@ -120,13 +124,31 @@ export const Companionship: React.FC = () => {
           }
         }
 
-        // Filtrar membros elegíveis e enriquecer com discipulador
+        // Mapa: nome (uppercase) -> papel no GC (LIDER | AUXILIAR)
+        const gcRoleMap: Record<string, 'LIDER' | 'AUXILIAR'> = {};
+        if (!celulasRes.error && celulasRes.data) {
+          for (const celula of celulasRes.data) {
+            if (celula.lider) {
+              gcRoleMap[celula.lider.trim().toUpperCase()] = 'LIDER';
+            }
+            if (celula.auxiliar) {
+              // Suporta múltiplos auxiliares separados por vírgula
+              celula.auxiliar.split(',').forEach((aux: string) => {
+                const name = aux.trim().toUpperCase();
+                if (name) gcRoleMap[name] = 'AUXILIAR';
+              });
+            }
+          }
+        }
+
+        // Filtrar membros elegíveis e enriquecer com discipulador e papel no GC
         const filteredMembers = (membrosRes.data || []).filter(m => {
           const type = (m.tipo_de_pessoa || '').toUpperCase().trim();
           return ELIGIBLE_TYPES.includes(type);
         }).map(m => ({
           ...m,
           discipuladorNome: discipuladorDe[m.nome.trim().toUpperCase()] || null,
+          gcRole: gcRoleMap[m.nome.trim().toUpperCase()] || null,
         }));
         setMembers(filteredMembers);
 
@@ -422,24 +444,23 @@ export const Companionship: React.FC = () => {
   };
 
   // Pontua compatibilidade entre dois membros (0-100)
+  // Pesos: Distância=25, Maturidade=28, EstadoCivil=22, RedeDisc/GC=15, FaixaEtária=10
   const calculateCompatibilityScore = (
     m1: Member, m2: Member, distKm: number | null
   ): SimulatedPair['scoreBreakdown'] & { total: number } => {
-    // --- MATURIDADE ESPIRITUAL (0-35 pts) ---
+    // --- MATURIDADE ESPIRITUAL (0-28 pts) ---
     const r1 = MATURITY_RANK[(m1.tipo_de_pessoa || '').toUpperCase().trim()] ?? 1;
     const r2 = MATURITY_RANK[(m2.tipo_de_pessoa || '').toUpperCase().trim()] ?? 1;
     const rankDiff = Math.abs(r1 - r2);
-    // Mesmo nível = 35, 1 nível diferença = 22, 2 = 10, 3+ = 0
-    const maturidade = rankDiff === 0 ? 35 : rankDiff === 1 ? 22 : rankDiff === 2 ? 10 : 0;
+    const maturidade = rankDiff === 0 ? 28 : rankDiff === 1 ? 18 : rankDiff === 2 ? 8 : 0;
 
-    // --- ESTADO CIVIL (0-25 pts) ---
+    // --- ESTADO CIVIL (0-22 pts) ---
     const ec1 = normalizeMarital(m1.estado_civil);
     const ec2 = normalizeMarital(m2.estado_civil);
-    const estadoCivil = ec1 === ec2 && ec1 !== 'DESCONHECIDO' ? 25 :
-      (ec1 === 'DESCONHECIDO' || ec2 === 'DESCONHECIDO') ? 12 : 0;
+    const estadoCivil = ec1 === ec2 && ec1 !== 'DESCONHECIDO' ? 22 :
+      (ec1 === 'DESCONHECIDO' || ec2 === 'DESCONHECIDO') ? 10 : 0;
 
-    // --- REDE DE DISCIPULADO + GC (0-20 pts) ---
-    // O GC (Grupo Caseiro) é o núcleo operacional real — membros do mesmo GC já se reúnem juntos
+    // --- REDE DE DISCIPULADO + GC (0-15 pts) ---
     const disc1 = m1.discipuladorNome?.trim().toUpperCase() || null;
     const disc2 = m2.discipuladorNome?.trim().toUpperCase() || null;
     const nome1 = m1.nome.trim().toUpperCase();
@@ -448,43 +469,52 @@ export const Companionship: React.FC = () => {
     const gc2 = (m2.grupos_caseiros || '').trim().toUpperCase();
     const sameGC = gc1.length > 0 && gc1 === gc2;
     const sameDisc = disc1 !== null && disc2 !== null && disc1 === disc2;
-    const isVertical = disc1 === nome2 || disc2 === nome1; // Um discipula o outro
+    const isVertical = disc1 === nome2 || disc2 === nome1;
+    // Bônus de núcleo de liderança: líder/auxiliar do mesmo GC
+    const bothLeadership = sameGC &&
+      (m1.gcRole === 'LIDER' || m1.gcRole === 'AUXILIAR') &&
+      (m2.gcRole === 'LIDER' || m2.gcRole === 'AUXILIAR');
     let redeDisc = 0;
-    if (sameGC && sameDisc) {
-      redeDisc = 20; // Mesmo GC E mesmo discipulador — núcleo completo!
+    if (bothLeadership) {
+      redeDisc = 15; // Núcleo de liderança do mesmo GC — companheirismo preferencial!
+    } else if (sameGC && sameDisc) {
+      redeDisc = 14; // Mesmo GC + mesmo discipulador
     } else if (sameGC) {
-      redeDisc = 18; // Mesmo GC — já andam juntos no núcleo, fortíssimo sinal
+      redeDisc = 12; // Mesmo GC
     } else if (sameDisc) {
-      redeDisc = 14; // Mesmo discipulador, GCs diferentes
+      redeDisc = 8;  // Mesmo discipulador, GCs diferentes
     } else if (isVertical) {
-      redeDisc = 3;  // Um discipula o outro — relação vertical, não ideal para companheirismo horizontal
+      redeDisc = 2;  // Relação vertical (não ideal para companheirismo horizontal)
     } else if (disc1 && disc2) {
-      redeDisc = 4;  // Ambos têm rede, mas são núcleos distintos
+      redeDisc = 3;  // Redes distintas
     }
 
     // --- FAIXA ETÁRIA (0-10 pts) ---
     const age1 = getAge(m1.nascimento);
     const age2 = getAge(m2.nascimento);
-    let faixaEtaria = 5; // neutro se não soubermos
+    let faixaEtaria = 5;
     if (age1 !== null && age2 !== null) {
       const ageDiff = Math.abs(age1 - age2);
       faixaEtaria = ageDiff <= 3 ? 10 : ageDiff <= 7 ? 8 : ageDiff <= 12 ? 5 : ageDiff <= 18 ? 2 : 0;
     }
 
-    // --- DISTÂNCIA GEOGRÁFICA (0-10 pts) ---
+    // --- DISTÂNCIA GEOGRÁFICA (0-25 pts) ---
+    // Companheirismo exige presença física regular — distância é pilar crítico!
     let distancia = 0;
     if (distKm === null) {
-      distancia = 2; // Sem coordenadas, pontuação neutra baixa
-    } else if (distKm <= 2) {
-      distancia = 10;
-    } else if (distKm <= 5) {
-      distancia = 8;
-    } else if (distKm <= 8) {
-      distancia = 6;
-    } else if (distKm <= 15) {
-      distancia = 4;
+      distancia = 3; // Sem coordenadas: pontuação neutra mínima
+    } else if (distKm <= 3) {
+      distancia = 25; // Vizinhos — companheirismo fluido
+    } else if (distKm <= 7) {
+      distancia = 20; // Próximos
+    } else if (distKm <= 12) {
+      distancia = 12; // Alcançável
+    } else if (distKm <= 18) {
+      distancia = 5;  // Distante — requer esforço
+    } else if (distKm <= 25) {
+      distancia = 1;  // Muito distante
     } else {
-      distancia = 0; // Fora do limite
+      distancia = 0;  // Inviável para companheirismo regular
     }
 
     const total = maturidade + estadoCivil + redeDisc + faixaEtaria + distancia;
@@ -1223,11 +1253,14 @@ export const Companionship: React.FC = () => {
                                           {ec && <span className="text-[9px] font-semibold text-indigo-600 bg-indigo-50 px-1 rounded">{ec}</span>}
                                           {age !== null && <span className="text-[9px] text-blue-600 bg-blue-50 px-1 rounded">{age}a</span>}
                                           {candidate.distance !== null && <span className="text-[9px] text-gray-400">📍{candidate.distance}km</span>}
-                                          {candidate.grupos_caseiros && candidate.grupos_caseiros.trim().toUpperCase() === (selectedMember.grupos_caseiros || '').trim().toUpperCase() ? (
-                                            <span className="text-[9px] text-emerald-700 bg-emerald-50 px-1 rounded font-bold">🏠 Mesmo GC</span>
-                                          ) : candidate.scoreBreakdown.redeDisc >= 14 ? (
-                                            <span className="text-[9px] text-blue-700 bg-blue-50 px-1 rounded font-bold">🔗 Mesmo disc.</span>
-                                          ) : null}
+                                          {(() => {
+                                            const sameGC = candidate.grupos_caseiros && candidate.grupos_caseiros.trim().toUpperCase() === (selectedMember.grupos_caseiros || '').trim().toUpperCase();
+                                            const bothLeadership = sameGC && (candidate.gcRole === 'LIDER' || candidate.gcRole === 'AUXILIAR') && (selectedMember.gcRole === 'LIDER' || selectedMember.gcRole === 'AUXILIAR');
+                                            if (bothLeadership) return <span className="text-[9px] text-purple-700 bg-purple-50 px-1 rounded font-bold">👑 Núcleo GC</span>;
+                                            if (sameGC) return <span className="text-[9px] text-emerald-700 bg-emerald-50 px-1 rounded font-bold">🏠 Mesmo GC</span>;
+                                            if (candidate.scoreBreakdown.redeDisc >= 8) return <span className="text-[9px] text-blue-700 bg-blue-50 px-1 rounded font-bold">🔗 Mesmo disc.</span>;
+                                            return null;
+                                          })()}
                                         </div>
                                         {/* Mini score bar */}
                                         <div className="flex items-center gap-1.5 mt-1">
