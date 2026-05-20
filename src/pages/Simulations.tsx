@@ -256,11 +256,16 @@ export const Simulations: React.FC = () => {
       ]);
 
       if (membersRes.data) {
-        // cast strictly to ensure type safety
-        const parsedMembers = (membersRes.data as any[]).map(m => ({
-          ...m,
-          id: Number(m.id) // Ensure ID is strictly a number
-        })) as Member[];
+        // cast strictly to ensure type safety and filter only allowed person types
+        const parsedMembers = (membersRes.data as any[])
+          .map(m => ({
+            ...m,
+            id: Number(m.id) // Ensure ID is strictly a number
+          }))
+          .filter(m => {
+            const t = (m.tipo_de_pessoa || '').trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            return ['MEMBRO', 'LIDER', 'DISCIPULADOR', 'DIACONO', 'PASTOR', 'PRESBITERO'].includes(t);
+          }) as Member[];
         
         setDraftMembers(parsedMembers);
         setBaselineMembers(parsedMembers.map(m => ({ ...m })));

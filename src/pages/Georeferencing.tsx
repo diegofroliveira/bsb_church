@@ -152,10 +152,17 @@ const Georeferencing: React.FC = () => {
 
       if (gError) console.error('Erro ao buscar grupos:', gError.message);
 
+      const filterMembrosByAllowedTypes = (list: any[]) => {
+        return list.filter(m => {
+          const t = (m.tipo_de_pessoa || '').trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+          return ['MEMBRO', 'LIDER', 'DISCIPULADOR', 'DIACONO', 'PASTOR', 'PRESBITERO'].includes(t);
+        });
+      };
+
       let membros: any[] = [];
 
       if (!mError && fullMembros) {
-        membros = fullMembros;
+        membros = filterMembrosByAllowedTypes(fullMembros);
       } else {
         if (mError) console.error('Erro ao buscar membros com endereços:', mError.message);
         let fallbackQuery = supabase.from('membros').select('id, nome, latitude, longitude, grupos_caseiros, estado_civil, sexo, nascimento, tipo_de_pessoa').eq('status', 'Ativo');
@@ -163,7 +170,7 @@ const Georeferencing: React.FC = () => {
           fallbackQuery = fallbackQuery.ilike('grupos_caseiros', `%${user.assigned_gc}%`);
         }
         const { data: fallbackMembros } = await fallbackQuery;
-        membros = fallbackMembros || [];
+        membros = filterMembrosByAllowedTypes(fallbackMembros || []);
       }
 
       // 3. Buscar Discipulado
