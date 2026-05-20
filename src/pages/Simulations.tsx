@@ -1498,7 +1498,7 @@ export const Simulations: React.FC = () => {
         const distStr = calculateDistance(discipler.latitude, discipler.longitude, disciple.latitude, disciple.longitude);
         if (distStr) {
           const distNum = parseFloat(distStr);
-          if (distNum > 8) {
+          if (distNum > 15) {
             displacedDisciples.push({
               discipleName: link.discipulo,
               discipleId: disciple.id,
@@ -2019,7 +2019,7 @@ export const Simulations: React.FC = () => {
 
                     const distStr = calculateDistance(discipler.latitude, discipler.longitude, disciple.latitude, disciple.longitude);
                     const distNum = distStr ? parseFloat(distStr) : 0;
-                    const isDistant = distNum > 8;
+                    const isDistant = distNum > 15;
                     const color = isDistant ? '#ef4444' : '#6366f1';
                     
                     return (
@@ -2105,11 +2105,11 @@ export const Simulations: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-5 h-0.5 bg-[#6366f1] inline-block shrink-0"></span>
-                    <span className="text-gray-600 font-medium text-[11px]">Vínculo Saudável (&lt;= 8 km)</span>
+                    <span className="text-gray-600 font-medium text-[11px]">Vínculo Saudável (&lt;= 15 km)</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-5 h-0.5 border-t-2 border-dashed border-[#ef4444] inline-block shrink-0"></span>
-                    <span className="text-gray-600 font-medium text-[11px]">Distante (&gt; 8 km)</span>
+                    <span className="text-gray-600 font-medium text-[11px]">Distante (&gt; 15 km)</span>
                   </div>
                 </div>
               )}
