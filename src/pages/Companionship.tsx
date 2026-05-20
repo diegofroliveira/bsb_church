@@ -438,19 +438,28 @@ export const Companionship: React.FC = () => {
     const estadoCivil = ec1 === ec2 && ec1 !== 'DESCONHECIDO' ? 25 :
       (ec1 === 'DESCONHECIDO' || ec2 === 'DESCONHECIDO') ? 12 : 0;
 
-    // --- REDE DE DISCIPULADO (0-20 pts) ---
-    // Mesmo discipulador = 20, um é discipulador do outro (hierarquia) = 5 (penalidade leve)
+    // --- REDE DE DISCIPULADO + GC (0-20 pts) ---
+    // O GC (Grupo Caseiro) é o núcleo operacional real — membros do mesmo GC já se reúnem juntos
     const disc1 = m1.discipuladorNome?.trim().toUpperCase() || null;
     const disc2 = m2.discipuladorNome?.trim().toUpperCase() || null;
     const nome1 = m1.nome.trim().toUpperCase();
     const nome2 = m2.nome.trim().toUpperCase();
+    const gc1 = (m1.grupos_caseiros || '').trim().toUpperCase();
+    const gc2 = (m2.grupos_caseiros || '').trim().toUpperCase();
+    const sameGC = gc1.length > 0 && gc1 === gc2;
+    const sameDisc = disc1 !== null && disc2 !== null && disc1 === disc2;
+    const isVertical = disc1 === nome2 || disc2 === nome1; // Um discipula o outro
     let redeDisc = 0;
-    if (disc1 && disc2 && disc1 === disc2) {
-      redeDisc = 20; // Mesmo discipulador — andam juntos no núcleo!
-    } else if (disc1 === nome2 || disc2 === nome1) {
-      redeDisc = 3; // Um discipula o outro — relação vertical, não ideal para companheirismo
+    if (sameGC && sameDisc) {
+      redeDisc = 20; // Mesmo GC E mesmo discipulador — núcleo completo!
+    } else if (sameGC) {
+      redeDisc = 18; // Mesmo GC — já andam juntos no núcleo, fortíssimo sinal
+    } else if (sameDisc) {
+      redeDisc = 14; // Mesmo discipulador, GCs diferentes
+    } else if (isVertical) {
+      redeDisc = 3;  // Um discipula o outro — relação vertical, não ideal para companheirismo horizontal
     } else if (disc1 && disc2) {
-      redeDisc = 5; // Discipuladores diferentes mas ambos têm rede
+      redeDisc = 4;  // Ambos têm rede, mas são núcleos distintos
     }
 
     // --- FAIXA ETÁRIA (0-10 pts) ---
@@ -1214,7 +1223,11 @@ export const Companionship: React.FC = () => {
                                           {ec && <span className="text-[9px] font-semibold text-indigo-600 bg-indigo-50 px-1 rounded">{ec}</span>}
                                           {age !== null && <span className="text-[9px] text-blue-600 bg-blue-50 px-1 rounded">{age}a</span>}
                                           {candidate.distance !== null && <span className="text-[9px] text-gray-400">📍{candidate.distance}km</span>}
-                                          {candidate.scoreBreakdown.redeDisc >= 20 && <span className="text-[9px] text-emerald-700 bg-emerald-50 px-1 rounded font-bold">🤝 Mesmo núcleo</span>}
+                                          {candidate.grupos_caseiros && candidate.grupos_caseiros.trim().toUpperCase() === (selectedMember.grupos_caseiros || '').trim().toUpperCase() ? (
+                                            <span className="text-[9px] text-emerald-700 bg-emerald-50 px-1 rounded font-bold">🏠 Mesmo GC</span>
+                                          ) : candidate.scoreBreakdown.redeDisc >= 14 ? (
+                                            <span className="text-[9px] text-blue-700 bg-blue-50 px-1 rounded font-bold">🔗 Mesmo disc.</span>
+                                          ) : null}
                                         </div>
                                         {/* Mini score bar */}
                                         <div className="flex items-center gap-1.5 mt-1">
