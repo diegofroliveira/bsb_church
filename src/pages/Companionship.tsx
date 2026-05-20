@@ -371,19 +371,19 @@ export const Companionship: React.FC = () => {
     saveCompanionships(newList);
   };
 
-  // Algoritmo de busca de vizinhos geograficamente recomendados
-  const getRecommendedNeighbors = (member: Member): (Member & { distance: number })[] => {
-    if (!member.latitude || !member.longitude) return [];
-    
+  // Algoritmo de sugestão por COMPATIBILIDADE MULTI-CRITÉRIO (não mais só distância)
+  const getRecommendedNeighbors = (member: Member): (Member & { distance: number | null; compatScore: number; scoreBreakdown: SimulatedPair['scoreBreakdown'] })[] => {
     return members
       .filter(m => m.id !== member.id && m.sexo === member.sexo && !isMemberLinked(m.id))
       .map(m => {
         const dist = calculateDistance(member.latitude, member.longitude, m.latitude, m.longitude);
-        return { ...m, distance: dist ?? 9999 };
+        const breakdown = calculateCompatibilityScore(member, m, dist);
+        return { ...m, distance: dist, compatScore: breakdown.total, scoreBreakdown: { maturidade: breakdown.maturidade, estadoCivil: breakdown.estadoCivil, redeDisc: breakdown.redeDisc, faixaEtaria: breakdown.faixaEtaria, distancia: breakdown.distancia } };
       })
-      .filter(m => m.distance !== 9999)
-      .sort((a, b) => a.distance - b.distance);
+      .filter(m => m.compatScore > 0) // Excluir completamente incompatíveis
+      .sort((a, b) => b.compatScore - a.compatScore); // Ordenar por maior compatibilidade
   };
+
 
   // -----------------------------------------------------------------------
   // MOTOR DE COMPATIBILIDADE MULTI-CRITÉRIO (Pilares do Companheirismo)
@@ -1167,97 +1167,93 @@ export const Companionship: React.FC = () => {
                             </div>
                           </div>
 
-                          {/* Motor Geográfico */}
+                          {/* Motor de Compatibilidade Multi-Critério */}
                           <div className="mt-6 space-y-4">
                             <div className="flex items-center justify-between">
                               <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
-                                <Compass className="h-4 w-4 text-blue-600 animate-spin" style={{ animationDuration: '6s' }} />
-                                Vizinhos Recomendados (Proximidade)
+                                <Sparkles className="h-4 w-4 text-indigo-500 animate-pulse" />
+                                Mais Compatíveis pelos Pilares
                               </h4>
-                              <span className="text-[10px] text-gray-400 font-semibold italic">Apenas mesmo sexo sem aliança ativa</span>
+                              <span className="text-[10px] text-gray-400 font-semibold italic">Mesmo sexo · sem aliança ativa</span>
                             </div>
 
-                            {/* Tabela de Vizinhos Recomendados */}
+                            {/* Lista de Candidatos por Compatibilidade */}
                             <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
-                              {getRecommendedNeighbors(selectedMember).slice(0, 5).map((candidate, idx) => {
+                              {getRecommendedNeighbors(selectedMember).slice(0, 6).map((candidate, idx) => {
                                 const isSelectedTrio = trioSecondMember?.id === candidate.id;
-                                
-                                // Badge de cores baseado na distância
-                                const dist = candidate.distance;
-                                const distanceBadge = 
-                                  dist < 3 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                                  dist < 8 ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                                  dist < 15 ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                                  'bg-red-50 text-red-700 border-red-200';
-                                
-                                const distLabel = 
-                                  dist < 3 ? 'Extremamente Próximo' :
-                                  dist < 8 ? 'Próximo' :
-                                  dist < 15 ? 'Relativamente Próximo' :
-                                  'Distante';
+                                const score = candidate.compatScore;
+                                const scoreColor = score >= 70 ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : score >= 45 ? 'text-amber-700 bg-amber-50 border-amber-200' : 'text-red-700 bg-red-50 border-red-200';
+                                const barColor = score >= 70 ? 'bg-emerald-500' : score >= 45 ? 'bg-amber-400' : 'bg-red-400';
+                                const age = getAge(candidate.nascimento);
+                                const ec = candidate.estado_civil;
 
                                 return (
                                   <div
                                     key={candidate.id}
                                     className={clsx(
-                                      idx === 0 ? 'ring-1 ring-blue-500 bg-blue-50/10' : 'bg-gray-50/50',
-                                      'p-3 rounded-xl border border-gray-100 flex items-center justify-between gap-4 hover:bg-gray-50 transition-all'
+                                      idx === 0 ? 'ring-1 ring-indigo-400 bg-indigo-50/20' : 'bg-gray-50/50',
+                                      'p-3 rounded-xl border border-gray-100 flex items-center justify-between gap-3 hover:bg-gray-50 transition-all'
                                     )}
                                   >
-                                    <div className="flex items-center gap-3 min-w-0">
-                                      <div className="relative">
+                                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                                      <div className="relative shrink-0">
                                         <div className="h-9 w-9 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs border">
                                           {candidate.foto ? <img src={candidate.foto} alt={candidate.nome} className="h-9 w-9 rounded-full object-cover" /> : candidate.nome.charAt(0)}
                                         </div>
                                         {idx === 0 && (
-                                          <span className="absolute -top-1 -left-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[8px] font-bold text-white shadow animate-bounce">
+                                          <span className="absolute -top-1 -left-1 flex h-4 w-4 items-center justify-center rounded-full bg-indigo-500 text-[8px] font-bold text-white shadow animate-bounce">
                                             1º
                                           </span>
                                         )}
                                       </div>
                                       
-                                      <div className="min-w-0">
+                                      <div className="min-w-0 flex-1">
                                         <div className="text-xs font-bold text-gray-900 truncate">{candidate.nome}</div>
-                                        <div className="text-[10px] text-gray-500 truncate mt-0.5">📍 Bairro: {candidate.bairro || 'Sem Bairro'} • GC: {candidate.grupos_caseiros || 'Nenhum'}</div>
+                                        <div className="flex flex-wrap items-center gap-1 mt-0.5">
+                                          <span className="text-[9px] font-semibold text-gray-500 bg-gray-100 px-1 rounded">{candidate.tipo_de_pessoa}</span>
+                                          {ec && <span className="text-[9px] font-semibold text-indigo-600 bg-indigo-50 px-1 rounded">{ec}</span>}
+                                          {age !== null && <span className="text-[9px] text-blue-600 bg-blue-50 px-1 rounded">{age}a</span>}
+                                          {candidate.distance !== null && <span className="text-[9px] text-gray-400">📍{candidate.distance}km</span>}
+                                          {candidate.scoreBreakdown.redeDisc >= 20 && <span className="text-[9px] text-emerald-700 bg-emerald-50 px-1 rounded font-bold">🤝 Mesmo núcleo</span>}
+                                        </div>
+                                        {/* Mini score bar */}
+                                        <div className="flex items-center gap-1.5 mt-1">
+                                          <div className="flex-1 h-1 bg-gray-100 rounded-full overflow-hidden">
+                                            <div className={clsx(barColor, 'h-full rounded-full')} style={{ width: `${score}%` }} />
+                                          </div>
+                                          <span className={clsx(scoreColor, 'text-[8px] font-bold border px-1 rounded-full')}>{score}pts</span>
+                                        </div>
                                       </div>
                                     </div>
 
-                                    <div className="flex items-center gap-2 shrink-0">
-                                      {/* Badge da Distância */}
-                                      <div className={clsx(distanceBadge, 'text-right border px-2 py-0.5 rounded text-[10px] font-bold flex flex-col')}>
-                                        <span>{dist} km</span>
-                                        <span className="text-[8px] font-medium opacity-80">{distLabel}</span>
-                                      </div>
-
-                                      {/* Botão de Associação Rápida ou Trio */}
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                      {/* Botão principal */}
                                       {idx === 0 ? (
                                         <button
                                           onClick={handleLinkMembers}
-                                          className="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors"
-                                          title="Vincular com o vizinho mais próximo recomendado!"
+                                          className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors"
                                         >
-                                          <Plus className="h-4 w-4" /> Vincular
+                                          <Plus className="h-3.5 w-3.5" /> Vincular
                                         </button>
                                       ) : (
                                         <button
                                           onClick={() => handleManualLink(selectedMember.id, candidate.id)}
-                                          className="bg-white hover:bg-gray-100 text-gray-700 border border-gray-200 p-2 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors"
-                                          title="Vincular Manualmente"
+                                          className="bg-white hover:bg-gray-100 text-gray-700 border border-gray-200 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors"
                                         >
                                           Conectar
                                         </button>
                                       )}
 
-                                      {/* Botão para montar um Trio */}
+                                      {/* Botão Trio */}
                                       <button
                                         onClick={() => setTrioSecondMember(isSelectedTrio ? null : candidate)}
                                         className={clsx(
                                           isSelectedTrio ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-transparent',
                                           'p-1.5 rounded-lg border text-[10px] font-bold transition-all'
                                         )}
-                                        title="Incluir este membro no vínculo para formar um Trio"
+                                        title="Incluir no Trio"
                                       >
-                                        {isSelectedTrio ? 'Remover do Trio' : '+ Trio'}
+                                        {isSelectedTrio ? '✕ Trio' : '+ Trio'}
                                       </button>
                                     </div>
                                   </div>
@@ -1265,10 +1261,11 @@ export const Companionship: React.FC = () => {
                               })}
 
                               {getRecommendedNeighbors(selectedMember).length === 0 && (
-                                <div className="text-center py-8 text-gray-400 text-xs italic">Não existem vizinhos cadastrados com coordenadas geográficas do mesmo sexo sem vínculo ativo.</div>
+                                <div className="text-center py-8 text-gray-400 text-xs italic">Nenhum companheiro compatível encontrado. Verifique se há membros do mesmo sexo com perfil complementar cadastrados.</div>
                               )}
                             </div>
                           </div>
+
 
                           {trioSecondMember && (
                             <div className="mt-4 bg-indigo-50/50 border border-indigo-100 rounded-xl p-3 flex items-center justify-between">
