@@ -3,15 +3,15 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, Users, Home, DollarSign, Settings, LogOut,
   Menu, BookOpen, FileText, Network, AlertTriangle, MapPin,
-  Brain, Calendar, Play, Heart
+  Brain, Calendar, Play, Heart, Handshake
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import clsx from 'clsx';
 
 const DEFAULT_ROLES: Record<string, string[]> = {
-  admin: ['Dashboard', 'Aniversariantes', 'Mapa', 'Membros', 'Famílias', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Financeiro', 'Consultor IA', 'Insights IA', 'Configurações', 'Simulações'],
-  pastor: ['Dashboard', 'Aniversariantes', 'Mapa', 'Membros', 'Famílias', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Financeiro', 'Consultor IA', 'Insights IA', 'Simulações'],
+  admin: ['Dashboard', 'Aniversariantes', 'Mapa', 'Membros', 'Famílias', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Financeiro', 'Consultor IA', 'Insights IA', 'Configurações', 'Simulações', 'Companheirismo'],
+  pastor: ['Dashboard', 'Aniversariantes', 'Mapa', 'Membros', 'Famílias', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Financeiro', 'Consultor IA', 'Insights IA', 'Simulações', 'Companheirismo'],
   secretaria: ['Dashboard', 'Aniversariantes', 'Membros', 'Famílias', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Consultor IA'],
   financeiro: ['Dashboard', 'Financeiro']
 };
@@ -84,6 +84,7 @@ export const MainLayout: React.FC = () => {
     { id: 'Famílias',        name: 'Famílias',        path: '/families',     icon: Heart },
     { id: 'GCs/Localidades', name: 'GCs/Localidades', path: '/cells',        icon: Home },
     { id: 'Discipulado',     name: 'Discipulado',     path: '/discipleship', icon: BookOpen },
+    { id: 'Companheirismo',   name: 'Companheirismo',   path: '/companionship', icon: Handshake },
     { id: 'Rede',            name: 'Rede',            path: '/network',      icon: Network },
     { id: 'Relatórios',      name: 'Relatórios',      path: '/reports',      icon: FileText },
     { id: 'QA',              name: 'QA',              path: '/qa',           icon: AlertTriangle },
