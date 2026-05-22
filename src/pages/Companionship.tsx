@@ -9,6 +9,12 @@ import {
 } from 'lucide-react';
 import clsx from 'clsx';
 
+const formatName = (fullName: string) => {
+  if (!fullName) return '';
+  const parts = fullName.trim().split(' ');
+  return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1]}` : parts[0];
+};
+
 // Interface do Companheirismo
 interface CompanionshipData {
   id: string;
@@ -1127,7 +1133,7 @@ export const Companionship: React.FC = () => {
     });
 
     if (results.length === 0) {
-      alert(`Não foi possível encontrar outro parceiro compatível para ${m1.nome.split(' ')[0]} dentro das restrições atuais.`);
+      alert(`Não foi possível encontrar outro parceiro compatível para ${formatName(m1.nome)} dentro das restrições atuais.`);
       return;
     }
 
@@ -1429,7 +1435,7 @@ export const Companionship: React.FC = () => {
                             m1.nome.charAt(0)
                           )}
                         </div>
-                        <div className="text-xs font-bold text-gray-800 line-clamp-1">{m1.apelido || m1.nome.split(' ')[0]}</div>
+                        <div className="text-xs font-bold text-gray-800 line-clamp-1">{m1.apelido || formatName(m1.nome)}</div>
                         <div className="text-[10px] text-gray-400 font-medium capitalize">{m1.tipo_de_pessoa.toLowerCase()}</div>
                         <div className="text-[10px] text-gray-500 bg-gray-100 rounded py-0.5 px-1 inline-block truncate max-w-full">{m1.bairro || 'Sem Bairro'}</div>
                       </div>
@@ -1449,7 +1455,7 @@ export const Companionship: React.FC = () => {
                             m2.nome.charAt(0)
                           )}
                         </div>
-                        <div className="text-xs font-bold text-gray-800 line-clamp-1">{m2.apelido || m2.nome.split(' ')[0]}</div>
+                        <div className="text-xs font-bold text-gray-800 line-clamp-1">{m2.apelido || formatName(m2.nome)}</div>
                         <div className="text-[10px] text-gray-400 font-medium capitalize">{m2.tipo_de_pessoa.toLowerCase()}</div>
                         <div className="text-[10px] text-gray-500 bg-gray-100 rounded py-0.5 px-1 inline-block truncate max-w-full">{m2.bairro || 'Sem Bairro'}</div>
                       </div>
@@ -2013,7 +2019,7 @@ export const Companionship: React.FC = () => {
                               <div className="h-9 w-9 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs mx-auto border border-blue-100">
                                 {m.foto ? <img src={m.foto} alt={m.nome} className="h-9 w-9 rounded-full object-cover" /> : m.nome.charAt(0)}
                               </div>
-                              <div className="text-[10px] font-bold text-gray-800 truncate">{m.nome.split(' ')[0]}</div>
+                              <div className="text-[10px] font-bold text-gray-800 truncate">{formatName(m.nome)}</div>
                               <div className="text-[8px] text-gray-500 truncate">{m.tipo_de_pessoa}</div>
                               {ec && <div className="text-[8px] font-medium text-indigo-600 bg-indigo-50 px-1 rounded-full inline-block">{ec}</div>}
                               {age !== null && <div className="text-[8px] text-gray-400">{age} anos</div>}

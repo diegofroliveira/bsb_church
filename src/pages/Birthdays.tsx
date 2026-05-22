@@ -12,6 +12,12 @@ import {
 import { toPng } from 'html-to-image';
 import clsx from 'clsx';
 
+const formatName = (fullName: string) => {
+  if (!fullName) return '';
+  const parts = fullName.trim().split(' ');
+  return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1]}` : parts[0];
+};
+
 interface Member {
   id: any;
   nome: string;
@@ -169,7 +175,7 @@ export const Birthdays: React.FC = () => {
   const generateMessage = () => {
     if (getBirthdays.length === 0) return "Nenhum aniversariante encontrado.";
     
-    const names = getBirthdays.map(m => `*${m.nome.toUpperCase()}* (@${m.nome.split(' ')[0].toUpperCase()}) - ${m.grupos_caseiros || 'Sem GC'} 🌷`).join('\n');
+    const names = getBirthdays.map(m => `*${m.nome.toUpperCase()}* (@${formatName(m.nome).toUpperCase()}) - ${m.grupos_caseiros || 'Sem GC'} 🌷`).join('\n');
     
     const isPlural = getBirthdays.length > 1;
     const isFemale = !isPlural && getBirthdays[0]?.sexo === 'Feminino';
@@ -445,7 +451,7 @@ export const Birthdays: React.FC = () => {
                        </label>
                        
                        <div className="text-center mt-3">
-                           <h4 className="font-black text-gray-900 text-sm uppercase truncate max-w-[150px]">{m.nome.split(' ')[0]}</h4>
+                           <h4 className="font-black text-gray-900 text-sm uppercase truncate max-w-[150px]">{formatName(m.nome)}</h4>
                            <p className="text-[10px] font-bold text-gray-400 uppercase">
                              {calculateAge(m.nascimento)} Anos {m.estado_civil ? `• ${m.estado_civil}` : ''}
                            </p>
