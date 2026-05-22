@@ -1076,39 +1076,43 @@ export const Companionship: React.FC = () => {
 
     const currentPartners = match.memberIds.slice(1);
 
-    // Pool de órfãos do mesmo sexo mais os parceiros atuais
-    const unmatchedSameSex = simulatedUnmatched.filter(id => {
-      const m = members.find(member => member.id === id);
-      return m && m.sexo === m1.sexo;
-    });
+    // 1. Encontrar o pool de todos os membros do mesmo sexo sem vínculo ativo oficial
+    const poolSameSex = members.filter(m => 
+      m.sexo === m1.sexo && 
+      m.id !== m1.id && 
+      !isMemberLinked(m.id)
+    );
 
-    const candidatesPool = [...unmatchedSameSex, ...currentPartners];
+    // 2. Excluir os parceiros atuais para garantir que não vamos escolher os mesmos
+    const eligibleCandidates = poolSameSex.filter(m => !currentPartners.includes(m.id));
 
-    let bestPartner: Member | null = null;
-    let bestScore = -Infinity;
-    let bestDist = Infinity;
-    let bestBreakdown: SimulatedPair['scoreBreakdown'] | null = null;
+    // 3. Avaliar candidatos sob as restrições e calcular pontuação
+    interface CandidateResult {
+      member: Member;
+      score: number;
+      dist: number;
+      breakdown: SimulatedPair['scoreBreakdown'];
+    }
+    const results: CandidateResult[] = [];
 
-    // Tenta primeiro candidatos frescos (que não sejam os parceiros atuais)
-    const freshCandidates = candidatesPool.filter(id => !currentPartners.includes(id));
+    eligibleCandidates.forEach(m2 => {
+      const dist = calculateDistance(m1.latitude, m1.longitude, m2.latitude, m2.longitude);
 
-    const evaluateList = (list: string[]) => {
-      list.forEach(id => {
-        const m2 = members.find(m => m.id === id);
-        if (!m2 || m2.id === m1.id) return;
+      // Aplicar filtros de distância
+      if (m1.latitude !== null && m2.latitude !== null && dist !== null && dist > simMaxDistance) return;
+      if (simEnforceProximity && (dist === null || dist > simMaxDistance)) return;
 
-        const dist = calculateDistance(m1.latitude, m1.longitude, m2.latitude, m2.longitude);
+      // Verificar restrições do simulador (mesmo GC, mesmo Discipulado, etc)
+      if (!meetsSimulatorConstraints(m1, m2, dist)) return;
 
-        if (m1.latitude !== null && m2.latitude !== null && dist !== null && dist > simMaxDistance) return;
-        if (simEnforceProximity && (dist === null || dist > simMaxDistance)) return;
-        if (!meetsSimulatorConstraints(m1, m2, dist)) return;
-
-        const breakdown = calculateCompatibilityScore(m1, m2, dist);
-        if (breakdown.total > 0 && breakdown.total > bestScore) {
-          bestScore = breakdown.total;
-          bestPartner = m2;
-          bestDist = dist ?? 0;
-          bestBreakdown = {
+      // Calcular score de compatibilidade
+      const breakdown = calculateCompatibilityScore(m1, m2, dist);
+      if (breakdown.total > 0) {
+        results.push({
+          member: m2,
+          score: breakdown.total,
+          dist: dist ?? 0,
+          breakdown: {
             maturidade: breakdown.maturidade,
             tempoIgreja: breakdown.tempoIgreja,
             estadoCivil: breakdown.estadoCivil,
@@ -1117,44 +1121,91 @@ export const Companionship: React.FC = () => {
             faixaEtaria: breakdown.faixaEtaria,
             momentoVida: breakdown.momentoVida,
             distancia: breakdown.distancia
-          };
-        }
-      });
-    };
-
-    evaluateList(freshCandidates);
-
-    // Se não encontrou novos parceiros, tenta reavaliar com os antigos
-    if (!bestPartner) {
-      evaluateList(currentPartners);
-    }
-
-    if (bestPartner && bestBreakdown) {
-      const newPartnerId = bestPartner.id;
-
-      // Coloca os parceiros antigos de volta no pool de órfãos e remove o novo parceiro
-      setSimulatedUnmatched(prev => {
-        const withReplaced = [...prev, ...currentPartners];
-        return withReplaced.filter(id => id !== newPartnerId);
-      });
-
-      // Substitui o par/trio no simulador
-      setSimulatedMatches(prev => {
-        return prev.map((sm, i) => {
-          if (i === idx) {
-            return {
-              memberIds: [idA, newPartnerId],
-              distance: bestDist,
-              compatScore: bestScore,
-              scoreBreakdown: bestBreakdown!
-            };
           }
-          return sm;
         });
-      });
-    } else {
+      }
+    });
+
+    if (results.length === 0) {
       alert(`Não foi possível encontrar outro parceiro compatível para ${m1.nome.split(' ')[0]} dentro das restrições atuais.`);
+      return;
     }
+
+    // Ordenar por score de compatibilidade (maior primeiro)
+    results.sort((a, b) => b.score - a.score);
+    
+    const bestMatch = results[0];
+    const bestPartner = bestMatch.member;
+    const bestScore = bestMatch.score;
+    const bestDist = bestMatch.dist;
+    const bestBreakdown = bestMatch.breakdown;
+    const newPartnerId = bestPartner.id;
+
+    // 4. Atualizar os estados de simulatedUnmatched e simulatedMatches
+    // Coloca os parceiros antigos de volta no pool de órfãos
+    let updatedUnmatched = [...simulatedUnmatched, ...currentPartners];
+
+    // Se o novo parceiro estava no pool de órfãos, removemos ele de lá
+    updatedUnmatched = updatedUnmatched.filter(id => id !== newPartnerId);
+
+    // Se o novo parceiro estava em outra proposta simulada, precisamos atualizar ou dissolver essa outra proposta
+    let updatedMatches = simulatedMatches.map((sm, i) => {
+      if (i === idx) {
+        // Atualiza a proposta atual para ser a nova dupla
+        return {
+          memberIds: [idA, newPartnerId],
+          distance: bestDist,
+          compatScore: bestScore,
+          scoreBreakdown: bestBreakdown
+        };
+      }
+      return sm;
+    });
+
+    // Encontrar se o novo parceiro está em outra proposta
+    const otherMatchIdx = simulatedMatches.findIndex((sm, i) => i !== idx && sm.memberIds.includes(newPartnerId));
+    
+    if (otherMatchIdx !== -1) {
+      const otherMatch = simulatedMatches[otherMatchIdx];
+      const remainingIds = otherMatch.memberIds.filter(id => id !== newPartnerId);
+
+      if (remainingIds.length <= 1) {
+        // Se sobrou 0 ou 1 membro na outra proposta, removemos ela completamente dos matches
+        updatedMatches = updatedMatches.filter((_, i) => i !== otherMatchIdx);
+        // E jogamos o membro restante (se houver) de volta para o pool de órfãos
+        remainingIds.forEach(id => {
+          if (!updatedUnmatched.includes(id)) {
+            updatedUnmatched.push(id);
+          }
+        });
+      } else {
+        // Se era um trio e sobrou 2 membros (virou dupla), recalculamos o score para eles
+        const p1 = members.find(m => m.id === remainingIds[0])!;
+        const p2 = members.find(m => m.id === remainingIds[1])!;
+        const d = calculateDistance(p1.latitude, p1.longitude, p2.latitude, p2.longitude);
+        const bd = calculateCompatibilityScore(p1, p2, d);
+
+        updatedMatches[otherMatchIdx] = {
+          memberIds: remainingIds,
+          distance: d ?? 0,
+          compatScore: bd.total,
+          scoreBreakdown: {
+            maturidade: bd.maturidade,
+            tempoIgreja: bd.tempoIgreja,
+            estadoCivil: bd.estadoCivil,
+            redeDisc: bd.redeDisc,
+            mesmaFuncao: bd.mesmaFuncao,
+            faixaEtaria: bd.faixaEtaria,
+            momentoVida: bd.momentoVida,
+            distancia: bd.distancia
+          }
+        };
+      }
+    }
+
+    // Salvar estados atualizados
+    setSimulatedUnmatched(updatedUnmatched);
+    setSimulatedMatches(updatedMatches);
   };
 
   // Efetivar simulação (Salvar em lote)
