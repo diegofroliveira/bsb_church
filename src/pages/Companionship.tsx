@@ -663,6 +663,187 @@ export const Companionship: React.FC = () => {
       .sort((a, b) => b.compatScore - a.compatScore); // Ordenar por maior compatibilidade
   };
 
+  // Helper para mapear critérios de pontuação positiva em motivos legíveis com badges
+  const getCompatibilityReasons = (
+    member: Member,
+    candidate: Member & { scoreBreakdown: SimulatedPair['scoreBreakdown'] }
+  ) => {
+    const bd = candidate.scoreBreakdown;
+    const reasons: {
+      label: string;
+      points: number;
+      icon: React.ReactNode;
+      color: string;
+      tooltip: string;
+    }[] = [];
+
+    // --- MATURIDADE (0-15 pts) ---
+    if (bd.maturidade > 0) {
+      let label = 'Maturidade Compatível';
+      if (bd.maturidade === 15) label = 'Mesma Maturidade';
+      else if (bd.maturidade === 9) label = 'Maturidade Próxima';
+      
+      reasons.push({
+        label,
+        points: bd.maturidade,
+        icon: <Compass className="h-3 w-3 shrink-0" />,
+        color: 'bg-purple-50 text-purple-700 border-purple-100/70',
+        tooltip: 'Alinhamento por maturidade e caminhada cristã'
+      });
+    }
+
+    // --- TEMPO DE IGREJA (0-10 pts) ---
+    if (bd.tempoIgreja > 0) {
+      let label = 'Tempo de Igreja';
+      if (bd.tempoIgreja === 10) label = 'Tempo de Igreja Idêntico';
+      else if (bd.tempoIgreja === 7) label = 'Tempo de Igreja Próximo';
+      else if (bd.tempoIgreja === 4) label = 'Tempo de Igreja Compatível';
+      else if (bd.tempoIgreja === 1) label = 'Tempo de Igreja Similar';
+
+      reasons.push({
+        label,
+        points: bd.tempoIgreja,
+        icon: <Clock className="h-3 w-3 shrink-0" />,
+        color: 'bg-teal-50 text-teal-700 border-teal-100/70',
+        tooltip: 'Tempo de integração na igreja local'
+      });
+    }
+
+    // --- ESTADO CIVIL (0-10 pts) ---
+    if (bd.estadoCivil > 0) {
+      let label = 'Estado Civil';
+      if (bd.estadoCivil === 10) label = 'Mesmo Estado Civil';
+      else if (bd.estadoCivil === 5) label = 'Fase Civil Compatível';
+
+      reasons.push({
+        label,
+        points: bd.estadoCivil,
+        icon: <Heart className="h-3 w-3 text-pink-500 shrink-0" />,
+        color: 'bg-pink-50 text-pink-700 border-pink-100/70',
+        tooltip: 'Mesmo estado civil ou fase de vida compatível'
+      });
+    }
+
+    // --- REDE DE DISCIPULADO + GC (0-20 pts) ---
+    if (bd.redeDisc > 0) {
+      let label = 'Rede de Discipulado';
+      const gc1 = (member.grupos_caseiros || '').trim().toUpperCase();
+      const gc2 = (candidate.grupos_caseiros || '').trim().toUpperCase();
+      const sameGC = gc1.length > 0 && gc1 === gc2;
+
+      const bothLeadership = sameGC &&
+        (member.gcRole === 'LIDER' || member.gcRole === 'AUXILIAR') &&
+        (candidate.gcRole === 'LIDER' || candidate.gcRole === 'AUXILIAR');
+
+      const disc1 = member.discipuladorNome?.trim().toUpperCase() || null;
+      const disc2 = candidate.discipuladorNome?.trim().toUpperCase() || null;
+      const sameDisc = disc1 !== null && disc2 !== null && disc1 === disc2;
+
+      const r1Region = getNormalizedRegion(member.bairro, member.grupos_caseiros);
+      const r2Region = getNormalizedRegion(candidate.bairro, candidate.grupos_caseiros);
+      const sameRegion = r1Region === r2Region;
+      const hasMultipleGCs = sameRegion && (regionGcCounters[r1Region] > 1);
+
+      if (bothLeadership) {
+        label = '👑 Núcleo de GC';
+      } else if (bd.redeDisc === 18 && sameGC) {
+        label = '🏠 Mesmo GC + 🔗 Mesmo Disc.';
+      } else if (bd.redeDisc === 18 && hasMultipleGCs && sameDisc) {
+        label = '🔗 Mesmo Disc. (Região)';
+      } else if (sameGC) {
+        label = '🏠 Mesmo GC';
+      } else if (sameDisc) {
+        label = '🔗 Mesmo Discipulador';
+      } else if (bd.redeDisc === 4) {
+        label = 'Redes Distintas';
+      } else if (bd.redeDisc === 2) {
+        label = 'Discipulado Direto';
+      }
+
+      reasons.push({
+        label,
+        points: bd.redeDisc,
+        icon: <Users className="h-3 w-3 shrink-0" />,
+        color: 'bg-emerald-50 text-emerald-700 border-emerald-100/70',
+        tooltip: 'Grupo Caseiro ou linha de discipulado comum'
+      });
+    }
+
+    // --- FUNÇÃO MINISTERIAL (0-10 pts) ---
+    if (bd.mesmaFuncao > 0) {
+      let label = 'Função Ministerial';
+      if (bd.mesmaFuncao === 10) {
+        const role = getMemberRole(candidate);
+        label = `Mesma Função (${role === 'DISCIPULADOR' ? 'Discipulador' : role === 'LIDER' ? 'Líder' : role === 'AUXILIAR' ? 'Auxiliar' : 'Membro'})`;
+      }
+      else if (bd.mesmaFuncao === 7) label = 'Líder & Auxiliar (GC)';
+      else if (bd.mesmaFuncao === 3) label = 'Sinergia de Liderança';
+
+      reasons.push({
+        label,
+        points: bd.mesmaFuncao,
+        icon: <Sparkles className="h-3 w-3 text-indigo-500 shrink-0" />,
+        color: 'bg-indigo-50 text-indigo-700 border-indigo-100/70',
+        tooltip: 'Sinergia de responsabilidade ou liderança'
+      });
+    }
+
+    // --- FAIXA ETÁRIA (0-5 pts) ---
+    if (bd.faixaEtaria > 0) {
+      let label = 'Idade Compatível';
+      if (bd.faixaEtaria === 5) label = 'Idades Muito Próximas (±3a)';
+      else if (bd.faixaEtaria === 4) label = 'Idades Próximas (±7a)';
+      else if (bd.faixaEtaria === 2) label = 'Idades Compatíveis (±12a)';
+      else if (bd.faixaEtaria === 1) label = 'Faixa Etária Similar';
+
+      reasons.push({
+        label,
+        points: bd.faixaEtaria,
+        icon: <Smile className="h-3 w-3 shrink-0" />,
+        color: 'bg-blue-50 text-blue-700 border-blue-100/70',
+        tooltip: 'Aproximação e afinidade por faixa etária'
+      });
+    }
+
+    // --- MOMENTO DE VIDA (0-10 pts) ---
+    if (bd.momentoVida > 0) {
+      let label = 'Momento de Vida';
+      if (bd.momentoVida === 10) label = 'Filhos com Idade Próxima (±3a)';
+      else if (bd.momentoVida === 7) label = 'Filhos com Idade Compatível (±6a)';
+      else if (bd.momentoVida === 3) label = 'Ambos têm Filhos';
+      else if (bd.momentoVida === 6) label = 'Ambos sem Filhos';
+
+      reasons.push({
+        label,
+        points: bd.momentoVida,
+        icon: <Sparkles className="h-3 w-3 text-orange-500 shrink-0" />,
+        color: 'bg-orange-50 text-orange-700 border-orange-100/70',
+        tooltip: 'Afinidade de momento de vida e criação de filhos'
+      });
+    }
+
+    // --- DISTÂNCIA (0-20 pts) ---
+    if (bd.distancia > 0) {
+      let label = 'Distância';
+      if (bd.distancia === 20) label = 'Mora Perto';
+      else if (bd.distancia === 16) label = 'Mora Perto';
+      else if (bd.distancia === 10) label = 'Distância Acessível';
+      else if (bd.distancia === 4) label = 'Mora mais longe';
+      else if (bd.distancia === 1) label = 'Mora muito longe';
+      else if (bd.distancia === 2) label = 'Sem Coordenadas';
+
+      reasons.push({
+        label,
+        points: bd.distancia,
+        icon: <MapPin className="h-3 w-3 shrink-0" />,
+        color: 'bg-slate-50 text-slate-700 border-slate-200',
+        tooltip: 'Proximidade geográfica residencial'
+      });
+    }
+
+    return reasons;
+  };
+
 
   // -----------------------------------------------------------------------
   // MOTOR DE COMPATIBILIDADE MULTI-CRITÉRIO (Pilares do Companheirismo)
@@ -1837,7 +2018,7 @@ export const Companionship: React.FC = () => {
                             </div>
 
                             {/* Lista de Candidatos por Compatibilidade */}
-                            <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1">
+                            <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
                               {getRecommendedNeighbors(selectedMember).slice(0, 6).map((candidate, idx) => {
                                 const isSelectedTrio = trioSecondMember?.id === candidate.id;
                                 const score = candidate.compatScore;
@@ -1896,6 +2077,24 @@ export const Companionship: React.FC = () => {
                                             <div className={clsx(barColor, 'h-full rounded-full')} style={{ width: `${score}%` }} />
                                           </div>
                                           <span className={clsx(scoreColor, 'text-[8px] font-bold border px-1 rounded-full')}>{score}pts</span>
+                                        </div>
+
+                                        {/* Detalhamento dos Pontos de Compatibilidade */}
+                                        <div className="flex flex-wrap gap-1 mt-1.5 pt-1.5 border-t border-dashed border-gray-150">
+                                          {getCompatibilityReasons(selectedMember, candidate).map((reason, rIdx) => (
+                                            <span
+                                              key={rIdx}
+                                              className={clsx(
+                                                reason.color,
+                                                'inline-flex items-center gap-1 text-[8.5px] font-bold px-1.5 py-0.5 rounded border shadow-2sm transition-all hover:scale-105 select-none'
+                                              )}
+                                              title={reason.tooltip}
+                                            >
+                                              {reason.icon}
+                                              <span>{reason.label}</span>
+                                              <span className="font-extrabold">+{reason.points}p</span>
+                                            </span>
+                                          ))}
                                         </div>
                                       </div>
                                     </div>

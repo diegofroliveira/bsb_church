@@ -179,9 +179,19 @@ export const Birthdays: React.FC = () => {
     
     const isPlural = getBirthdays.length > 1;
     const isFemale = !isPlural && getBirthdays[0]?.sexo === 'Feminino';
+    
+    let timeLabel = "hoje";
+    if (filterMode === 'tomorrow') {
+      timeLabel = "de amanhã";
+    } else if (filterMode === 'month') {
+      timeLabel = "do mês";
+    } else if (filterMode === 'specific') {
+      timeLabel = "da data selecionada";
+    }
+
     const greeting = isPlural 
-      ? "Os aniversariantes hoje são:" 
-      : (isFemale ? "A aniversariante hoje é:" : "O aniversariante hoje é:");
+      ? `Os aniversariantes ${timeLabel} são:` 
+      : (isFemale ? `A aniversariante ${timeLabel} é:` : `O aniversariante ${timeLabel} é:`);
     const blessing = isPlural ? "Deus abençoe vocês!!" : "Deus abençoe você!!";
     
     return `Bom dia,\n\n${greeting}\n${names}\n\nParabéns!! ${blessing} 🥳 🎂 🎊 🥂 🎇\n\n_"Este é o dia com que nos presenteou o SENHOR: festejemos e regozijemo-nos nele!" (Salmos 118:24)_`;
