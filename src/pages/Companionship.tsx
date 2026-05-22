@@ -35,6 +35,12 @@ interface Member {
   nascimento?: string | null;
   discipuladorNome?: string | null;
   gcRole?: 'LIDER' | 'AUXILIAR' | null; // papel de liderança no GC
+  mae?: string | null;
+  pai?: string | null;
+  batismo?: string | null;
+  data_de_vinculo?: string | null;
+  data_de_cadastro?: string | null;
+  esposo_a?: string | null;
 }
 
 interface SimulatedPair {
@@ -42,11 +48,14 @@ interface SimulatedPair {
   distance: number;
   compatScore: number; // 0-100
   scoreBreakdown: {
-    maturidade: number;    // 0-28
-    estadoCivil: number;   // 0-22
-    redeDisc: number;      // 0-15
-    faixaEtaria: number;   // 0-10
-    distancia: number;     // 0-25 (maior peso — companheirismo requer presença física regular)
+    maturidade: number;      // 0-15
+    tempoIgreja: number;     // 0-10
+    estadoCivil: number;     // 0-10
+    redeDisc: number;        // 0-15
+    mesmaFuncao: number;     // 0-15
+    faixaEtaria: number;     // 0-5
+    momentoVida: number;     // 0-10
+    distancia: number;       // 0-20
   };
 }
 
@@ -54,6 +63,7 @@ export const Companionship: React.FC = () => {
   const { user: currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState<'active' | 'assistant' | 'theology'>('active');
   const [members, setMembers] = useState<Member[]>([]);
+  const [rawMembers, setRawMembers] = useState<any[]>([]);
   const [companionships, setCompanionships] = useState<CompanionshipData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -71,13 +81,24 @@ export const Companionship: React.FC = () => {
   const [simMaxDistance, setSimMaxDistance] = useState<number>(15); // Padrão: 15km para Brasília
   const [simAllowTrios, setSimAllowTrios] = useState<boolean>(true);
   
+  // Simulation Filter Toggles
+  const [simEnforceSameGC, setSimEnforceSameGC] = useState<boolean>(false);
+  const [simEnforceSameDisc, setSimEnforceSameDisc] = useState<boolean>(false);
+  const [simEnforceProximity, setSimEnforceProximity] = useState<boolean>(true);
+  const [simEnforceMaturity, setSimEnforceMaturity] = useState<boolean>(false);
+  const [simEnforceSameMarital, setSimEnforceSameMarital] = useState<boolean>(false);
+  const [simEnforceAgeCompatible, setSimEnforceAgeCompatible] = useState<boolean>(false);
+  const [simEnforceSameTenure, setSimEnforceSameTenure] = useState<boolean>(false);
+  const [simEnforceSameRole, setSimEnforceSameRole] = useState<boolean>(false);
+  const [activeDiscipuladores, setActiveDiscipuladores] = useState<Set<string>>(new Set());
+  
   // Modals / Input States
   const [newPrayerText, setNewPrayerText] = useState<Record<string, string>>({});
   const [newActivityText, setNewActivityText] = useState<Record<string, string>>({});
   const [newActivityType, setNewActivityType] = useState<Record<string, 'PALAVRA' | 'ORAÇÃO' | 'EVANGELISMO' | 'SERVIÇO'>>({});
 
-  // Tipos elegíveis para companheirismo (exclui agregado, visitante, etc.)
-  const ELIGIBLE_TYPES = ['MEMBRO', 'LÍDER', 'LIDER', 'DISCIPULADOR', 'DIÁCONO', 'DIACONO', 'PASTOR', 'PRESBÍTERO', 'PRESBITERO'];
+  // Tipos elegíveis para companheirismo (exclui agregado, visitante, etc. - e presbíteros/diáconos já pareados)
+  const ELIGIBLE_TYPES = ['MEMBRO', 'LÍDER', 'LIDER', 'DISCIPULADOR', 'PASTOR'];
 
   // Fórmula de Haversine para calcular distância geográfica em KM
   const calculateDistance = (lat1: number | null, lon1: number | null, lat2: number | null, lon2: number | null): number | null => {
@@ -99,25 +120,62 @@ export const Companionship: React.FC = () => {
       setIsLoading(true);
       try {
         // 1. Carregar membros, discipulado e células em paralelo
-        const [membrosRes, discipuladoRes, celulasRes] = await Promise.all([
-          supabase
-            .from('membros')
-            .select('id, nome, apelido, tipo_de_pessoa, sexo, bairro, grupos_caseiros, latitude, longitude, foto, estado_civil, nascimento')
-            .eq('status', 'Ativo'),
+        let membrosData: any[] = [];
+        let discipuladoData: any[] = [];
+        let celulasData: any[] = [];
+
+        const [discipuladoRes, celulasRes] = await Promise.all([
           supabase
             .from('discipulado')
             .select('discipulador, discipulo'),
           supabase
             .from('celulas')
-            .select('grupo_caseiro, lider, auxiliar')
+            .select('*')
         ]);
 
-        if (membrosRes.error) throw membrosRes.error;
+        if (!discipuladoRes.error && discipuladoRes.data) {
+          discipuladoData = discipuladoRes.data;
+        }
+        if (!celulasRes.error && celulasRes.data) {
+          celulasData = celulasRes.data;
+        }
+
+        // Tentar obter membros com batismo e data_de_vinculo
+        const membrosFullRes = await supabase
+          .from('membros')
+          .select('id, nome, apelido, tipo_de_pessoa, sexo, bairro, grupos_caseiros, latitude, longitude, foto, estado_civil, nascimento, mae, pai, batismo, data_de_vinculo, data_de_cadastro, esposo_a')
+          .eq('status', 'Ativo');
+
+        if (membrosFullRes.error) {
+          console.warn('Failed to load membros with batismo/data_de_vinculo columns, falling back to base columns...', membrosFullRes.error);
+          const membrosBaseRes = await supabase
+            .from('membros')
+            .select('id, nome, apelido, tipo_de_pessoa, sexo, bairro, grupos_caseiros, latitude, longitude, foto, estado_civil, nascimento, mae, pai, data_de_cadastro, esposo_a')
+            .eq('status', 'Ativo');
+          
+          if (membrosBaseRes.error) {
+            throw membrosBaseRes.error;
+          }
+          membrosData = membrosBaseRes.data || [];
+        } else {
+          membrosData = membrosFullRes.data || [];
+        }
+
+        // Pre-calcular discipuladores ativos
+        const discNames = new Set<string>();
+        if (discipuladoData) {
+          for (const d of discipuladoData) {
+            if (d.discipulador) {
+              discNames.add(d.discipulador.trim().toUpperCase());
+            }
+          }
+        }
+        setActiveDiscipuladores(discNames);
 
         // Mapa: nome do discípulo -> nome do discipulador
         const discipuladorDe: Record<string, string> = {};
-        if (!discipuladoRes.error && discipuladoRes.data) {
-          for (const d of discipuladoRes.data) {
+        if (discipuladoData) {
+          for (const d of discipuladoData) {
             if (d.discipulo && d.discipulador) {
               discipuladorDe[d.discipulo.trim().toUpperCase()] = d.discipulador.trim();
             }
@@ -126,14 +184,20 @@ export const Companionship: React.FC = () => {
 
         // Mapa: nome (uppercase) -> papel no GC (LIDER | AUXILIAR)
         const gcRoleMap: Record<string, 'LIDER' | 'AUXILIAR'> = {};
-        if (!celulasRes.error && celulasRes.data) {
-          for (const celula of celulasRes.data) {
+        if (celulasData) {
+          for (const celula of celulasData) {
             if (celula.lider) {
               gcRoleMap[celula.lider.trim().toUpperCase()] = 'LIDER';
             }
-            if (celula.auxiliar) {
-              // Suporta múltiplos auxiliares separados por vírgula
-              celula.auxiliar.split(',').forEach((aux: string) => {
+            // Suporta a coluna antiga 'auxiliar' e as novas 'auxiliar_1' e 'auxiliar_2'
+            const auxiliares = [
+              celula.auxiliar,
+              celula.auxiliar_1,
+              celula.auxiliar_2
+            ].filter(Boolean).join(',');
+
+            if (auxiliares) {
+              auxiliares.split(',').forEach((aux: string) => {
                 const name = aux.trim().toUpperCase();
                 if (name) gcRoleMap[name] = 'AUXILIAR';
               });
@@ -142,7 +206,7 @@ export const Companionship: React.FC = () => {
         }
 
         // Filtrar membros elegíveis e enriquecer com discipulador e papel no GC
-        const filteredMembers = (membrosRes.data || []).filter(m => {
+        const filteredMembers = membrosData.filter(m => {
           const type = (m.tipo_de_pessoa || '').toUpperCase().trim();
           return ELIGIBLE_TYPES.includes(type);
         }).map(m => ({
@@ -150,6 +214,7 @@ export const Companionship: React.FC = () => {
           discipuladorNome: discipuladorDe[m.nome.trim().toUpperCase()] || null,
           gcRole: gcRoleMap[m.nome.trim().toUpperCase()] || null,
         }));
+        setRawMembers(membrosData);
         setMembers(filteredMembers);
 
         // 2. Carregar companheirismos dos perfis do Supabase (com fallback no localStorage)
@@ -393,14 +458,200 @@ export const Companionship: React.FC = () => {
     saveCompanionships(newList);
   };
 
+  // Nome normalizado para comparação robusta
+  const normName = (name: string | null | undefined): string => {
+    if (!name) return '';
+    return name.trim().toUpperCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/\s+/g, ' ');
+  };
+
+  // Verifica se dois membros são irmãos de sangue
+  const isSibling = (m1: Member, m2: Member): boolean => {
+    const mae1 = normName(m1.mae);
+    const mae2 = normName(m2.mae);
+    const pai1 = normName(m1.pai);
+    const pai2 = normName(m2.pai);
+    
+    // Se mães batem e não estão vazias
+    if (mae1 && mae2 && mae1 === mae2) return true;
+    // Se pais batem e não estão vazias
+    if (pai1 && pai2 && pai1 === pai2) return true;
+    
+    // Fallback: Se residem nas mesmas coordenadas exatas E têm o mesmo sobrenome principal
+    if (m1.latitude !== null && m1.longitude !== null && m1.latitude === m2.latitude && m1.longitude === m2.longitude) {
+      const p1 = m1.nome.trim().split(/\s+/);
+      const p2 = m2.nome.trim().split(/\s+/);
+      const last1 = p1[p1.length - 1].toUpperCase();
+      const last2 = p2[p2.length - 1].toUpperCase();
+      if (last1.length > 2 && last1 === last2) return true;
+    }
+    return false;
+  };
+
+  // Verifica se há relação vertical (discipulador / discípulo)
+  const isVertical = (m1: Member, m2: Member): boolean => {
+    const nome1 = m1.nome.trim().toUpperCase();
+    const nome2 = m2.nome.trim().toUpperCase();
+    const disc1 = m1.discipuladorNome?.trim().toUpperCase() || null;
+    const disc2 = m2.discipuladorNome?.trim().toUpperCase() || null;
+    return disc1 === nome2 || disc2 === nome1;
+  };
+
+  // Verifica se dois membros são cunhados ou possuem relação direta de casamento/afins
+  const isCunhadoOrInLaw = (m1: Member, m2: Member): boolean => {
+    const spouse1Name = m1.esposo_a;
+    const spouse2Name = m2.esposo_a;
+
+    const spouse1 = spouse1Name ? members.find(m => normName(m.nome) === normName(spouse1Name)) : null;
+    const spouse2 = spouse2Name ? members.find(m => normName(m.nome) === normName(spouse2Name)) : null;
+
+    // 1. Se o cônjuge do m1 for irmão/irmã do m2
+    if (spouse1 && isSibling(spouse1, m2)) return true;
+
+    // 2. Se o cônjuge do m2 for irmão/irmã do m1
+    if (spouse2 && isSibling(spouse2, m1)) return true;
+
+    // 3. Se ambos são casados com pessoas que são irmãs entre si (concunhados)
+    if (spouse1 && spouse2 && isSibling(spouse1, spouse2)) return true;
+
+    return false;
+  };
+
+  // Método auxiliar para obter o tempo de igreja em anos (menor entre batismo e vinculo, fallback cadastro)
+  const getTenureYears = (m: Member): number => {
+    const dates = [m.batismo, m.data_de_vinculo, m.data_de_cadastro].filter(Boolean) as string[];
+    if (dates.length === 0) return 3; // Padrão: 3 anos de casa
+    const timeStamps = dates.map(d => new Date(d).getTime()).filter(t => !isNaN(t));
+    if (timeStamps.length === 0) return 3;
+    const minTimestamp = Math.min(...timeStamps);
+    const oldestDate = new Date(minTimestamp);
+    const today = new Date();
+    let years = today.getFullYear() - oldestDate.getFullYear();
+    const mDiff = today.getMonth() - oldestDate.getMonth();
+    if (mDiff < 0 || (mDiff === 0 && today.getDate() < oldestDate.getDate())) {
+      years--;
+    }
+    return Math.max(0, years);
+  };
+
+  // Resolve a função eclesiástica primária do membro
+  const getMemberRole = (m: Member): 'DISCIPULADOR' | 'LIDER' | 'AUXILIAR' | 'MEMBRO' => {
+    const nameUpper = m.nome.trim().toUpperCase();
+    const typeUpper = (m.tipo_de_pessoa || '').trim().toUpperCase();
+    
+    if (typeUpper === 'DISCIPULADOR' || activeDiscipuladores.has(nameUpper)) {
+      return 'DISCIPULADOR';
+    }
+    if (m.gcRole === 'LIDER' || typeUpper === 'LÍDER' || typeUpper === 'LIDER') {
+      return 'LIDER';
+    }
+    if (m.gcRole === 'AUXILIAR') {
+      return 'AUXILIAR';
+    }
+    return 'MEMBRO';
+  };
+
+  // Verifica se o par de membros satisfaz as flags de simulação ativadas no painel
+  const meetsSimulatorConstraints = (m1: Member, m2: Member, dist: number | null): boolean => {
+    // 1. Mesmo GC (ou mesmo discipulado em região com múltiplos GCs)
+    if (simEnforceSameGC) {
+      const gc1 = (m1.grupos_caseiros || '').trim().toUpperCase();
+      const gc2 = (m2.grupos_caseiros || '').trim().toUpperCase();
+      const sameGC = gc1.length > 0 && gc1 === gc2;
+      
+      const disc1 = m1.discipuladorNome?.trim().toUpperCase() || null;
+      const disc2 = m2.discipuladorNome?.trim().toUpperCase() || null;
+      const sameDisc = disc1 !== null && disc2 !== null && disc1 === disc2;
+      
+      const r1 = getNormalizedRegion(m1.bairro, m1.grupos_caseiros);
+      const r2 = getNormalizedRegion(m2.bairro, m2.grupos_caseiros);
+      const sameRegion = r1 === r2;
+      const hasMultipleGCs = sameRegion && (regionGcCounters[r1] > 1);
+      
+      if (!sameGC && !(hasMultipleGCs && sameDisc)) {
+        return false;
+      }
+    }
+    
+    // 2. Mesmo discipulado
+    if (simEnforceSameDisc) {
+      const disc1 = m1.discipuladorNome?.trim().toUpperCase() || null;
+      const disc2 = m2.discipuladorNome?.trim().toUpperCase() || null;
+      if (!disc1 || disc1 !== disc2) return false;
+    }
+    
+    // 3. Proximidade (dentro da distância limite definida)
+    if (simEnforceProximity) {
+      if (dist === null || dist > simMaxDistance) return false;
+    }
+    
+    // 4. Maturidade compatível (diferença no rank <= 1)
+    if (simEnforceMaturity) {
+      const r1 = MATURITY_RANK[(m1.tipo_de_pessoa || '').toUpperCase().trim()] ?? 1;
+      const r2 = MATURITY_RANK[(m2.tipo_de_pessoa || '').toUpperCase().trim()] ?? 1;
+      if (Math.abs(r1 - r2) > 1) return false;
+    }
+    
+    // 5. Mesmo Estado Civil
+    if (simEnforceSameMarital) {
+      const ec1 = normalizeMarital(m1.estado_civil);
+      const ec2 = normalizeMarital(m2.estado_civil);
+      if (ec1 === 'DESCONHECIDO' || ec2 === 'DESCONHECIDO' || ec1 !== ec2) return false;
+    }
+    
+    // 6. Idade compatível (diferença <= 10 anos)
+    if (simEnforceAgeCompatible) {
+      const age1 = getAge(m1.nascimento);
+      const age2 = getAge(m2.nascimento);
+      if (age1 === null || age2 === null || Math.abs(age1 - age2) > 10) return false;
+    }
+
+    // 7. Tempo de Igreja Equivalente (diferença <= 3 anos)
+    if (simEnforceSameTenure) {
+      const t1 = getTenureYears(m1);
+      const t2 = getTenureYears(m2);
+      if (Math.abs(t1 - t2) > 3) return false;
+    }
+
+    // 8. Mesma Função Ministerial
+    if (simEnforceSameRole) {
+      const role1 = getMemberRole(m1);
+      const role2 = getMemberRole(m2);
+      if (role1 !== role2) return false;
+    }
+    
+    return true;
+  };
+
   // Algoritmo de sugestão por COMPATIBILIDADE MULTI-CRITÉRIO (não mais só distância)
   const getRecommendedNeighbors = (member: Member): (Member & { distance: number | null; compatScore: number; scoreBreakdown: SimulatedPair['scoreBreakdown'] })[] => {
     return members
       .filter(m => m.id !== member.id && m.sexo === member.sexo && !isMemberLinked(m.id))
       .map(m => {
         const dist = calculateDistance(member.latitude, member.longitude, m.latitude, m.longitude);
+        
+        // Se as flags adicionais não forem atendidas, tratar como totalmente incompatível (score = 0)
+        if (!meetsSimulatorConstraints(member, m, dist)) {
+          return { ...m, distance: dist, compatScore: 0, scoreBreakdown: { maturidade: 0, tempoIgreja: 0, estadoCivil: 0, redeDisc: 0, mesmaFuncao: 0, faixaEtaria: 0, momentoVida: 0, distancia: 0 } };
+        }
+        
         const breakdown = calculateCompatibilityScore(member, m, dist);
-        return { ...m, distance: dist, compatScore: breakdown.total, scoreBreakdown: { maturidade: breakdown.maturidade, estadoCivil: breakdown.estadoCivil, redeDisc: breakdown.redeDisc, faixaEtaria: breakdown.faixaEtaria, distancia: breakdown.distancia } };
+        return { 
+          ...m, 
+          distance: dist, 
+          compatScore: breakdown.total, 
+          scoreBreakdown: { 
+            maturidade: breakdown.maturidade, 
+            tempoIgreja: breakdown.tempoIgreja,
+            estadoCivil: breakdown.estadoCivil, 
+            redeDisc: breakdown.redeDisc, 
+            mesmaFuncao: breakdown.mesmaFuncao,
+            faixaEtaria: breakdown.faixaEtaria, 
+            momentoVida: breakdown.momentoVida,
+            distancia: breakdown.distancia 
+          } 
+        };
       })
       .filter(m => m.compatScore > 0) // Excluir completamente incompatíveis
       .sort((a, b) => b.compatScore - a.compatScore); // Ordenar por maior compatibilidade
@@ -410,6 +661,50 @@ export const Companionship: React.FC = () => {
   // -----------------------------------------------------------------------
   // MOTOR DE COMPATIBILIDADE MULTI-CRITÉRIO (Pilares do Companheirismo)
   // -----------------------------------------------------------------------
+
+  // Auxiliar para normalizar o bairro/região
+  const getNormalizedRegion = (bairro?: string, gc?: string): string => {
+    const b = (bairro || '').toUpperCase();
+    const g = (gc || '').toUpperCase();
+    
+    if (b.includes('ÁGUAS CLARAS') || b.includes('AGUAS CLARAS') || g.includes('AGUAS CLARAS')) return 'AGUAS CLARAS';
+    if (b.includes('TAGUATINGA') || g.includes('TAGUA')) return 'TAGUATINGA';
+    if (b.includes('GUARÁ') || b.includes('GUARA') || g.includes('GUARÁ') || g.includes('GUARA')) return 'GUARA';
+    if (b.includes('VICENTE PIRES') || g.includes('VICENTE PIRES')) return 'VICENTE PIRES';
+    if (b.includes('SAMAMBAIA') || g.includes('SAMAMBAIA')) return 'SAMAMBAIA';
+    if (b.includes('ASA SUL') || g.includes('ASA SUL')) return 'ASA SUL';
+    if (b.includes('ASA NORTE') || g.includes('ASA NORTE')) return 'ASA NORTE';
+    if (b.includes('SOBRADINHO') || g.includes('SOBRADINHO')) return 'SOBRADINHO';
+    if (b.includes('RECANTO') || g.includes('RECANTO')) return 'RECANTO DAS EMAS';
+    if (b.includes('CEILÂNDIA') || b.includes('CEILANDIA') || g.includes('CEILÂNDIA') || g.includes('CEILANDIA')) return 'CEILANDIA';
+    
+    return b
+      .replace(/\s+(SUL|NORTE|LESTE|OESTE|I|II|III|IV|V)\b/g, '')
+      .replace(/\(.*?\)/g, '')
+      .trim();
+  };
+
+  // Mapeia região para conjunto de GCs únicos
+  const regionGcCounters = React.useMemo(() => {
+    const map: Record<string, Set<string>> = {};
+    members.forEach(m => {
+      const region = getNormalizedRegion(m.bairro, m.grupos_caseiros);
+      const gc = (m.grupos_caseiros || '').trim().toUpperCase();
+      if (gc && gc !== 'NENHUM') {
+        if (!map[region]) {
+          map[region] = new Set();
+        }
+        map[region].add(gc);
+      }
+    });
+    
+    // Converte para contagem
+    const counts: Record<string, number> = {};
+    Object.keys(map).forEach(r => {
+      counts[r] = map[r].size;
+    });
+    return counts;
+  }, [members]);
 
   // Hierarquia de maturidade espiritual (0=mais novo, maior=mais maduro)
   const MATURITY_RANK: Record<string, number> = {
@@ -444,23 +739,34 @@ export const Companionship: React.FC = () => {
   };
 
   // Pontua compatibilidade entre dois membros (0-100)
-  // Pesos: Distância=25, Maturidade=28, EstadoCivil=22, RedeDisc/GC=15, FaixaEtária=10
+  // Pesos: Maturidade=15, Tempo=10, EstadoCivil=10, RedeDisc=20, Função=10, FaixaEtária=5, MomentoVida=10, Distância=20
   const calculateCompatibilityScore = (
     m1: Member, m2: Member, distKm: number | null
   ): SimulatedPair['scoreBreakdown'] & { total: number } => {
-    // --- MATURIDADE ESPIRITUAL (0-28 pts) ---
+    // --- EXCLUSÕES CRÍTICAS (Irmãos de sangue e Relações Verticais) ---
+    if (isSibling(m1, m2) || isVertical(m1, m2)) {
+      return { maturidade: 0, tempoIgreja: 0, estadoCivil: 0, redeDisc: 0, mesmaFuncao: 0, faixaEtaria: 0, momentoVida: 0, distancia: 0, total: 0 };
+    }
+
+    // --- MATURIDADE ESPIRITUAL (0-15 pts) ---
     const r1 = MATURITY_RANK[(m1.tipo_de_pessoa || '').toUpperCase().trim()] ?? 1;
     const r2 = MATURITY_RANK[(m2.tipo_de_pessoa || '').toUpperCase().trim()] ?? 1;
     const rankDiff = Math.abs(r1 - r2);
-    const maturidade = rankDiff === 0 ? 28 : rankDiff === 1 ? 18 : rankDiff === 2 ? 8 : 0;
+    const maturidade = rankDiff === 0 ? 15 : rankDiff === 1 ? 9 : rankDiff === 2 ? 4 : 0;
 
-    // --- ESTADO CIVIL (0-22 pts) ---
+    // --- TEMPO DE IGREJA (0-10 pts) ---
+    const t1 = getTenureYears(m1);
+    const t2 = getTenureYears(m2);
+    const tenureDiff = Math.abs(t1 - t2);
+    const tempoIgreja = tenureDiff <= 1 ? 10 : tenureDiff <= 3 ? 7 : tenureDiff <= 5 ? 4 : tenureDiff <= 8 ? 1 : 0;
+
+    // --- ESTADO CIVIL (0-10 pts) ---
     const ec1 = normalizeMarital(m1.estado_civil);
     const ec2 = normalizeMarital(m2.estado_civil);
-    const estadoCivil = ec1 === ec2 && ec1 !== 'DESCONHECIDO' ? 22 :
-      (ec1 === 'DESCONHECIDO' || ec2 === 'DESCONHECIDO') ? 10 : 0;
+    const estadoCivil = ec1 === ec2 && ec1 !== 'DESCONHECIDO' ? 10 :
+      (ec1 === 'DESCONHECIDO' || ec2 === 'DESCONHECIDO') ? 5 : 0;
 
-    // --- REDE DE DISCIPULADO + GC (0-15 pts) ---
+    // --- REDE DE DISCIPULADO + GC (0-20 pts) ---
     const disc1 = m1.discipuladorNome?.trim().toUpperCase() || null;
     const disc2 = m2.discipuladorNome?.trim().toUpperCase() || null;
     const nome1 = m1.nome.trim().toUpperCase();
@@ -469,56 +775,130 @@ export const Companionship: React.FC = () => {
     const gc2 = (m2.grupos_caseiros || '').trim().toUpperCase();
     const sameGC = gc1.length > 0 && gc1 === gc2;
     const sameDisc = disc1 !== null && disc2 !== null && disc1 === disc2;
-    const isVertical = disc1 === nome2 || disc2 === nome1;
+    const isVerticalRel = disc1 === nome2 || disc2 === nome1;
+
+    const r1Region = getNormalizedRegion(m1.bairro, m1.grupos_caseiros);
+    const r2Region = getNormalizedRegion(m2.bairro, m2.grupos_caseiros);
+    const sameRegion = r1Region === r2Region;
+    const hasMultipleGCs = sameRegion && (regionGcCounters[r1Region] > 1);
+
     // Bônus de núcleo de liderança: líder/auxiliar do mesmo GC
     const bothLeadership = sameGC &&
       (m1.gcRole === 'LIDER' || m1.gcRole === 'AUXILIAR') &&
       (m2.gcRole === 'LIDER' || m2.gcRole === 'AUXILIAR');
     let redeDisc = 0;
     if (bothLeadership) {
-      redeDisc = 15; // Núcleo de liderança do mesmo GC — companheirismo preferencial!
+      redeDisc = 20; // Núcleo de liderança do mesmo GC — companheirismo preferencial!
     } else if (sameGC && sameDisc) {
-      redeDisc = 14; // Mesmo GC + mesmo discipulador
+      redeDisc = 18; // Mesmo GC + mesmo discipulador
+    } else if (hasMultipleGCs && sameDisc) {
+      redeDisc = 18; // Múltiplos GCs na mesma região + mesmo discipulador
     } else if (sameGC) {
-      redeDisc = 12; // Mesmo GC
+      redeDisc = 16; // Mesmo GC
     } else if (sameDisc) {
-      redeDisc = 8;  // Mesmo discipulador, GCs diferentes
-    } else if (isVertical) {
+      redeDisc = 10; // Mesmo discipulador, GCs diferentes (em Vicente Pires ou regiões sem múltiplos GCs)
+    } else if (isVerticalRel) {
       redeDisc = 2;  // Relação vertical (não ideal para companheirismo horizontal)
     } else if (disc1 && disc2) {
-      redeDisc = 3;  // Redes distintas
+      redeDisc = 4;  // Redes distintas
     }
 
-    // --- FAIXA ETÁRIA (0-10 pts) ---
+    // --- ALINHAMENTO DE FUNÇÃO MINISTERIAL (0-10 pts) ---
+    const role1 = getMemberRole(m1);
+    const role2 = getMemberRole(m2);
+    let mesmaFuncao = 0;
+    if (role1 === role2) {
+      mesmaFuncao = 10;
+    } else if (
+      (role1 === 'LIDER' && role2 === 'AUXILIAR') ||
+      (role1 === 'AUXILIAR' && role2 === 'LIDER')
+    ) {
+      mesmaFuncao = 7;
+    } else if (
+      (role1 === 'DISCIPULADOR' && (role2 === 'LIDER' || role2 === 'AUXILIAR')) ||
+      (role2 === 'DISCIPULADOR' && (role1 === 'LIDER' || role1 === 'AUXILIAR'))
+    ) {
+      mesmaFuncao = 3;
+    } else {
+      mesmaFuncao = 0;
+    }
+
+    // --- FAIXA ETÁRIA (0-5 pts) ---
     const age1 = getAge(m1.nascimento);
     const age2 = getAge(m2.nascimento);
-    let faixaEtaria = 5;
+    let faixaEtaria = 2;
     if (age1 !== null && age2 !== null) {
       const ageDiff = Math.abs(age1 - age2);
-      faixaEtaria = ageDiff <= 3 ? 10 : ageDiff <= 7 ? 8 : ageDiff <= 12 ? 5 : ageDiff <= 18 ? 2 : 0;
+      faixaEtaria = ageDiff <= 3 ? 5 : ageDiff <= 7 ? 4 : ageDiff <= 12 ? 2 : ageDiff <= 18 ? 1 : 0;
     }
 
-    // --- DISTÂNCIA GEOGRÁFICA (0-25 pts) ---
-    // Companheirismo exige presença física regular — distância é pilar crítico!
+    // --- MOMENTO DE VIDA / FILHOS (0-10 pts) ---
+    const getChildrenAges = (m: Member): number[] => {
+      const nName = normName(m.nome);
+      if (!nName) return [];
+      return rawMembers
+        .filter(c => {
+          const pName = normName(c.pai);
+          const mName = normName(c.mae);
+          return (pName && pName === nName) || (mName && mName === nName);
+        })
+        .map(c => getAge(c.nascimento))
+        .filter((age): age is number => age !== null);
+    };
+
+    const ages1 = getChildrenAges(m1);
+    const ages2 = getChildrenAges(m2);
+
+    let momentoVida = 0;
+    if (ages1.length > 0 && ages2.length > 0) {
+      let minAgeDiff = Infinity;
+      for (const a1 of ages1) {
+        for (const a2 of ages2) {
+          const diff = Math.abs(a1 - a2);
+          if (diff < minAgeDiff) {
+            minAgeDiff = diff;
+          }
+        }
+      }
+      
+      if (minAgeDiff <= 3) {
+        momentoVida = 10; // Filhos com idades próximas (0 a 3 anos)
+      } else if (minAgeDiff <= 6) {
+        momentoVida = 7;  // Diferença razoável (4 a 6 anos)
+      } else {
+        momentoVida = 3;  // Ambos têm filhos, mas idades distantes
+      }
+    } else if (ages1.length === 0 && ages2.length === 0) {
+      momentoVida = 6; // Ambos sem filhos (fase similar)
+    } else {
+      momentoVida = 0; // Fase de vida diferente (um tem filhos e o outro não)
+    }
+
+    // --- DISTÂNCIA GEOGRÁFICA (0-20 pts) ---
     let distancia = 0;
     if (distKm === null) {
-      distancia = 3; // Sem coordenadas: pontuação neutra mínima
-    } else if (distKm <= 3) {
-      distancia = 25; // Vizinhos — companheirismo fluido
-    } else if (distKm <= 7) {
-      distancia = 20; // Próximos
+      distancia = 2; // Sem coordenadas: pontuação neutra mínima
+    } else if (distKm <= 2.5) {
+      distancia = 20; // Vizinhos muito próximos
+    } else if (distKm <= 5) {
+      distancia = 16; // Próximos
+    } else if (distKm <= 8) {
+      distancia = 10; // Acessível
     } else if (distKm <= 12) {
-      distancia = 12; // Alcançável
-    } else if (distKm <= 18) {
-      distancia = 5;  // Distante — requer esforço
-    } else if (distKm <= 25) {
+      distancia = 4;  // Distante
+    } else if (distKm <= 15) {
       distancia = 1;  // Muito distante
     } else {
-      distancia = 0;  // Inviável para companheirismo regular
+      distancia = 0;  // Inviável
     }
 
-    const total = maturidade + estadoCivil + redeDisc + faixaEtaria + distancia;
-    return { maturidade, estadoCivil, redeDisc, faixaEtaria, distancia, total };
+    // Calcular total e aplicar penalidade suave para cunhados
+    let total = maturidade + tempoIgreja + estadoCivil + redeDisc + mesmaFuncao + faixaEtaria + momentoVida + distancia;
+    if (isCunhadoOrInLaw(m1, m2)) {
+      total = Math.max(0, total - 15); // Deduz 15 pontos para evitar incentivar cunhados na mesma dupla primária
+    }
+
+    return { maturidade, tempoIgreja, estadoCivil, redeDisc, mesmaFuncao, faixaEtaria, momentoVida, distancia, total };
   };
 
   const handleGenerateSimulation = () => {
@@ -554,12 +934,27 @@ export const Companionship: React.FC = () => {
           // Se ambos têm coordenadas, aplicar limite de distância
           if (m1.latitude !== null && m2.latitude !== null && dist !== null && dist > simMaxDistance) continue;
 
+          // Se a flag de proximidade exigir e não satisfizer, pular
+          if (simEnforceProximity && (dist === null || dist > simMaxDistance)) continue;
+
+          // Se as flags adicionais de simulação não forem satisfeitas, pular
+          if (!meetsSimulatorConstraints(m1, m2, dist)) continue;
+
           const breakdown = calculateCompatibilityScore(m1, m2, dist);
-          if (breakdown.total > bestScore) {
+          if (breakdown.total > 0 && breakdown.total > bestScore) {
             bestScore = breakdown.total;
             bestPartner = m2;
             bestDist = dist ?? 0;
-            bestBreakdown = { maturidade: breakdown.maturidade, estadoCivil: breakdown.estadoCivil, redeDisc: breakdown.redeDisc, faixaEtaria: breakdown.faixaEtaria, distancia: breakdown.distancia };
+            bestBreakdown = { 
+              maturidade: breakdown.maturidade, 
+              tempoIgreja: breakdown.tempoIgreja,
+              estadoCivil: breakdown.estadoCivil, 
+              redeDisc: breakdown.redeDisc, 
+              mesmaFuncao: breakdown.mesmaFuncao,
+              faixaEtaria: breakdown.faixaEtaria, 
+              momentoVida: breakdown.momentoVida,
+              distancia: breakdown.distancia 
+            };
           }
         }
 
@@ -607,8 +1002,25 @@ export const Companionship: React.FC = () => {
           const dist = calculateDistance(unmatchedMember.latitude, unmatchedMember.longitude, pairLeader.latitude, pairLeader.longitude);
           if (pairLeader.latitude !== null && unmatchedMember.latitude !== null && dist !== null && dist > simMaxDistance) continue;
 
+          if (simEnforceProximity && (dist === null || dist > simMaxDistance)) continue;
+
+          // Trio also needs to meet constraints and NOT be sibling or vertical with EITHER of the existing members of the pair
+          const pairPartner = members.find(m => m.id === pair.memberIds[1]);
+          if (pairPartner) {
+            // Sibling/vertical exclusions
+            if (isSibling(unmatchedMember, pairLeader) || isSibling(unmatchedMember, pairPartner)) continue;
+            if (isVertical(unmatchedMember, pairLeader) || isVertical(unmatchedMember, pairPartner)) continue;
+            
+            // Check simulator flags
+            if (!meetsSimulatorConstraints(unmatchedMember, pairLeader, dist)) continue;
+            const distWithPartner = calculateDistance(unmatchedMember.latitude, unmatchedMember.longitude, pairPartner.latitude, pairPartner.longitude);
+            if (!meetsSimulatorConstraints(unmatchedMember, pairPartner, distWithPartner)) continue;
+          } else {
+            if (!meetsSimulatorConstraints(unmatchedMember, pairLeader, dist)) continue;
+          }
+
           const bd = calculateCompatibilityScore(unmatchedMember, pairLeader, dist);
-          if (bd.total > bestPairScore) {
+          if (bd.total > 0 && bd.total > bestPairScore) {
             bestPairScore = bd.total;
             bestPairIdx = i;
           }
@@ -633,6 +1045,116 @@ export const Companionship: React.FC = () => {
     setSimulatedMatches(simulated);
     setIsSimulationMode(true);
     setIsLoading(false);
+  };
+
+  // Descartar uma proposta específica da simulação
+  const handleRemoveSimulatedMatch = (idxToRemove: number) => {
+    const match = simulatedMatches[idxToRemove];
+    if (!match) return;
+
+    // Retornar membros de volta ao pool de órfãos (simulatedUnmatched)
+    setSimulatedUnmatched(prev => {
+      const updated = [...prev];
+      match.memberIds.forEach(id => {
+        if (!updated.includes(id)) updated.push(id);
+      });
+      return updated;
+    });
+
+    // Remover da lista de propostas
+    setSimulatedMatches(prev => prev.filter((_, idx) => idx !== idxToRemove));
+  };
+
+  // Tentar outro parceiro para o membro titular (Re-mapear / Re-roll)
+  const handleRefreshSimulatedMatch = (idx: number) => {
+    const match = simulatedMatches[idx];
+    if (!match) return;
+
+    const idA = match.memberIds[0];
+    const m1 = members.find(m => m.id === idA);
+    if (!m1) return;
+
+    const currentPartners = match.memberIds.slice(1);
+
+    // Pool de órfãos do mesmo sexo mais os parceiros atuais
+    const unmatchedSameSex = simulatedUnmatched.filter(id => {
+      const m = members.find(member => member.id === id);
+      return m && m.sexo === m1.sexo;
+    });
+
+    const candidatesPool = [...unmatchedSameSex, ...currentPartners];
+
+    let bestPartner: Member | null = null;
+    let bestScore = -Infinity;
+    let bestDist = Infinity;
+    let bestBreakdown: SimulatedPair['scoreBreakdown'] | null = null;
+
+    // Tenta primeiro candidatos frescos (que não sejam os parceiros atuais)
+    const freshCandidates = candidatesPool.filter(id => !currentPartners.includes(id));
+
+    const evaluateList = (list: string[]) => {
+      list.forEach(id => {
+        const m2 = members.find(m => m.id === id);
+        if (!m2 || m2.id === m1.id) return;
+
+        const dist = calculateDistance(m1.latitude, m1.longitude, m2.latitude, m2.longitude);
+
+        if (m1.latitude !== null && m2.latitude !== null && dist !== null && dist > simMaxDistance) return;
+        if (simEnforceProximity && (dist === null || dist > simMaxDistance)) return;
+        if (!meetsSimulatorConstraints(m1, m2, dist)) return;
+
+        const breakdown = calculateCompatibilityScore(m1, m2, dist);
+        if (breakdown.total > 0 && breakdown.total > bestScore) {
+          bestScore = breakdown.total;
+          bestPartner = m2;
+          bestDist = dist ?? 0;
+          bestBreakdown = {
+            maturidade: breakdown.maturidade,
+            tempoIgreja: breakdown.tempoIgreja,
+            estadoCivil: breakdown.estadoCivil,
+            redeDisc: breakdown.redeDisc,
+            mesmaFuncao: breakdown.mesmaFuncao,
+            faixaEtaria: breakdown.faixaEtaria,
+            momentoVida: breakdown.momentoVida,
+            distancia: breakdown.distancia
+          };
+        }
+      });
+    };
+
+    evaluateList(freshCandidates);
+
+    // Se não encontrou novos parceiros, tenta reavaliar com os antigos
+    if (!bestPartner) {
+      evaluateList(currentPartners);
+    }
+
+    if (bestPartner && bestBreakdown) {
+      const newPartnerId = bestPartner.id;
+
+      // Coloca os parceiros antigos de volta no pool de órfãos e remove o novo parceiro
+      setSimulatedUnmatched(prev => {
+        const withReplaced = [...prev, ...currentPartners];
+        return withReplaced.filter(id => id !== newPartnerId);
+      });
+
+      // Substitui o par/trio no simulador
+      setSimulatedMatches(prev => {
+        return prev.map((sm, i) => {
+          if (i === idx) {
+            return {
+              memberIds: [idA, newPartnerId],
+              distance: bestDist,
+              compatScore: bestScore,
+              scoreBreakdown: bestBreakdown!
+            };
+          }
+          return sm;
+        });
+      });
+    } else {
+      alert(`Não foi possível encontrar outro parceiro compatível para ${m1.nome.split(' ')[0]} dentro das restrições atuais.`);
+    }
   };
 
   // Efetivar simulação (Salvar em lote)
@@ -1032,46 +1554,87 @@ export const Companionship: React.FC = () => {
               
               {/* Barra de Ferramentas de Simulação (Simulador em Massa) */}
               {!isSimulationMode ? (
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50/50 rounded-2xl border border-blue-100/50 p-6 flex flex-col md:flex-row md:items-center justify-between gap-6">
-                  <div className="space-y-1">
-                    <h3 className="text-sm font-extrabold text-blue-900 flex items-center gap-2">
-                      <Sparkles className="h-5 w-5 text-indigo-600 animate-pulse" />
-                      Simulador Geográfico em Massa
-                    </h3>
-                    <p className="text-xs text-blue-700 leading-relaxed max-w-xl">
-                      Deseja que o sistema simule automaticamente o companheirismo de todos os <strong>{unlinkedMembers.length} membros sem aliança</strong> de uma só vez baseando-se nas distâncias geográficas residenciais?
-                    </p>
-                  </div>
-
-                  {/* Parâmetros e Gatilho */}
-                  <div className="flex flex-wrap items-center gap-4">
-                    <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-gray-100 shadow-sm text-xs font-semibold text-gray-700">
-                      <Sliders className="h-4 w-4 text-gray-400" />
-                      Limite: 
-                      <input
-                        type="number"
-                        className="w-12 text-center text-blue-600 bg-gray-50 border-0 p-0 font-bold focus:ring-0 focus:outline-none"
-                        value={simMaxDistance}
-                        onChange={(e) => setSimMaxDistance(Math.max(1, parseInt(e.target.value) || 1))}
-                      /> km
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50/50 rounded-2xl border border-blue-100/50 p-6 flex flex-col gap-6">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div className="space-y-1">
+                      <h3 className="text-sm font-extrabold text-blue-900 flex items-center gap-2">
+                        <Sparkles className="h-5 w-5 text-indigo-600 animate-pulse" />
+                        Simulador Geográfico em Massa
+                      </h3>
+                      <p className="text-xs text-blue-700 leading-relaxed max-w-xl">
+                        Deseja que o sistema simule automaticamente o companheirismo de todos os <strong>{unlinkedMembers.length} membros sem aliança</strong> de uma só vez baseando-se nas distâncias geográficas residenciais?
+                      </p>
                     </div>
 
-                    <label className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-gray-100 shadow-sm text-xs font-semibold text-gray-700 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={simAllowTrios}
-                        onChange={(e) => setSimAllowTrios(e.target.checked)}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      Permitir Trios
-                    </label>
+                    {/* Parâmetros e Gatilho */}
+                    <div className="flex flex-wrap items-center gap-4">
+                      <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-gray-100 shadow-sm text-xs font-semibold text-gray-700">
+                        <Sliders className="h-4 w-4 text-gray-400" />
+                        Limite: 
+                        <input
+                          type="number"
+                          className="w-12 text-center text-blue-600 bg-gray-50 border-0 p-0 font-bold focus:ring-0 focus:outline-none"
+                          value={simMaxDistance}
+                          onChange={(e) => setSimMaxDistance(Math.max(1, parseInt(e.target.value) || 1))}
+                        /> km
+                      </div>
 
-                    <button
-                      onClick={handleGenerateSimulation}
-                      className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2 rounded-xl text-xs flex items-center gap-2 shadow hover:shadow-md transition-all active:scale-95"
-                    >
-                      <Play className="h-4 w-4 shrink-0 fill-current" /> Rodar Simulador
-                    </button>
+                      <label className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-gray-100 shadow-sm text-xs font-semibold text-gray-700 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={simAllowTrios}
+                          onChange={(e) => setSimAllowTrios(e.target.checked)}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        Permitir Trios
+                      </label>
+
+                      <button
+                        onClick={handleGenerateSimulation}
+                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2 rounded-xl text-xs flex items-center gap-2 shadow hover:shadow-md transition-all active:scale-95"
+                      >
+                        <Play className="h-4 w-4 shrink-0 fill-current" /> Rodar Simulador
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Filtros Inteligentes (Pills) */}
+                  <div className="border-t border-blue-100/50 pt-4 mt-2">
+                    <div className="text-xs font-bold text-blue-900 mb-2 flex items-center gap-1.5">
+                      <Filter className="h-3.5 w-3.5 text-indigo-500" />
+                      Filtros & Restrições Inteligentes (Diminuir opções elegíveis):
+                    </div>
+                    <div className="flex flex-wrap gap-2.5">
+                      {[
+                        { id: 'sameGC', label: 'Mesmo GC', active: simEnforceSameGC, toggle: () => setSimEnforceSameGC(!simEnforceSameGC), color: 'border-emerald-200 text-emerald-700 bg-emerald-50/50 hover:bg-emerald-50' },
+                        { id: 'sameDisc', label: 'Mesmo Discipulado', active: simEnforceSameDisc, toggle: () => setSimEnforceSameDisc(!simEnforceSameDisc), color: 'border-blue-200 text-blue-700 bg-blue-50/50 hover:bg-blue-50' },
+                        { id: 'proximity', label: 'Restringir Distância', active: simEnforceProximity, toggle: () => setSimEnforceProximity(!simEnforceProximity), color: 'border-gray-200 text-gray-700 bg-gray-50/50 hover:bg-gray-100' },
+                        { id: 'maturity', label: 'Maturidade Equivalente', active: simEnforceMaturity, toggle: () => setSimEnforceMaturity(!simEnforceMaturity), color: 'border-purple-200 text-purple-700 bg-purple-50/50 hover:bg-purple-50' },
+                        { id: 'tenure', label: 'Tempo Equivalente (±3a)', active: simEnforceSameTenure, toggle: () => setSimEnforceSameTenure(!simEnforceSameTenure), color: 'border-teal-200 text-teal-700 bg-teal-50/50 hover:bg-teal-50' },
+                        { id: 'marital', label: 'Mesmo Estado Civil', active: simEnforceSameMarital, toggle: () => setSimEnforceSameMarital(!simEnforceSameMarital), color: 'border-pink-200 text-pink-700 bg-pink-50/50 hover:bg-pink-50' },
+                        { id: 'role', label: 'Mesma Função Ministerial', active: simEnforceSameRole, toggle: () => setSimEnforceSameRole(!simEnforceSameRole), color: 'border-indigo-200 text-indigo-700 bg-indigo-50/50 hover:bg-indigo-50' },
+                        { id: 'age', label: 'Idade Compatível (±10a)', active: simEnforceAgeCompatible, toggle: () => setSimEnforceAgeCompatible(!simEnforceAgeCompatible), color: 'border-amber-200 text-amber-700 bg-amber-50/50 hover:bg-amber-50' },
+                      ].map((flag) => (
+                        <button
+                          key={flag.id}
+                          onClick={flag.toggle}
+                          className={clsx(
+                            'flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold shadow-sm transition-all active:scale-95 cursor-pointer',
+                            flag.active 
+                              ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-transparent' 
+                              : flag.color
+                          )}
+                        >
+                          <span className={clsx(
+                            'w-4 h-4 rounded-full flex items-center justify-center border text-[9px]',
+                            flag.active ? 'bg-white text-indigo-600 border-white' : 'border-current'
+                          )}>
+                            {flag.active ? '✓' : ''}
+                          </span>
+                          {flag.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -1254,6 +1817,14 @@ export const Companionship: React.FC = () => {
                                           {age !== null && <span className="text-[9px] text-blue-600 bg-blue-50 px-1 rounded">{age}a</span>}
                                           {candidate.distance !== null && <span className="text-[9px] text-gray-400">📍{candidate.distance}km</span>}
                                           {(() => {
+                                            const tenure = getTenureYears(candidate);
+                                            return <span className="text-[9px] text-teal-700 bg-teal-50 px-1 rounded font-bold">⏳ {tenure}a de igreja</span>;
+                                          })()}
+                                          {(() => {
+                                            const role = getMemberRole(candidate);
+                                            return <span className="text-[9px] text-indigo-700 bg-indigo-50 px-1 rounded font-bold">💼 {role.toLowerCase()}</span>;
+                                          })()}
+                                          {(() => {
                                             const sameGC = candidate.grupos_caseiros && candidate.grupos_caseiros.trim().toUpperCase() === (selectedMember.grupos_caseiros || '').trim().toUpperCase();
                                             const bothLeadership = sameGC && (candidate.gcRole === 'LIDER' || candidate.gcRole === 'AUXILIAR') && (selectedMember.gcRole === 'LIDER' || selectedMember.gcRole === 'AUXILIAR');
                                             if (bothLeadership) return <span className="text-[9px] text-purple-700 bg-purple-50 px-1 rounded font-bold">👑 Núcleo GC</span>;
@@ -1380,6 +1951,9 @@ export const Companionship: React.FC = () => {
                         const scoreBg = score >= 70 ? 'bg-emerald-50 border-emerald-200' : score >= 45 ? 'bg-amber-50 border-amber-200' : 'bg-red-50 border-red-200';
                         const scoreLabel = score >= 70 ? 'Alta' : score >= 45 ? 'Média' : 'Baixa';
 
+                        // Detecção de in-laws (cunhados) na proposta
+                        const hasInLaw = isCunhadoOrInLaw(m1, m2) || (m3 && (isCunhadoOrInLaw(m1, m3) || isCunhadoOrInLaw(m2, m3)));
+
                         const renderMemberTag = (m: Member) => {
                           const age = getAge(m.nascimento);
                           const ec = m.estado_civil ? m.estado_civil.charAt(0).toUpperCase() + m.estado_civil.slice(1).toLowerCase() : null;
@@ -1400,9 +1974,33 @@ export const Companionship: React.FC = () => {
                           <div key={idx} className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm space-y-3 hover:shadow-md transition-all flex flex-col justify-between">
                             {/* Header: tipo + score */}
                             <div className="flex items-center justify-between">
-                              <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-100 rounded-full px-2 py-0.5">
-                                {m3 ? 'Trio Proposto' : 'Dupla Proposta'}
-                              </span>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-100 rounded-full px-2 py-0.5">
+                                  {m3 ? 'Trio Proposto' : 'Dupla Proposta'}
+                                </span>
+                                {hasInLaw && (
+                                  <span className="text-[9px] font-bold text-red-700 bg-red-50 border border-red-200 rounded-full px-2 py-0.5 animate-pulse" title="Membros possuem relação direta de cunhados ou parentesco familiar próximo.">
+                                    ⚠️ Cunhados/Família
+                                  </span>
+                                )}
+                                <div className="flex items-center gap-1 bg-gray-50 rounded-full border border-gray-150 px-1">
+                                  <button
+                                    onClick={() => handleRefreshSimulatedMatch(idx)}
+                                    title="Tentar outro parceiro para este titular (Re-mapear)"
+                                    className="text-gray-400 hover:text-blue-600 transition-colors p-1 rounded-full hover:bg-blue-50 cursor-pointer"
+                                  >
+                                    <RefreshCw className="h-3 w-3 hover:rotate-180 transition-transform duration-500" />
+                                  </button>
+                                  <div className="w-[1px] h-3 bg-gray-200" />
+                                  <button
+                                    onClick={() => handleRemoveSimulatedMatch(idx)}
+                                    title="Desconsiderar proposta"
+                                    className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded-full hover:bg-red-50 cursor-pointer"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </button>
+                                </div>
+                              </div>
                               <div className={clsx(scoreBg, 'border rounded-full px-2 py-0.5 flex items-center gap-1.5')}>
                                 <div className="w-12 h-1.5 bg-gray-200 rounded-full overflow-hidden">
                                   <div className={clsx(scoreColor, 'h-full rounded-full transition-all')} style={{ width: `${score}%` }} />
@@ -1428,18 +2026,21 @@ export const Companionship: React.FC = () => {
                             </div>
 
                             {/* Score Breakdown */}
-                            <div className="grid grid-cols-5 gap-1 pt-1 border-t border-gray-50">
+                            <div className="grid grid-cols-8 gap-1 pt-1 border-t border-gray-50">
                               {[
-                                { label: 'Maturidade', val: sm.scoreBreakdown.maturidade, max: 35, color: 'bg-purple-400' },
-                                { label: 'Est. Civil', val: sm.scoreBreakdown.estadoCivil, max: 25, color: 'bg-pink-400' },
-                                { label: 'Rede Disc.', val: sm.scoreBreakdown.redeDisc, max: 20, color: 'bg-emerald-400' },
-                                { label: 'Faixa Et.', val: sm.scoreBreakdown.faixaEtaria, max: 10, color: 'bg-blue-400' },
-                                { label: 'Distância', val: sm.scoreBreakdown.distancia, max: 10, color: 'bg-gray-400' },
+                                { label: 'Maturidade', val: sm.scoreBreakdown.maturidade, max: 15, color: 'bg-purple-400' },
+                                { label: 'Tempo', val: sm.scoreBreakdown.tempoIgreja, max: 10, color: 'bg-teal-400' },
+                                { label: 'Est. Civil', val: sm.scoreBreakdown.estadoCivil, max: 10, color: 'bg-pink-400' },
+                                { label: 'Rede Disc.', val: sm.scoreBreakdown.redeDisc, max: 15, color: 'bg-emerald-400' },
+                                { label: 'Função', val: sm.scoreBreakdown.mesmaFuncao, max: 15, color: 'bg-indigo-400' },
+                                { label: 'Faixa Et.', val: sm.scoreBreakdown.faixaEtaria, max: 5, color: 'bg-blue-400' },
+                                { label: 'Mom. Vida', val: sm.scoreBreakdown.momentoVida, max: 10, color: 'bg-orange-400' },
+                                { label: 'Distância', val: sm.scoreBreakdown.distancia, max: 20, color: 'bg-gray-400' },
                               ].map(({ label, val, max, color }) => (
                                 <div key={label} className="text-center space-y-0.5">
                                   <div className="text-[7px] text-gray-400 font-medium leading-tight">{label}</div>
                                   <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
-                                    <div className={clsx(color, 'h-full rounded-full')} style={{ width: `${(val / max) * 100}%` }} />
+                                    <div className={clsx(color, 'h-full rounded-full')} style={{ width: `${(val / (max || 1)) * 100}%` }} />
                                   </div>
                                   <div className="text-[8px] font-bold text-gray-500">{val}<span className="font-normal opacity-60">/{max}</span></div>
                                 </div>
