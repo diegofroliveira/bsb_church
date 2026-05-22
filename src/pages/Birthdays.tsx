@@ -171,7 +171,14 @@ export const Birthdays: React.FC = () => {
     
     const names = getBirthdays.map(m => `*${m.nome.toUpperCase()}* (@${m.nome.split(' ')[0].toUpperCase()}) - ${m.grupos_caseiros || 'Sem GC'} 🌷`).join('\n');
     
-    return `Bom dia,\n\nOs aniversariantes hoje são:\n${names}\n\nParabéns!! Deus abençoe vocês!! 🥳 🎂 🎊 🥂 🎇\n\n_"Este é o dia com que nos presenteou o SENHOR: festejemos e regozijemo-nos nele!" (Salmos 118:24)_`;
+    const isPlural = getBirthdays.length > 1;
+    const isFemale = !isPlural && getBirthdays[0]?.sexo === 'Feminino';
+    const greeting = isPlural 
+      ? "Os aniversariantes hoje são:" 
+      : (isFemale ? "A aniversariante hoje é:" : "O aniversariante hoje é:");
+    const blessing = isPlural ? "Deus abençoe vocês!!" : "Deus abençoe você!!";
+    
+    return `Bom dia,\n\n${greeting}\n${names}\n\nParabéns!! ${blessing} 🥳 🎂 🎊 🥂 🎇\n\n_"Este é o dia com que nos presenteou o SENHOR: festejemos e regozijemo-nos nele!" (Salmos 118:24)_`;
   };
 
   const handleCopyText = () => {
@@ -360,7 +367,9 @@ export const Birthdays: React.FC = () => {
                 className="bg-white rounded-2xl shadow-xl p-10 w-full"
               >
               <div className="text-center mb-10">
-                <h2 className="text-4xl font-black text-gray-900 tracking-tight">Aniversariantes</h2>
+                <h2 className="text-4xl font-black text-gray-900 tracking-tight">
+                  {getBirthdays.length === 1 ? "Aniversariante" : "Aniversariantes"}
+                </h2>
                 <p className="text-pink-500 font-bold tracking-widest text-sm mt-2 uppercase">Parabéns!</p>
               </div>
 
