@@ -566,16 +566,12 @@ export const Companionship: React.FC = () => {
       const gc2 = (m2.grupos_caseiros || '').trim().toUpperCase();
       const sameGC = gc1.length > 0 && gc1 === gc2;
       
-      const disc1 = m1.discipuladorNome?.trim().toUpperCase() || null;
-      const disc2 = m2.discipuladorNome?.trim().toUpperCase() || null;
-      const sameDisc = disc1 !== null && disc2 !== null && disc1 === disc2;
-      
       const r1 = getNormalizedRegion(m1.bairro, m1.grupos_caseiros);
       const r2 = getNormalizedRegion(m2.bairro, m2.grupos_caseiros);
       const sameRegion = r1 === r2;
       const hasMultipleGCs = sameRegion && (regionGcCounters[r1] > 1);
       
-      if (!sameGC && !(hasMultipleGCs && sameDisc)) {
+      if (!sameGC && !hasMultipleGCs) {
         return false;
       }
     }
@@ -594,8 +590,12 @@ export const Companionship: React.FC = () => {
     
     // 4. Maturidade compatível (diferença no rank <= 1)
     if (simEnforceMaturity) {
-      const r1 = MATURITY_RANK[(m1.tipo_de_pessoa || '').toUpperCase().trim()] ?? 1;
-      const r2 = MATURITY_RANK[(m2.tipo_de_pessoa || '').toUpperCase().trim()] ?? 1;
+      const role1 = getMemberRole(m1);
+      const role2 = getMemberRole(m2);
+      const rawR1 = MATURITY_RANK[(m1.tipo_de_pessoa || '').toUpperCase().trim()] ?? 1;
+      const rawR2 = MATURITY_RANK[(m2.tipo_de_pessoa || '').toUpperCase().trim()] ?? 1;
+      const r1 = Math.max(rawR1, MATURITY_RANK[role1] ?? 1);
+      const r2 = Math.max(rawR2, MATURITY_RANK[role2] ?? 1);
       if (Math.abs(r1 - r2) > 1) return false;
     }
     
@@ -752,6 +752,8 @@ export const Companionship: React.FC = () => {
         label = '🔗 Mesmo Disc. (Região)';
       } else if (sameGC) {
         label = '🏠 Mesmo GC';
+      } else if (bd.redeDisc === 14) {
+        label = '📍 Mesmo Bairro (GCs Distintos)';
       } else if (sameDisc) {
         label = '🔗 Mesmo Discipulador';
       } else if (bd.redeDisc === 4) {
@@ -936,8 +938,12 @@ export const Companionship: React.FC = () => {
     }
 
     // --- MATURIDADE ESPIRITUAL (0-15 pts) ---
-    const r1 = MATURITY_RANK[(m1.tipo_de_pessoa || '').toUpperCase().trim()] ?? 1;
-    const r2 = MATURITY_RANK[(m2.tipo_de_pessoa || '').toUpperCase().trim()] ?? 1;
+    const role1 = getMemberRole(m1);
+    const role2 = getMemberRole(m2);
+    const rawR1 = MATURITY_RANK[(m1.tipo_de_pessoa || '').toUpperCase().trim()] ?? 1;
+    const rawR2 = MATURITY_RANK[(m2.tipo_de_pessoa || '').toUpperCase().trim()] ?? 1;
+    const r1 = Math.max(rawR1, MATURITY_RANK[role1] ?? 1);
+    const r2 = Math.max(rawR2, MATURITY_RANK[role2] ?? 1);
     const rankDiff = Math.abs(r1 - r2);
     const maturidade = rankDiff === 0 ? 15 : rankDiff === 1 ? 9 : rankDiff === 2 ? 4 : 0;
 
@@ -982,17 +988,17 @@ export const Companionship: React.FC = () => {
       redeDisc = 18; // Múltiplos GCs na mesma região + mesmo discipulador
     } else if (sameGC) {
       redeDisc = 16; // Mesmo GC
+    } else if (hasMultipleGCs) {
+      redeDisc = 14; // Mesma Região (Múltiplos GCs) — companheirismo altamente compatível!
     } else if (sameDisc) {
       redeDisc = 10; // Mesmo discipulador, GCs diferentes (em Vicente Pires ou regiões sem múltiplos GCs)
     } else if (isVerticalRel) {
       redeDisc = 2;  // Relação vertical (não ideal para companheirismo horizontal)
-    } else if (disc1 && disc2) {
-      redeDisc = 4;  // Redes distintas
+    } else {
+      redeDisc = 4;  // Redes distintas/neutro
     }
 
     // --- ALINHAMENTO DE FUNÇÃO MINISTERIAL (0-10 pts) ---
-    const role1 = getMemberRole(m1);
-    const role2 = getMemberRole(m2);
     let mesmaFuncao = 0;
     if (role1 === role2) {
       mesmaFuncao = 10;
