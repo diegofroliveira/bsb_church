@@ -493,9 +493,20 @@ export const Birthdays: React.FC = () => {
                        
                        <div className="text-center mt-3">
                            <h4 className="font-black text-gray-900 text-sm uppercase truncate max-w-[150px]">{formatName(m.nome)}</h4>
-                           <p className="text-[10px] font-bold text-gray-400 uppercase">
-                             {calculateAge(m.nascimento)} Anos {m.estado_civil ? `• ${m.estado_civil}` : ''}
-                           </p>
+                            <p className="text-[10px] font-bold text-gray-400 uppercase">
+                              {(() => {
+                                const age = calculateAge(m.nascimento);
+                                const hasGC = m.grupos_caseiros && m.grupos_caseiros.trim() !== '' && m.grupos_caseiros.trim().toUpperCase() !== 'NENHUM';
+                                const gcText = hasGC ? m.grupos_caseiros : '';
+                                
+                                if (age >= 0 && age <= 15) {
+                                  return `${age} Anos${gcText ? ` • ${gcText}` : ''}`;
+                                } else {
+                                  // >15 anos: Sem idade, sem estado civil! Apenas Grupo Caseiro se houver.
+                                  return gcText;
+                                }
+                              })()}
+                            </p>
                         </div>
                     </div>
                   );
