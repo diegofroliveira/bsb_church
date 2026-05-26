@@ -117,72 +117,9 @@ export const useFamilyEngine = (
       });
     }
 
-    // Pre-calculate address validity and normalized keys
-    const memberAddresses = new Map<string, { key: string; isValid: boolean }>();
-    draftMembers.forEach(m => {
-      const addrKey = normalizeAddress(m.logradouro);
-      const isValid = addrKey.length > 2 && !['naoinformado', 'semendereco', 'n/a', 'naoconsta'].includes(addrKey);
-      memberAddresses.set(m.id.toString(), { key: addrKey, isValid });
-    });
+    // No address or text fallback grouping is used.
+    // Grouping is done strictly by the explicit relationships defined by the database IDs in Prover "Pessoas x Familiares" table.
 
-    // Step 2: Group strictly by exact same valid physical address
-    const byAddress = new Map<string, string[]>();
-    draftMembers.forEach(m => {
-      const idStr = m.id.toString();
-      const addr = memberAddresses.get(idStr)!;
-      if (addr.isValid) {
-        if (!byAddress.has(addr.key)) byAddress.set(addr.key, []);
-        byAddress.get(addr.key)!.push(idStr);
-      }
-    });
-
-    byAddress.forEach(ids => {
-      for (let k = 1; k < ids.length; k++) {
-        union(ids[0], ids[k]);
-      }
-    });
-
-    // Step 3: Fallback grouping for missing/incomplete addresses (DSU)
-    // We union them ONLY if BOTH members have invalid addresses, 
-    // ensuring we never group people with valid addresses via parentage/spouse.
-    draftMembers.forEach(m1 => {
-      const id1 = m1.id.toString();
-      const addr1 = memberAddresses.get(id1)!;
-
-      draftMembers.forEach(m2 => {
-        const id2 = m2.id.toString();
-        if (id1 === id2) return;
-        const addr2 = memberAddresses.get(id2)!;
-
-        // Condition: BOTH members must have invalid/blank addresses.
-        const canGroup = !addr1.isValid && !addr2.isValid;
-        if (!canGroup) return;
-
-        // Check 1: Spouse relation
-        const spouse1 = cleanName(m1.esposo_a);
-        const name2 = cleanName(m2.nome);
-        const isSpouse = spouse1 && (spouse1 === name2 || name2.includes(spouse1) || spouse1.includes(name2));
-
-        // Check 2: Parent-child relation
-        const parent1 = cleanName(m2.pai);
-        const parent2 = cleanName(m2.mae);
-        const name1 = cleanName(m1.nome);
-        const isParentChild = (parent1 && (parent1 === name1 || name1.includes(parent1) || parent1.includes(name1))) ||
-                             (parent2 && (parent2 === name1 || name1.includes(parent2) || parent2.includes(name1)));
-
-        // Check 3: Share a phone number
-        const ph1_1 = normalizePhone(m1.celular_principal_sms);
-        const ph1_2 = normalizePhone(m1.telefone_fixo);
-        const ph2_1 = normalizePhone(m2.celular_principal_sms);
-        const ph2_2 = normalizePhone(m2.telefone_fixo);
-        const sharesPhone = (ph1_1 && ph1_1.length >= 8 && (ph1_1 === ph2_1 || ph1_1 === ph2_2)) ||
-                            (ph1_2 && ph1_2.length >= 8 && (ph1_2 === ph2_1 || ph1_2 === ph2_2));
-
-        if (isSpouse || isParentChild || sharesPhone) {
-          union(id1, id2);
-        }
-      });
-    });
 
     // Collect components
     const components: Record<string, string[]> = {};
