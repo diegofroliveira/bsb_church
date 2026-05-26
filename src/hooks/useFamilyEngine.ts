@@ -53,10 +53,16 @@ export const useFamilyEngine = (draftMembers: Member[]): Record<string, Family> 
     const memberById = new Map<string, Member>();
     const memberByName = new Map<string, Member>();
     
+    // Robust name cleanup that strips quotes and extra whitespaces
+    const cleanName = (name: string | null | undefined): string => {
+      if (!name) return '';
+      return name.replace(/['"]/g, '').trim().toUpperCase().replace(/\s+/g, ' ');
+    };
+
     draftMembers.forEach(m => {
       const idStr = m.id.toString();
       memberById.set(idStr, m);
-      const normName = normalizeName(m.nome);
+      const normName = cleanName(m.nome);
       if (normName) memberByName.set(normName, m);
     });
 
@@ -88,11 +94,11 @@ export const useFamilyEngine = (draftMembers: Member[]): Record<string, Family> 
     const memberAddresses = new Map<string, { key: string; isValid: boolean }>();
     draftMembers.forEach(m => {
       const addrKey = normalizeAddress(m.logradouro);
-      const isValid = addrKey.length > 6 && addrKey !== 'naoinformado';
+      const isValid = addrKey.length > 2 && !['naoinformado', 'semendereco', 'n/a', 'naoconsta'].includes(addrKey);
       memberAddresses.set(m.id.toString(), { key: addrKey, isValid });
     });
 
-    // Step 1: Group by exact same valid address
+    // Step 1: Group strictly by exact same valid address
     const byAddress = new Map<string, string[]>();
     draftMembers.forEach(m => {
       const idStr = m.id.toString();
@@ -110,8 +116,8 @@ export const useFamilyEngine = (draftMembers: Member[]): Record<string, Family> 
     });
 
     // Step 2: Fallback grouping for missing/incomplete addresses
-    // We union them ONLY if at least one of them has an invalid address, 
-    // ensuring we never group people with different valid addresses.
+    // We union them ONLY if BOTH members have invalid addresses, 
+    // ensuring we never group people with valid addresses via parentage/spouse.
     draftMembers.forEach(m1 => {
       const id1 = m1.id.toString();
       const addr1 = memberAddresses.get(id1)!;
@@ -121,20 +127,21 @@ export const useFamilyEngine = (draftMembers: Member[]): Record<string, Family> 
         if (id1 === id2) return;
         const addr2 = memberAddresses.get(id2)!;
 
-        // Condition: at least one of them must have an invalid address
-        // If both have different valid addresses, we NEVER union them.
-        const canGroup = !addr1.isValid || !addr2.isValid;
+        // Condition: BOTH members must have invalid/blank addresses.
+        // This strictly prevents a blank/incomplete child profile from acting
+        // as a DSU "bridge" that merges different valid addresses.
+        const canGroup = !addr1.isValid && !addr2.isValid;
         if (!canGroup) return;
 
         // Check 1: Spouse relation
-        const spouse1 = normalizeName(m1.esposo_a);
-        const name2 = normalizeName(m2.nome);
+        const spouse1 = cleanName(m1.esposo_a);
+        const name2 = cleanName(m2.nome);
         const isSpouse = spouse1 && (spouse1 === name2 || name2.includes(spouse1) || spouse1.includes(name2));
 
         // Check 2: Parent-child relation
-        const parent1 = normalizeName(m2.pai);
-        const parent2 = normalizeName(m2.mae);
-        const name1 = normalizeName(m1.nome);
+        const parent1 = cleanName(m2.pai);
+        const parent2 = cleanName(m2.mae);
+        const name1 = cleanName(m1.nome);
         const isParentChild = (parent1 && (parent1 === name1 || name1.includes(parent1) || parent1.includes(name1))) ||
                              (parent2 && (parent2 === name1 || name1.includes(parent2) || parent2.includes(name1)));
 
@@ -178,10 +185,10 @@ export const useFamilyEngine = (draftMembers: Member[]): Record<string, Family> 
         head = marriedMale;
       } else {
         const parent = familyMembers.find(m => {
-          const normName = normalizeName(m.nome);
+          const normName = cleanName(m.nome);
           return familyMembers.some(c => 
-            normalizeName(c.pai) === normName || 
-            normalizeName(c.mae) === normName
+            cleanName(c.pai) === normName || 
+            cleanName(c.mae) === normName
           );
         });
         if (parent) {
