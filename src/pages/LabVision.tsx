@@ -243,7 +243,37 @@ function formIdealCells(pool: Member[], targetSize = 12): IdealCell[] {
       regionName: region
     }));
 
-    sortedUnits.forEach(u => {
+    // 1. Separar unidades com líderes masculinos das unidades normais
+    const leaderUnits = sortedUnits.filter(u => 
+      u.members.some(m => {
+        const tipo = normalizeType(m.tipo_de_pessoa);
+        const isMale = (m.sexo || '').toUpperCase().trim().startsWith('M');
+        return isMale && (tipo === 'LÍDER' || tipo === 'PASTOR');
+      })
+    );
+    const regularUnits = sortedUnits.filter(u => !leaderUnits.includes(u));
+
+    // 2. Distribuir primeiro as unidades de liderança de forma rotativa (round-robin)
+    // Isso garante que os líderes disponíveis sejam espalhados de forma equilibrada pelas células da região!
+    leaderUnits.forEach((u, i) => {
+      const targetCell = regionCells[i % numCellsInRegion];
+      u.members.forEach(m => {
+        const min = assignMin(m)[0];
+        const tipo = normalizeType(m.tipo_de_pessoa);
+        const isMale = (m.sexo || '').toUpperCase().trim().startsWith('M');
+        
+        if (isMale && (tipo === 'LÍDER' || tipo === 'PASTOR') && targetCell.lideranca.length < 3) {
+          targetCell.lideranca.push({ member: m, ministry: min });
+        } else if ((tipo === 'DIÁCONO' || tipo === 'LÍDER' || tipo === 'PASTOR' || targetCell.ligamentos.length < 3) && targetCell.ligamentos.length < 4 && targetCell.lideranca.length > 0) {
+          targetCell.ligamentos.push({ member: m, ministry: min });
+        } else {
+          targetCell.corpo.push({ member: m, ministry: min });
+        }
+      });
+    });
+
+    // 3. Preencher o restante das células com as unidades normais buscando manter os tamanhos equilibrados
+    regularUnits.forEach(u => {
       const targetCell = regionCells.reduce((prev, curr) => {
         const prevSize = prev.lideranca.length + prev.ligamentos.length + prev.corpo.length;
         const currSize = curr.lideranca.length + curr.ligamentos.length + curr.corpo.length;
