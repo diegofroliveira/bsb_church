@@ -23,6 +23,8 @@ import { Birthdays } from './pages/Birthdays';
 import { Simulations } from './pages/Simulations';
 import { Families } from './pages/Families';
 import { Companionship } from './pages/Companionship';
+import { LabVision } from './pages/LabVision';
+import { LabVisits } from './pages/LabVisits';
 
 function App() {
   return (
@@ -57,6 +59,9 @@ function App() {
               <Route path="/my-group" element={<MyGroup />} />
               <Route path="/ai-consultant" element={<AiConsultant />} />
               <Route path="/ai-insights" element={<AiInsights />} />
+              {/* ── SECRET LAB ROUTES — not linked anywhere in the UI — */}
+              <Route path="/lab/vision" element={<LabVision />} />
+              <Route path="/lab/visits" element={<LabVisits />} />
             </Route>
           </Route>
 

@@ -8,6 +8,8 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import clsx from 'clsx';
+import { useLabShortcut } from '../hooks/useLabShortcut';
+import { LabLauncher } from '../components/LabLauncher';
 
 const DEFAULT_ROLES: Record<string, string[]> = {
   admin: ['Dashboard', 'Aniversariantes', 'Mapa', 'Membros', 'Famílias', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Financeiro', 'Consultor IA', 'Insights IA', 'Configurações', 'Simulações', 'Companheirismo'],
@@ -21,6 +23,10 @@ export const MainLayout: React.FC = () => {
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [allowedModules, setAllowedModules] = useState<string[]>([]);
+  const [isLabOpen, setIsLabOpen] = useState(false);
+
+  // Secret lab access: type L → A → B on keyboard (not in input fields)
+  useLabShortcut(() => setIsLabOpen(true));
 
   useEffect(() => {
     if (user?.forcePasswordReset) {
@@ -168,6 +174,8 @@ export const MainLayout: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50/50">
+      {/* Secret Lab Launcher — invisible in nav, activated by typing L-A-B */}
+      {isLabOpen && <LabLauncher onClose={() => setIsLabOpen(false)} />}
       {isMobileMenuOpen && (
         <div className="fixed inset-0 z-50 flex lg:hidden">
           <div className="fixed inset-0 bg-gray-900/80 transition-opacity" onClick={() => setIsMobileMenuOpen(false)} />
