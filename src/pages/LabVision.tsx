@@ -91,8 +91,8 @@ const PRESB_CONFIG: Array<{
     ministries: ['apostolo', 'mestre'],
     note: 'Apóstolo + Mestre — arquiteto e professor do corpo local' },
   { nameKey: 'WANDERLEY CLODOALDO LIMA DE FREITAS', displayName: 'Wanderley C. L. de Freitas',
-    ministries: ['apostolo', 'mestre'],
-    note: 'Apóstolo + Mestre — segunda coluna apostólica, consolida o ensino' },
+    ministries: ['pastor', 'mestre'],
+    note: 'Pastor + Mestre — pastoreio local do corpo, consolidando o ensino na Palavra' },
   { nameKey: 'CARLOS ALBERTO RIBEIRO DO NASCIMENTO', displayName: 'Carlos Alberto R. do Nascimento',
     ministries: ['profeta'],
     note: 'Profeta — discernimento e direção profética para o corpo' },
@@ -693,7 +693,7 @@ export const LabVision: React.FC = () => {
           </div>
           <div className="space-y-3">
             {[
-              { icon: '✅', text: `Cobertura apostólica dupla forte (Wagner + Wanderley) — fundação sólida para construir` },
+              { icon: '✅', text: `Cobertura apostólica forte (Wagner) — fundação sólida e visão bem delineadas` },
               { icon: '✅', text: `Presença profética (Carlos Alberto) e evangelística (Marcelo Braga) no governo — corpo com voz e missão` },
               { icon: '✅', text: `Vinci como cobertura apostólica externa — conexão com o corpo maior de Cristo` },
               { icon: presidGap.includes('pastor') ? '⚠️' : '✅', text: presidGap.includes('pastor') ? `LACUNA CRÍTICA: Ministério Pastoral sênior ausente no Presbítério — prioridade número 1 para resolver` : `Pastoral coberto no Presbítério ✓` },
