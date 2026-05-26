@@ -179,6 +179,13 @@ def main():
                     if before != after:
                         print(f"  [info] Removed {before - after} duplicate IDs from the file.")
 
+                if table_name == "pessoas_familiares" and "id_pessoa_a" in df.columns and "id_pessoa_b" in df.columns:
+                    before = len(df)
+                    df = df.drop_duplicates(subset=["id_pessoa_a", "id_pessoa_b"], keep="first")
+                    after = len(df)
+                    if before != after:
+                        print(f"  [info] Removed {before - after} duplicate relationships from the file.")
+
                 if table_name == "eventos" and "id_serial" in df.columns:
                     df = df.drop(columns=["id_serial"])
 
@@ -192,9 +199,13 @@ def main():
                     filtered_batch = []
 
                     for record in batch:
-                        filtered_batch.append(
-                            {key: value for key, value in record.items() if key not in invalid_columns}
-                        )
+                        cleaned = {}
+                        for key, value in record.items():
+                            if key in invalid_columns:
+                                continue
+                            # Convert empty string to None/null to prevent Postgres cast errors for DATE/BIGINT
+                            cleaned[key] = None if value == "" else value
+                        filtered_batch.append(cleaned)
 
                     response = client.post(
                         url,
