@@ -7,7 +7,11 @@ import {
   Image as ImageIcon, 
   Loader2, 
   Upload,
-  AlertCircle
+  AlertCircle,
+  AlertTriangle,
+  Lock,
+  Check,
+  X
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import clsx from 'clsx';
@@ -61,6 +65,29 @@ export const Birthdays: React.FC = () => {
   const [filterMinAge, setFilterMinAge] = useState<number>(0);
   const [filterMaxAge, setFilterMaxAge] = useState<number>(120);
   const [filterMaritalStatus, setFilterMaritalStatus] = useState('Todos');
+
+  const [editedMessage, setEditedMessage] = useState<string | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showWarningBlock, setShowWarningBlock] = useState(false);
+
+  const getStorageKey = () => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    return `birthday_msg_${filterMode}_${filterMode === 'specific' ? specificDate : todayStr}`;
+  };
+
+  useEffect(() => {
+    const key = getStorageKey();
+    const saved = localStorage.getItem(key);
+    if (saved) {
+      setEditedMessage(saved);
+    } else {
+      setEditedMessage(null);
+    }
+    setIsEditMode(false);
+    setShowConfirmModal(false);
+    setShowWarningBlock(false);
+  }, [filterMode, specificDate]);
 
   useEffect(() => {
     fetchMembers();
@@ -186,7 +213,7 @@ export const Birthdays: React.FC = () => {
     }).sort((a, b) => a.nome.localeCompare(b.nome));
   }, [members, filterMode, specificDate, filterGender, filterGC, filterMinAge, filterMaxAge, filterMaritalStatus]);
 
-  const generateMessage = () => {
+  const generateAutomaticMessage = () => {
     if (getBirthdays.length === 0) return "Nenhum aniversariante encontrado.";
     
     const names = getBirthdays.map(m => {
@@ -236,6 +263,66 @@ export const Birthdays: React.FC = () => {
     const blessing = isPlural ? "Deus abençoe vocês!!" : "Deus abençoe você!!";
     
     return `Bom dia,\n\n${greeting}\n${names}\n\nParabéns!! ${blessing} 🥳 🎂 🎊 🥂 🎇\n\n_"Este é o dia com que nos presenteou o SENHOR: festejemos e regozijemo-nos nele!" (Salmos 118:24)_`;
+  };
+
+  const generateMessage = () => {
+    if (editedMessage !== null) {
+      return editedMessage;
+    }
+    return generateAutomaticMessage();
+  };
+
+  const handleStartEdit = () => {
+    const savedDatesStr = localStorage.getItem('edited_birthday_dates');
+    const savedDates = savedDatesStr ? JSON.parse(savedDatesStr) : [];
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    if (savedDates.length >= 3 && !savedDates.includes(todayStr)) {
+      setShowWarningBlock(true);
+      return;
+    }
+
+    setShowConfirmModal(true);
+  };
+
+  const handleConfirmEdit = () => {
+    setShowConfirmModal(false);
+    if (editedMessage === null) {
+      setEditedMessage(generateAutomaticMessage());
+    }
+    setIsEditMode(true);
+  };
+
+  const handleSaveEdit = () => {
+    if (editedMessage !== null) {
+      const key = getStorageKey();
+      localStorage.setItem(key, editedMessage);
+
+      const todayStr = new Date().toISOString().split('T')[0];
+      const savedDatesStr = localStorage.getItem('edited_birthday_dates');
+      const savedDates = savedDatesStr ? JSON.parse(savedDatesStr) : [];
+      if (!savedDates.includes(todayStr)) {
+        savedDates.push(todayStr);
+        localStorage.setItem('edited_birthday_dates', JSON.stringify(savedDates));
+      }
+    }
+    setIsEditMode(false);
+  };
+
+  const handleCancelEdit = () => {
+    const key = getStorageKey();
+    const saved = localStorage.getItem(key);
+    setEditedMessage(saved);
+    setIsEditMode(false);
+  };
+
+  const handleRestoreDefault = () => {
+    if (window.confirm("Deseja realmente restaurar a mensagem automática padrão para este dia?")) {
+      const key = getStorageKey();
+      localStorage.removeItem(key);
+      setEditedMessage(null);
+      setIsEditMode(false);
+    }
   };
 
   const handleCopyText = () => {
@@ -385,16 +472,61 @@ export const Birthdays: React.FC = () => {
                 <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
                    <ImageIcon className="h-4 w-4 text-pink-500" /> Mensagem Automática
                 </h3>
-                <button 
-                  onClick={handleCopyText}
-                  className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50 px-2 py-1 rounded transition-colors"
-                >
-                   <Copy className="h-3 w-3" /> Copiar Texto
-                </button>
+                <div className="flex items-center gap-1.5">
+                  {isEditMode ? (
+                    <>
+                      <button 
+                        onClick={handleSaveEdit}
+                        className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 hover:bg-emerald-50 px-2 py-1 rounded border border-emerald-100 transition-colors uppercase"
+                      >
+                         Salvar
+                      </button>
+                      <button 
+                        onClick={handleCancelEdit}
+                        className="inline-flex items-center gap-1 text-[10px] font-bold text-red-600 hover:bg-red-50 px-2 py-1 rounded border border-red-100 transition-colors uppercase"
+                      >
+                         Cancelar
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button 
+                        onClick={handleStartEdit}
+                        className="inline-flex items-center gap-1 text-[10px] font-bold text-pink-600 hover:bg-pink-50 px-2 py-1 rounded border border-pink-100 transition-colors uppercase"
+                      >
+                         Editar
+                      </button>
+                      {editedMessage !== null && (
+                        <button 
+                          onClick={handleRestoreDefault}
+                          className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-500 hover:bg-slate-50 px-2 py-1 rounded border border-slate-100 transition-colors uppercase"
+                          title="Restaurar mensagem automática padrão"
+                        >
+                           Padrão
+                        </button>
+                      )}
+                      <button 
+                        onClick={handleCopyText}
+                        className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50 px-2 py-1 rounded transition-colors"
+                      >
+                         <Copy className="h-3 w-3" /> Copiar
+                      </button>
+                    </>
+                  )}
+                </div>
              </div>
-             <div className="bg-gray-50 rounded-xl p-4 text-xs text-gray-600 font-mono whitespace-pre-wrap leading-relaxed border border-gray-100">
-                {generateMessage()}
-             </div>
+             {isEditMode ? (
+               <textarea
+                 value={editedMessage ?? generateAutomaticMessage()}
+                 onChange={e => setEditedMessage(e.target.value)}
+                 className="w-full h-64 bg-gray-50 rounded-xl p-4 text-xs text-gray-750 font-mono leading-relaxed border border-pink-200 outline-none focus:ring-1 focus:ring-pink-500 resize-y"
+                 placeholder="Digite sua mensagem personalizada aqui..."
+               />
+             ) : (
+               <div className="bg-gray-50 rounded-xl p-4 text-xs text-gray-600 font-mono whitespace-pre-wrap leading-relaxed border border-gray-100">
+                  {generateMessage()}
+               </div>
+             )}
           </div>
 
           <div className="bg-pink-50/50 rounded-2xl border border-pink-100 p-6">
@@ -541,6 +673,85 @@ export const Birthdays: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* ── Modal: Confirmação de Edição ── */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95 duration-200">
+            <div className="flex items-start gap-4 mb-5">
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+                <AlertTriangle className="h-5 w-5 text-amber-600" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-gray-900">Confirmar edição da mensagem</h2>
+                <p className="text-sm text-gray-500 mt-1">Antes de prosseguir, precisamos confirmar uma coisa.</p>
+              </div>
+            </div>
+
+            <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 mb-5">
+              <p className="text-sm text-amber-800 leading-relaxed">
+                Você já conversou com o administrador sobre a alteração que deseja fazer na mensagem?
+              </p>
+              <p className="text-xs text-amber-600 mt-2 italic">
+                Lembre-se: edições manuais são exceções pontuais. Se a mudança for recorrente, o ideal é atualizar a lógica padrão com o administrador.
+              </p>
+            </div>
+
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowConfirmModal(false)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors"
+              >
+                <X className="h-4 w-4" /> Não, cancelar
+              </button>
+              <button
+                onClick={handleConfirmEdit}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white bg-pink-600 hover:bg-pink-700 transition-colors shadow-md shadow-pink-200"
+              >
+                <Check className="h-4 w-4" /> Sim, já falei — editar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Bloqueio por excesso de edições ── */}
+      {showWarningBlock && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95 duration-200">
+            <div className="flex items-start gap-4 mb-5">
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                <Lock className="h-5 w-5 text-red-600" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-gray-900">Limite de edições atingido</h2>
+                <p className="text-sm text-gray-500 mt-1">A mensagem foi editada manualmente em 3 ou mais dias distintos.</p>
+              </div>
+            </div>
+
+            <div className="bg-red-50 border border-red-100 rounded-xl p-4 mb-5">
+              <p className="text-sm text-red-800 leading-relaxed font-medium">
+                ⚠️ Atenção, secretária!
+              </p>
+              <p className="text-sm text-red-700 mt-2 leading-relaxed">
+                Percebemos que você tem editado a mensagem de aniversariantes com frequência. Isso é um sinal de que algo na <strong>lógica padrão</strong> precisa ser atualizado — e não a mensagem em si.
+              </p>
+              <p className="text-sm text-red-700 mt-2 leading-relaxed">
+                Ficar "remendando" manualmente todo dia não é a solução ideal. Por favor, <strong>fale com o administrador do sistema</strong> para que a regra seja ajustada de forma definitiva. Assim, o trabalho fica mais fácil para todo mundo! 😊
+              </p>
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                onClick={() => setShowWarningBlock(false)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white bg-red-600 hover:bg-red-700 transition-colors"
+              >
+                <Check className="h-4 w-4" /> Entendido — falarei com o admin
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
