@@ -27,6 +27,9 @@ interface Member {
   sexo?: string;
   estado_civil?: string;
   status?: string;
+  pai?: string;
+  mae?: string;
+  celular_principal_sms?: string;
 }
 
 export const Birthdays: React.FC = () => {
@@ -58,7 +61,7 @@ export const Birthdays: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('membros')
-        .select('id, nome, nascimento, grupos_caseiros, sexo, estado_civil, status')
+        .select('id, nome, nascimento, grupos_caseiros, sexo, estado_civil, status, pai, mae, celular_principal_sms')
         .limit(10000);
 
       if (error) throw error;
@@ -175,7 +178,35 @@ export const Birthdays: React.FC = () => {
   const generateMessage = () => {
     if (getBirthdays.length === 0) return "Nenhum aniversariante encontrado.";
     
-    const names = getBirthdays.map(m => `*${m.nome.toUpperCase()}* (@${formatName(m.nome).toUpperCase()}) - ${m.grupos_caseiros || 'Sem GC'} 🌷`).join('\n');
+    const names = getBirthdays.map(m => {
+      const age = calculateAge(m.nascimento);
+      const hasGC = m.grupos_caseiros && m.grupos_caseiros.trim() !== '' && m.grupos_caseiros.trim().toUpperCase() !== 'NENHUM';
+      const gcText = hasGC ? m.grupos_caseiros : 'Sem GC';
+
+      if (age >= 0 && age <= 15) {
+        // Até 15 anos: Nome, idade, pais e GC
+        const genderWord = m.sexo === 'Feminino' ? 'Filha' : m.sexo === 'Masculino' ? 'Filho' : 'Filho(a)';
+        
+        let parentsText = '';
+        const father = m.pai?.trim();
+        const mother = m.mae?.trim();
+        
+        if (father && mother) {
+          parentsText = ` - ${genderWord} de ${father} e ${mother}`;
+        } else if (father) {
+          parentsText = ` - ${genderWord} de ${father}`;
+        } else if (mother) {
+          parentsText = ` - ${genderWord} de ${mother}`;
+        }
+
+        return `*${m.nome.toUpperCase()}* (${age} anos)${parentsText} - ${gcText} 🌷`;
+      } else {
+        // Depois dos 15 anos: Nome, @mention (se tem telefone) e GC
+        const hasPhone = m.celular_principal_sms && m.celular_principal_sms.trim() !== '';
+        const mention = hasPhone ? ` (@${formatName(m.nome).toUpperCase()})` : '';
+        return `*${m.nome.toUpperCase()}*${mention} - ${gcText} 🌷`;
+      }
+    }).join('\n');
     
     const isPlural = getBirthdays.length > 1;
     const isFemale = !isPlural && getBirthdays[0]?.sexo === 'Feminino';
