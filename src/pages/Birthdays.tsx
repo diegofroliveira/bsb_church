@@ -18,6 +18,17 @@ const formatName = (fullName: string) => {
   return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1]}` : parts[0];
 };
 
+const formatGCName = (gcName?: string): string => {
+  if (!gcName) return 'Sem GC';
+  let name = gcName.trim();
+  if (name.toUpperCase() === 'NENHUM' || name === '') return 'Sem GC';
+  
+  // Remove BSB prefix (case-insensitive, followed by spaces, hyphens, or underscores)
+  name = name.replace(/^BSB[\s\-_]+/i, '');
+  
+  return `GC ${name}`;
+};
+
 interface Member {
   id: any;
   nome: string;
@@ -180,8 +191,7 @@ export const Birthdays: React.FC = () => {
     
     const names = getBirthdays.map(m => {
       const age = calculateAge(m.nascimento);
-      const hasGC = m.grupos_caseiros && m.grupos_caseiros.trim() !== '' && m.grupos_caseiros.trim().toUpperCase() !== 'NENHUM';
-      const gcText = hasGC ? m.grupos_caseiros : 'Sem GC';
+      const gcText = formatGCName(m.grupos_caseiros);
 
       if (age >= 0 && age <= 15) {
         // Até 15 anos: Nome, idade, pais e GC
@@ -497,7 +507,7 @@ export const Birthdays: React.FC = () => {
                               {(() => {
                                 const age = calculateAge(m.nascimento);
                                 const hasGC = m.grupos_caseiros && m.grupos_caseiros.trim() !== '' && m.grupos_caseiros.trim().toUpperCase() !== 'NENHUM';
-                                const gcText = hasGC ? m.grupos_caseiros : '';
+                                const gcText = hasGC ? formatGCName(m.grupos_caseiros) : '';
                                 
                                 if (age >= 0 && age <= 15) {
                                   return `${age} Anos${gcText ? ` • ${gcText}` : ''}`;
