@@ -208,7 +208,6 @@ function formIdealCells(pool: Member[], targetSize = 12): IdealCell[] {
     });
   });
 
-  // 2. Group Family Units by Macro-Region
   const regionMap: Record<string, typeof familyUnits> = {};
   familyUnits.forEach(u => {
     regionMap[u.macro] = regionMap[u.macro] || [];
@@ -218,12 +217,10 @@ function formIdealCells(pool: Member[], targetSize = 12): IdealCell[] {
   const cells: IdealCell[] = [];
   let cellIndex = 1;
 
-  // 3. For each macro-region, form cells contiguously
   Object.entries(regionMap).forEach(([region, units]) => {
     const totalPeople = units.reduce((acc, u) => acc + u.members.length, 0);
     if (totalPeople === 0) return;
     
-    // Sort units: prioritize putting leaders/pastors units first
     const sortedUnits = [...units].sort((a, b) => {
       const getPriority = (u: typeof a) => {
         if (u.members.some(m => normalizeType(m.tipo_de_pessoa) === 'PASTOR')) return 3;
@@ -246,7 +243,6 @@ function formIdealCells(pool: Member[], targetSize = 12): IdealCell[] {
       regionName: region
     }));
 
-    // Distribute units into cells (keeps couples/families completely intact)
     sortedUnits.forEach(u => {
       const targetCell = regionCells.reduce((prev, curr) => {
         const prevSize = prev.lideranca.length + prev.ligamentos.length + prev.corpo.length;
@@ -257,10 +253,11 @@ function formIdealCells(pool: Member[], targetSize = 12): IdealCell[] {
       u.members.forEach(m => {
         const min = assignMin(m)[0];
         const tipo = normalizeType(m.tipo_de_pessoa);
+        const isMale = (m.sexo || '').toUpperCase().trim().startsWith('M');
         
-        if ((tipo === 'LÍDER' || tipo === 'PASTOR') && targetCell.lideranca.length < 3) {
+        if (isMale && (tipo === 'LÍDER' || tipo === 'PASTOR') && targetCell.lideranca.length < 3) {
           targetCell.lideranca.push({ member: m, ministry: min });
-        } else if ((tipo === 'DIÁCONO' || targetCell.ligamentos.length < 3) && targetCell.ligamentos.length < 4 && targetCell.lideranca.length > 0) {
+        } else if ((tipo === 'DIÁCONO' || tipo === 'LÍDER' || tipo === 'PASTOR' || targetCell.ligamentos.length < 3) && targetCell.ligamentos.length < 4 && targetCell.lideranca.length > 0) {
           targetCell.ligamentos.push({ member: m, ministry: min });
         } else {
           targetCell.corpo.push({ member: m, ministry: min });
@@ -273,10 +270,23 @@ function formIdealCells(pool: Member[], targetSize = 12): IdealCell[] {
       const totalMembers = c.lideranca.length + c.ligamentos.length + c.corpo.length;
       if (totalMembers === 0) return;
 
-      if (c.lideranca.length === 0 && c.ligamentos.length > 0) {
-        c.lideranca.push(c.ligamentos.shift()!);
-      } else if (c.lideranca.length === 0 && c.corpo.length > 0) {
-        c.lideranca.push(c.corpo.shift()!);
+      // Garantir que a liderança tenha um sacerdote (homem) se disponível
+      if (c.lideranca.length === 0) {
+        const manInLig = c.ligamentos.find(cm => (cm.member.sexo || '').toUpperCase().trim().startsWith('M'));
+        if (manInLig) {
+          c.lideranca.push(manInLig);
+          c.ligamentos = c.ligamentos.filter(cm => cm.member.id !== manInLig.member.id);
+        } else {
+          const manInCorpo = c.corpo.find(cm => (cm.member.sexo || '').toUpperCase().trim().startsWith('M'));
+          if (manInCorpo) {
+            c.lideranca.push(manInCorpo);
+            c.corpo = c.corpo.filter(cm => cm.member.id !== manInCorpo.member.id);
+          } else {
+            // Caso absoluto em que não há homens no grupo, mantém a funcionalidade de fallback
+            if (c.ligamentos.length > 0) c.lideranca.push(c.ligamentos.shift()!);
+            else if (c.corpo.length > 0) c.lideranca.push(c.corpo.shift()!);
+          }
+        }
       }
       
       const allMins = new Set([...c.lideranca, ...c.ligamentos, ...c.corpo].map(m => m.ministry));
