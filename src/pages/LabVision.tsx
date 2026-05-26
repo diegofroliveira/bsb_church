@@ -191,28 +191,41 @@ export const LabVision: React.FC = () => {
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedCell, setExpandedCell] = useState<number | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
     supabase
       .from('membros')
       .select('id, nome, tipo_de_pessoa, grupos_caseiros, discipulador_nome, status, sexo')
       .limit(10000)
-      .then(({ data }) => { setMembers(data || []); setLoading(false); });
+      .then(({ data, error }) => { 
+        if (error) {
+          console.error("Supabase error:", error);
+          setFetchError(error.message);
+        }
+        setMembers(data || []); 
+        setLoading(false); 
+      })
+      .catch(err => {
+        console.error("Fetch exception:", err);
+        setFetchError(err.message);
+        setLoading(false);
+      });
   }, []);
 
   const bodyPool = useMemo(() =>
     members.filter(m => {
-      if (!m.status?.includes('Ativ')) return false;
+      if (!m.status || m.status.trim().toLowerCase() !== 'ativo') return false;
       const tipo = normalizeType(m.tipo_de_pessoa);
       if (!VALID_TIPOS.includes(tipo)) return false;
-      if (m.nome.toUpperCase().includes('VINCI')) return false;
+      if (m.nome && m.nome.toUpperCase().includes('VINCI')) return false;
       return true;
     }), [members]);
 
   const presbyNames = PRESB_CONFIG.map(p => p.nameKey);
   const nonPresb = useMemo(() =>
-    bodyPool.filter(m => !presbyNames.some(key => key.split(' ').every(part => m.nome.toUpperCase().includes(part)))),
-    [bodyPool]);
+    bodyPool.filter(m => !presbyNames.some(key => m.nome && m.nome.toUpperCase().includes(key.split(' ')[0]))),
+    [bodyPool, presbyNames]);
 
   const idealCells = useMemo(() => formIdealCells(nonPresb, 12), [nonPresb]);
 
@@ -220,6 +233,7 @@ export const LabVision: React.FC = () => {
     const minConfig = MIN[cm.ministry];
     const Icon = minConfig.Icon;
     const isLider = normalizeType(cm.member.tipo_de_pessoa) === 'LÍDER' || normalizeType(cm.member.tipo_de_pessoa) === 'PASTOR';
+    const shortName = cm.member.nome ? cm.member.nome.split(' ')[0] : 'Desconhecido';
     
     return (
       <div key={cm.member.id} className={clsx('flex flex-col items-center p-2 rounded-xl border relative group transition-all', minConfig.bg, minConfig.border, 'bg-white shadow-sm hover:shadow-md')}>
@@ -234,11 +248,11 @@ export const LabVision: React.FC = () => {
         )}
 
         <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mb-1 text-gray-500 font-black text-sm uppercase border border-gray-200">
-          {cm.member.nome.substring(0, 2)}
+          {shortName.substring(0, 2)}
         </div>
         
         <p className="text-[10px] font-black text-gray-900 w-full text-center truncate px-1">
-          {cm.member.nome.split(' ')[0]}
+          {shortName}
         </p>
         <p className={clsx('text-[8px] font-bold uppercase tracking-widest mt-0.5', minConfig.text)}>
           {minConfig.label}
@@ -282,6 +296,20 @@ export const LabVision: React.FC = () => {
           </p>
         </div>
       </div>
+      
+      {/* ERROR / DEBUG BANNER */}
+      {fetchError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl">
+          <p className="font-bold">Erro ao carregar dados do Supabase:</p>
+          <p className="text-sm font-mono mt-1">{fetchError}</p>
+        </div>
+      )}
+      {(members.length === 0 && !fetchError) && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-700 p-4 rounded-xl">
+          <p className="font-bold">Nenhum membro retornado do banco (Total: {members.length}).</p>
+        </div>
+      )}
+
 
       {/* CÉLULAS SIMULADAS */}
       <section>
