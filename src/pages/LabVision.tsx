@@ -153,44 +153,143 @@ interface IdealCell {
   lideranca: CellMember[];
   ligamentos: CellMember[];
   corpo: CellMember[];
+  regionName?: string;
+}
+
+function getMacroRegion(gc: string): string {
+  const g = (gc || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  if (g.includes('AGUAS CLARAS') || g.includes('CLARAS')) return 'Águas Claras';
+  if (g.includes('TAGUA')) return 'Taguatinga';
+  if (g.includes('GUARA')) return 'Guará';
+  if (g.includes('ASA') || g.includes('PLANO')) return 'Plano Piloto';
+  if (g.includes('VICENTE')) return 'Vicente Pires';
+  if (g.includes('RECANTO')) return 'Recanto das Emas';
+  if (g.includes('SAMAMBAIA')) return 'Samambaia';
+  if (g.includes('CEILANDIA')) return 'Ceilândia';
+  if (g.includes('SOBRADINHO')) return 'Sobradinho';
+  if (g.includes('VIX') || g.includes('VITORIA')) return 'Vitória (VIX)';
+  return 'Sem Célula / Outros';
 }
 
 function formIdealCells(pool: Member[], targetSize = 12): IdealCell[] {
-  const shuffled = [...pool].sort((a, b) => {
-    const ma = assignMin(a)[0];
-    const mb = assignMin(b)[0];
-    return MIN_KEYS.indexOf(ma) - MIN_KEYS.indexOf(mb);
-  });
+  const getLastName = (nome: string) => {
+    const parts = nome.trim().toUpperCase().split(/\s+/);
+    return parts.length > 1 ? parts[parts.length - 1] : '';
+  };
+  
+  // 1. Group into Family Units (Couples & same last-name members in the same GC)
+  const familyUnits: Array<{
+    members: Member[];
+    gc: string;
+    macro: string;
+    lastName: string;
+  }> = [];
+  const visited = new Set<string>();
 
-  const numCells = Math.ceil(pool.length / targetSize);
-  if (numCells === 0) return [];
-
-  const cells: IdealCell[] = Array.from({ length: numCells }, (_, i) => ({
-    index: i + 1, score: 0, coverage: 0, lideranca: [], ligamentos: [], corpo: []
-  }));
-
-  shuffled.forEach((m, i) => {
-    const cell = cells[i % numCells];
-    const min = assignMin(m)[0];
-    const tipo = normalizeType(m.tipo_de_pessoa);
+  pool.forEach(m => {
+    if (visited.has(m.id)) return;
+    const gc = m.grupos_caseiros || '';
+    const macro = getMacroRegion(gc);
+    const lastName = getLastName(m.nome);
     
-    // Distribuir nos 3 níveis estruturais da Visão Indonésia:
-    if ((tipo === 'LÍDER' || tipo === 'PASTOR') && cell.lideranca.length < 3) {
-      cell.lideranca.push({ member: m, ministry: min });
-    } else if ((tipo === 'DIÁCONO' || cell.ligamentos.length < 3) && cell.ligamentos.length < 4 && cell.lideranca.length > 0) {
-      cell.ligamentos.push({ member: m, ministry: min });
-    } else {
-      cell.corpo.push({ member: m, ministry: min });
-    }
+    const familyMembers = pool.filter(o => {
+      if (visited.has(o.id)) return false;
+      if ((o.grupos_caseiros || '') !== gc) return false;
+      if (lastName && getLastName(o.nome) === lastName) return true;
+      return false;
+    });
+    
+    familyMembers.forEach(f => visited.add(f.id));
+    familyUnits.push({
+      members: familyMembers,
+      gc,
+      macro,
+      lastName
+    });
   });
 
-  cells.forEach(c => {
-    if (c.lideranca.length === 0 && c.ligamentos.length > 0) {
-      c.lideranca.push(c.ligamentos.shift()!);
-    }
-    const allMins = new Set([...c.lideranca, ...c.ligamentos, ...c.corpo].map(m => m.ministry));
-    c.coverage = allMins.size;
-    c.score = Math.round((c.coverage / 5) * 100);
+  // 2. Group Family Units by Macro-Region
+  const regionMap: Record<string, typeof familyUnits> = {};
+  familyUnits.forEach(u => {
+    regionMap[u.macro] = regionMap[u.macro] || [];
+    regionMap[u.macro].push(u);
+  });
+
+  const cells: IdealCell[] = [];
+  let cellIndex = 1;
+
+  // 3. For each macro-region, form cells contiguously
+  Object.entries(regionMap).forEach(([region, units]) => {
+    const totalPeople = units.reduce((acc, u) => acc + u.members.length, 0);
+    if (totalPeople === 0) return;
+    
+    // Sort units: prioritize putting leaders/pastors units first
+    const sortedUnits = [...units].sort((a, b) => {
+      const getPriority = (u: typeof a) => {
+        if (u.members.some(m => normalizeType(m.tipo_de_pessoa) === 'PASTOR')) return 3;
+        if (u.members.some(m => normalizeType(m.tipo_de_pessoa) === 'LÍDER')) return 2;
+        if (u.members.some(m => normalizeType(m.tipo_de_pessoa) === 'DIÁCONO')) return 1;
+        return 0;
+      };
+      return getPriority(b) - getPriority(a);
+    });
+
+    const numCellsInRegion = Math.max(1, Math.round(totalPeople / targetSize));
+    
+    const regionCells: IdealCell[] = Array.from({ length: numCellsInRegion }, (_, i) => ({
+      index: cellIndex++,
+      score: 0,
+      coverage: 0,
+      lideranca: [],
+      ligamentos: [],
+      corpo: [],
+      regionName: region
+    }));
+
+    // Distribute units into cells (keeps couples/families completely intact)
+    sortedUnits.forEach(u => {
+      const targetCell = regionCells.reduce((prev, curr) => {
+        const prevSize = prev.lideranca.length + prev.ligamentos.length + prev.corpo.length;
+        const currSize = curr.lideranca.length + curr.ligamentos.length + curr.corpo.length;
+        return prevSize <= currSize ? prev : curr;
+      });
+
+      u.members.forEach(m => {
+        const min = assignMin(m)[0];
+        const tipo = normalizeType(m.tipo_de_pessoa);
+        
+        if ((tipo === 'LÍDER' || tipo === 'PASTOR') && targetCell.lideranca.length < 3) {
+          targetCell.lideranca.push({ member: m, ministry: min });
+        } else if ((tipo === 'DIÁCONO' || targetCell.ligamentos.length < 3) && targetCell.ligamentos.length < 4 && targetCell.lideranca.length > 0) {
+          targetCell.ligamentos.push({ member: m, ministry: min });
+        } else {
+          targetCell.corpo.push({ member: m, ministry: min });
+        }
+      });
+    });
+
+    // Post-process region cells
+    regionCells.forEach(c => {
+      const totalMembers = c.lideranca.length + c.ligamentos.length + c.corpo.length;
+      if (totalMembers === 0) return;
+
+      if (c.lideranca.length === 0 && c.ligamentos.length > 0) {
+        c.lideranca.push(c.ligamentos.shift()!);
+      } else if (c.lideranca.length === 0 && c.corpo.length > 0) {
+        c.lideranca.push(c.corpo.shift()!);
+      }
+      
+      const allMins = new Set([...c.lideranca, ...c.ligamentos, ...c.corpo].map(m => m.ministry));
+      c.coverage = allMins.size;
+      c.score = Math.round((c.coverage / 5) * 100);
+      
+      cells.push(c);
+    });
+  });
+
+  // Re-index cells sequentially
+  cells.forEach((c, idx) => {
+    c.index = idx + 1;
   });
 
   return cells;
@@ -607,7 +706,14 @@ export const LabVision: React.FC = () => {
                       {cell.index}
                     </div>
                     <div className="text-left">
-                      <p className="font-black text-gray-900">Micro Célula {cell.index}</p>
+                      <p className="font-black text-gray-900 flex items-center gap-2">
+                        Micro Célula {cell.index}
+                        {cell.regionName && (
+                          <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-violet-50 text-violet-600 border border-violet-100/60 uppercase tracking-wider">
+                            {cell.regionName}
+                          </span>
+                        )}
+                      </p>
                       <p className="text-xs text-gray-400 font-medium">
                         {cell.lideranca.length + cell.ligamentos.length + cell.corpo.length} membros · {cell.coverage}/5 Dons Presentes
                       </p>
