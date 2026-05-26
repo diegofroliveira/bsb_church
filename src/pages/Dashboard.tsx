@@ -265,15 +265,36 @@ export const Dashboard: React.FC = () => {
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <header className="mb-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Visão Geral</h1>
-          <p className="mt-2 flex items-baseline text-sm text-gray-500">
-            Bem-vindo de volta, <span className="font-semibold text-primary-600 ml-1">{user?.name}</span>. Dados reais extraídos do Supabase.
-          </p>
+      <header className="mb-4">
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0c1445] via-[#1a237e] to-[#283593] p-6 text-white shadow-xl">
+          <div className="absolute inset-0 pointer-events-none">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-blue-400/20 rounded-full translate-x-1/3 -translate-y-1/3 blur-2xl" />
+            <div className="absolute bottom-0 left-1/4 w-48 h-48 bg-indigo-300/10 rounded-full blur-2xl" />
+          </div>
+          <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <p className="text-blue-200 text-xs font-semibold uppercase tracking-widest mb-1">
+                {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
+              </p>
+              <h1 className="text-2xl font-black tracking-tight">
+                Olá, <span className="text-blue-200">{user?.name?.split(' ')[0]}</span> 👋
+              </h1>
+              <p className="text-blue-300 text-sm mt-1">
+                Aqui está a visão geral da Igreja BSB — dados atualizados em tempo real.
+              </p>
+            </div>
+            <div className="flex gap-4 shrink-0">
+              {[
+                { label: 'Sua Função', value: user?.role || '—' },
+              ].map(s => (
+                <div key={s.label} className="bg-white/10 rounded-xl px-4 py-2 border border-white/10 text-center">
+                  <p className="text-white font-bold capitalize text-sm">{s.value}</p>
+                  <p className="text-blue-300 text-[10px] font-semibold uppercase tracking-wide">{s.label}</p>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
-
-
       </header>
 
       <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-wrap gap-4 items-center mb-6">

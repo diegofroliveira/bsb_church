@@ -27,3 +27,15 @@ desktop.ini
 
 .vercel
 .env*.local
+
+# Scratch / temp scripts (never commit these - may contain tokens)
+scratch/
+*.cjs
+check_*.py
+find_*.py
+get_*.py
+inspect_*.py
+test_membros.*
+importador_supabase.py
+dados_exportados/
+.npmrc
