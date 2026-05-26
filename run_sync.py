@@ -1,6 +1,10 @@
 import subprocess
 import sys
+import io
 import time
+
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
 def run_step(name, command):
     print(f"\n{'='*60}")

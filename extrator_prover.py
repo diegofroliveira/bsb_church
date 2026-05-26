@@ -35,14 +35,37 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 BASE_LOGIN = f"{PROVER_BASE_URL}/login/"
 EXPORT_URL = f"{PROVER_BASE_URL}/consolidado/exportacao"
 
-# Mapeamento de módulos para termos de busca ou URLs diretas
+# Mapeamento de todos os módulos disponíveis no painel consolidado do Prover
 MODULOS_EXPORT = {
-    "membros": ["/backend/exportar-dados/pessoas", "cadastro de pessoas", "membros"],
-    "celulas": ["/backend/exportar-dados/grupos", "grupo caseiro", "celulas"],
-    "financeiro": ["/backend/exportar-dados/lancamentos", "financeiro", "lançamentos financeiros", "caixa"],
-    "eventos": ["/backend/exportar-dados/ministerios-participantes", "eventos", "participantes"],
-    "discipulado": ["/backend/exportar-dados/mda", "discipulado", "mda"],
-    "orcamento": ["/backend/exportar-dados/orcamento", "orçamento", "budget"],
+    "membros": ["/backend/exportar-dados/pessoas", "cadastro de pessoas"],
+    "pessoas_familiares": ["/backend/exportar-dados/pessoas-familiares", "pessoas x familiares"],
+    "pessoas_historico": ["/backend/exportar-dados/pessoas-historico", "pessoas x historicos"],
+    "pessoas_funcoes": ["/backend/exportar-dados/pessoas-funcoes", "pessoas x funcoes"],
+    "pessoas_protocolos": ["/backend/exportar-dados/pessoas-protocolos", "pessoas x protocolos"],
+    "visitantes": ["/backend/exportar-dados/visitantes", "visitantes"],
+    "localidade": ["/backend/exportar-dados/ministerios", "localidade"],
+    "localidade_participantes": ["/backend/exportar-dados/ministerios-participantes", "localidade x participantes"],
+    "localidade_visitantes": ["/backend/exportar-dados/ministerios-visitantes", "localidade x visitantes"],
+    "celulas": ["/backend/exportar-dados/grupos", "grupo caseiro"],
+    "celulas_participantes": ["/backend/exportar-dados/grupos-participantes", "grupo caseiro x participantes"],
+    "celulas_visitantes": ["/backend/exportar-dados/grupos-visitantes", "grupo caseiro x visitantes"],
+    "celulas_encontros": ["/backend/exportar-dados/grupos-encontros", "grupo caseiro x encontros"],
+    "celulas_encontros_presenca_participantes": ["/backend/exportar-dados/grupos-encontros-presenca-participantes", "grupo caseiro x presenca participantes"],
+    "celulas_encontros_presenca_visitantes": ["/backend/exportar-dados/grupos-encontros-presencas-visitantes", "grupo caseiro x presenca visitantes"],
+    "reuniao_presenca": ["/backend/exportar-dados/cultos-presenca", "reuniao x presenca"],
+    "eventos": ["/backend/exportar-dados/eventos", "eventos"],
+    "eventos_encontros": ["/backend/exportar-dados/eventos-encontros", "eventos x encontros"],
+    "eventos_inscricoes": ["/backend/exportar-dados/eventos-inscricoes", "eventos x inscricoes"],
+    "eventos_presencas": ["/backend/exportar-dados/eventos-presencas", "eventos x presencas"],
+    "ensinos": ["/backend/exportar-dados/ensinos", "ensinos"],
+    "ensinos_encontros": ["/backend/exportar-dados/ensinos-encontros", "ensinos x encontros"],
+    "ensinos_inscricoes": ["/backend/exportar-dados/ensinos-inscricoes", "ensinos x inscricoes"],
+    "ensinos_presencas": ["/backend/exportar-dados/ensinos-presencas", "ensinos x presencas"],
+    "financeiro": ["/backend/exportar-dados/lancamentos", "financeiro"],
+    "fotos_cadastros": ["/backend/exportar-dados/fotos-pessoas", "fotos dos cadastros"],
+    "discipulado": ["/backend/exportar-dados/mda", "discipulado"],
+    "orcamento": ["/backend/exportar-dados/orcamento", "orcamento"],
+    "noticias": ["/backend/exportar-dados/noticias", "noticias"],
 }
 
 # ─────────────────────────────────────────────

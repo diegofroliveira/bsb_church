@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { useFamilyEngine } from '../hooks/useFamilyEngine';
-import type { Member } from '../hooks/useFamilyEngine';
+import type { Member, FamilyRelation } from '../hooks/useFamilyEngine';
 import { getAdministrativeRegion } from '../lib/geoUtils';
 import { 
   Home, Search, Users, MapPin, AlertCircle, Phone, 
@@ -24,6 +24,7 @@ type VisitationState = Record<string, VisitRecord>;
 
 export const LabVisits: React.FC = () => {
   const [members, setMembers] = useState<Member[]>([]);
+  const [relations, setRelations] = useState<FamilyRelation[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRA, setFilterRA] = useState('Todos');
@@ -42,13 +43,23 @@ export const LabVisits: React.FC = () => {
     const fetchData = async () => {
       try {
         setIsLoadingData(true);
-        const { data, error } = await supabase
-          .from('membros')
-          .select('id, nome, grupos_caseiros, status, sexo, bairro, pai, mae, logradouro, celular_principal_sms, telefone_fixo, estado_civil, nascimento, latitude, longitude')
-          .eq('status', 'Ativo');
+        const [membrosRes, relationsRes] = await Promise.all([
+          supabase
+            .from('membros')
+            .select('id, nome, grupos_caseiros, status, sexo, bairro, pai, mae, logradouro, celular_principal_sms, telefone_fixo, estado_civil, nascimento, latitude, longitude')
+            .eq('status', 'Ativo'),
+          supabase
+            .from('pessoas_familiares')
+            .select('id_pessoa_a, pessoa_a, parentesco, id_pessoa_b, pessoa_b, mesmo_domicilio')
+        ]);
 
-        if (error) throw error;
-        if (data) setMembers(data as Member[]);
+        if (membrosRes.error) throw membrosRes.error;
+        if (membrosRes.data) setMembers(membrosRes.data as Member[]);
+        if (relationsRes.data) {
+          setRelations(relationsRes.data as FamilyRelation[]);
+        } else {
+          console.warn('Could not load relations from Supabase:', relationsRes.error);
+        }
       } catch (err) {
         console.error('Error fetching members for visits:', err);
       } finally {
@@ -98,8 +109,8 @@ export const LabVisits: React.FC = () => {
     localStorage.setItem('bsb_church_visitation_records', JSON.stringify(nextState));
   };
 
-  // Group members into nuclear families (strictly grouped by household address)
-  const families = useFamilyEngine(members);
+  // Group members into nuclear families (strictly grouped by household address and relations)
+  const families = useFamilyEngine(members, relations);
 
   // Compute list of unique GCs and RAs for filter options
   const filterOptions = useMemo(() => {

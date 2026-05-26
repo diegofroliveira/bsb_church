@@ -17,6 +17,8 @@ MAP_TABELAS = {
     "eventos.csv": "eventos",
     "discipulado.csv": "discipulado",
     "orcamento.csv": "orcamento",
+    "pessoas_familiares.csv": "pessoas_familiares",
+    "pessoas_historico.csv": "pessoas_historico",
 }
 
 

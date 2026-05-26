@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { useFamilyEngine } from '../hooks/useFamilyEngine';
-import type { Member, Cell, Family } from '../hooks/useFamilyEngine';
+import type { Member, Cell, Family, FamilyRelation } from '../hooks/useFamilyEngine';
 import { 
   getAdministrativeRegion, 
   getGCRegion 
@@ -16,27 +16,35 @@ import clsx from 'clsx';
 export const Families: React.FC = () => {
   const [members, setMembers] = useState<Member[]>([]);
   const [cells, setCells] = useState<Cell[]>([]);
+  const [relations, setRelations] = useState<FamilyRelation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRA, setFilterRA] = useState('Todos');
   const [filterStatus, setFilterStatus] = useState('Todos');
   const [activeTab, setActiveTab] = useState<'nucleos' | 'parentelas'>('nucleos');
 
-  // Load active members and cells
+  // Load active members, cells and family relations
   useEffect(() => {
     const fetchData = async () => {
       try {
         setIsLoading(true);
-        const [membrosRes, celulasRes] = await Promise.all([
+        const [membrosRes, celulasRes, relationsRes] = await Promise.all([
           supabase.from('membros')
             .select('id, nome, grupos_caseiros, status, sexo, bairro, pai, mae, logradouro, celular_principal_sms, telefone_fixo, estado_civil, nascimento, latitude, longitude')
             .eq('status', 'Ativo'),
           supabase.from('celulas')
-            .select('grupo_caseiro, lider, auxiliar, setor')
+            .select('grupo_caseiro, lider, auxiliar, setor'),
+          supabase.from('pessoas_familiares')
+            .select('id_pessoa_a, pessoa_a, parentesco, id_pessoa_b, pessoa_b, mesmo_domicilio')
         ]);
 
         if (membrosRes.data) setMembers(membrosRes.data as Member[]);
         if (celulasRes.data) setCells(celulasRes.data as Cell[]);
+        if (relationsRes.data) {
+          setRelations(relationsRes.data as FamilyRelation[]);
+        } else {
+          console.warn('Could not load relations from Supabase:', relationsRes.error);
+        }
       } catch (err) {
         console.error('Error loading family data:', err);
       } finally {
@@ -48,7 +56,7 @@ export const Families: React.FC = () => {
   }, []);
 
   // Initialize high-performance disjoint-set clustering (DSU)
-  const families = useFamilyEngine(members);
+  const families = useFamilyEngine(members, relations);
 
   // Compute calculated family metrics and audit divisions
   const familyData = useMemo(() => {

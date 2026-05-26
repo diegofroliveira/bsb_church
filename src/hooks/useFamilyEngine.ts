@@ -46,7 +46,20 @@ export interface Family {
   memberIds: string[];
 }
 
-export const useFamilyEngine = (draftMembers: Member[]): Record<string, Family> => {
+export interface FamilyRelation {
+  id_pessoa_a: number;
+  pessoa_a: string;
+  parentesco: string;
+  id_pessoa_b: number;
+  pessoa_b: string;
+  mesmo_domicilio: string;
+  data?: string | null;
+}
+
+export const useFamilyEngine = (
+  draftMembers: Member[],
+  relations: FamilyRelation[] = []
+): Record<string, Family> => {
   return useMemo((): Record<string, Family> => {
     if (draftMembers.length === 0) return {};
     
@@ -90,6 +103,20 @@ export const useFamilyEngine = (draftMembers: Member[]): Record<string, Family> 
       }
     };
 
+    // Step 1: Group strictly using the official Prover "Pessoas x Familiares" relations (where Mesmo Domicilio = "Sim")
+    if (Array.isArray(relations) && relations.length > 0) {
+      relations.forEach(rel => {
+        const mesmoDomicilio = rel.mesmo_domicilio || '';
+        if (mesmoDomicilio.toUpperCase().trim() === 'SIM') {
+          const idAStr = rel.id_pessoa_a?.toString();
+          const idBStr = rel.id_pessoa_b?.toString();
+          if (idAStr && idBStr && memberById.has(idAStr) && memberById.has(idBStr)) {
+            union(idAStr, idBStr);
+          }
+        }
+      });
+    }
+
     // Pre-calculate address validity and normalized keys
     const memberAddresses = new Map<string, { key: string; isValid: boolean }>();
     draftMembers.forEach(m => {
@@ -98,7 +125,7 @@ export const useFamilyEngine = (draftMembers: Member[]): Record<string, Family> 
       memberAddresses.set(m.id.toString(), { key: addrKey, isValid });
     });
 
-    // Step 1: Group strictly by exact same valid address
+    // Step 2: Group strictly by exact same valid physical address
     const byAddress = new Map<string, string[]>();
     draftMembers.forEach(m => {
       const idStr = m.id.toString();
@@ -115,7 +142,7 @@ export const useFamilyEngine = (draftMembers: Member[]): Record<string, Family> 
       }
     });
 
-    // Step 2: Fallback grouping for missing/incomplete addresses
+    // Step 3: Fallback grouping for missing/incomplete addresses (DSU)
     // We union them ONLY if BOTH members have invalid addresses, 
     // ensuring we never group people with valid addresses via parentage/spouse.
     draftMembers.forEach(m1 => {
@@ -128,8 +155,6 @@ export const useFamilyEngine = (draftMembers: Member[]): Record<string, Family> 
         const addr2 = memberAddresses.get(id2)!;
 
         // Condition: BOTH members must have invalid/blank addresses.
-        // This strictly prevents a blank/incomplete child profile from acting
-        // as a DSU "bridge" that merges different valid addresses.
         const canGroup = !addr1.isValid && !addr2.isValid;
         if (!canGroup) return;
 
@@ -223,5 +248,5 @@ export const useFamilyEngine = (draftMembers: Member[]): Record<string, Family> 
     });
 
     return result;
-  }, [draftMembers]);
+  }, [draftMembers, relations]);
 };
