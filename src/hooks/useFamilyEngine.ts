@@ -84,74 +84,72 @@ export const useFamilyEngine = (draftMembers: Member[]): Record<string, Family> 
       }
     };
 
-    // Rule 1: Parent-child connection
+    // Pre-calculate address validity and normalized keys
+    const memberAddresses = new Map<string, { key: string; isValid: boolean }>();
     draftMembers.forEach(m => {
-      const idStr = m.id.toString();
-      const p1 = normalizeName(m.pai);
-      const p2 = normalizeName(m.mae);
-      
-      if (p1 && memberByName.has(p1)) {
-        union(idStr, memberByName.get(p1)!.id.toString());
-      }
-      if (p2 && memberByName.has(p2)) {
-        union(idStr, memberByName.get(p2)!.id.toString());
-      }
+      const addrKey = normalizeAddress(m.logradouro);
+      const isValid = addrKey.length > 6 && addrKey !== 'naoinformado';
+      memberAddresses.set(m.id.toString(), { key: addrKey, isValid });
     });
 
-    // Rule 2: Share the same parent string (siblings)
-    const byParents = new Map<string, string[]>();
-    draftMembers.forEach(m => {
-      const idStr = m.id.toString();
-      const p1 = normalizeName(m.pai);
-      const p2 = normalizeName(m.mae);
-      if (p1) {
-        if (!byParents.has(p1)) byParents.set(p1, []);
-        byParents.get(p1)!.push(idStr);
-      }
-      if (p2) {
-        if (!byParents.has(p2)) byParents.set(p2, []);
-        byParents.get(p2)!.push(idStr);
-      }
-    });
-    byParents.forEach(ids => {
-      for (let k = 1; k < ids.length; k++) {
-        union(ids[0], ids[k]);
-      }
-    });
-
-    // Rule 3: Share the same phone number (>= 8 digits)
-    const byPhone = new Map<string, string[]>();
-    draftMembers.forEach(m => {
-      const idStr = m.id.toString();
-      const ph1 = normalizePhone(m.celular_principal_sms);
-      const ph2 = normalizePhone(m.telefone_fixo);
-      [ph1, ph2].forEach(ph => {
-        if (ph && ph.length >= 8) {
-          if (!byPhone.has(ph)) byPhone.set(ph, []);
-          byPhone.get(ph)!.push(idStr);
-        }
-      });
-    });
-    byPhone.forEach(ids => {
-      for (let k = 1; k < ids.length; k++) {
-        union(ids[0], ids[k]);
-      }
-    });
-
-    // Rule 4: Share the exact same address
+    // Step 1: Group by exact same valid address
     const byAddress = new Map<string, string[]>();
     draftMembers.forEach(m => {
       const idStr = m.id.toString();
-      const addr = normalizeAddress(m.logradouro);
-      if (addr && addr.length > 6) {
-        if (!byAddress.has(addr)) byAddress.set(addr, []);
-        byAddress.get(addr)!.push(idStr);
+      const addr = memberAddresses.get(idStr)!;
+      if (addr.isValid) {
+        if (!byAddress.has(addr.key)) byAddress.set(addr.key, []);
+        byAddress.get(addr.key)!.push(idStr);
       }
     });
+
     byAddress.forEach(ids => {
       for (let k = 1; k < ids.length; k++) {
         union(ids[0], ids[k]);
       }
+    });
+
+    // Step 2: Fallback grouping for missing/incomplete addresses
+    // We union them ONLY if at least one of them has an invalid address, 
+    // ensuring we never group people with different valid addresses.
+    draftMembers.forEach(m1 => {
+      const id1 = m1.id.toString();
+      const addr1 = memberAddresses.get(id1)!;
+
+      draftMembers.forEach(m2 => {
+        const id2 = m2.id.toString();
+        if (id1 === id2) return;
+        const addr2 = memberAddresses.get(id2)!;
+
+        // Condition: at least one of them must have an invalid address
+        // If both have different valid addresses, we NEVER union them.
+        const canGroup = !addr1.isValid || !addr2.isValid;
+        if (!canGroup) return;
+
+        // Check 1: Spouse relation
+        const spouse1 = normalizeName(m1.esposo_a);
+        const name2 = normalizeName(m2.nome);
+        const isSpouse = spouse1 && (spouse1 === name2 || name2.includes(spouse1) || spouse1.includes(name2));
+
+        // Check 2: Parent-child relation
+        const parent1 = normalizeName(m2.pai);
+        const parent2 = normalizeName(m2.mae);
+        const name1 = normalizeName(m1.nome);
+        const isParentChild = (parent1 && (parent1 === name1 || name1.includes(parent1) || parent1.includes(name1))) ||
+                             (parent2 && (parent2 === name1 || name1.includes(parent2) || parent2.includes(name1)));
+
+        // Check 3: Share a phone number
+        const ph1_1 = normalizePhone(m1.celular_principal_sms);
+        const ph1_2 = normalizePhone(m1.telefone_fixo);
+        const ph2_1 = normalizePhone(m2.celular_principal_sms);
+        const ph2_2 = normalizePhone(m2.telefone_fixo);
+        const sharesPhone = (ph1_1 && ph1_1.length >= 8 && (ph1_1 === ph2_1 || ph1_1 === ph2_2)) ||
+                            (ph1_2 && ph1_2.length >= 8 && (ph1_2 === ph2_1 || ph1_2 === ph2_2));
+
+        if (isSpouse || isParentChild || sharesPhone) {
+          union(id1, id2);
+        }
+      });
     });
 
     // Collect components
@@ -168,7 +166,7 @@ export const useFamilyEngine = (draftMembers: Member[]): Record<string, Family> 
     Object.entries(components).forEach(([rootId, mIds]) => {
       const familyMembers = mIds.map(id => memberById.get(id)!);
       
-      // Determine Head
+      // Determine Head of Family
       let head = familyMembers[0];
       
       const marriedMale = familyMembers.find(m => 
@@ -209,8 +207,8 @@ export const useFamilyEngine = (draftMembers: Member[]): Record<string, Family> 
         ? `Família ${lastName} (${head.nome.split(' ')[0]})`
         : `Família de ${head.nome}`;
 
-      result[rootId] = {
-        id: rootId,
+      result[headIdStr] = {
+        id: headIdStr,
         name: familyName,
         headId: headIdStr,
         memberIds: mIds
