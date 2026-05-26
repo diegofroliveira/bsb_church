@@ -270,24 +270,8 @@ function formIdealCells(pool: Member[], targetSize = 12): IdealCell[] {
       const totalMembers = c.lideranca.length + c.ligamentos.length + c.corpo.length;
       if (totalMembers === 0) return;
 
-      // Garantir que a liderança tenha um sacerdote (homem) se disponível
-      if (c.lideranca.length === 0) {
-        const manInLig = c.ligamentos.find(cm => (cm.member.sexo || '').toUpperCase().trim().startsWith('M'));
-        if (manInLig) {
-          c.lideranca.push(manInLig);
-          c.ligamentos = c.ligamentos.filter(cm => cm.member.id !== manInLig.member.id);
-        } else {
-          const manInCorpo = c.corpo.find(cm => (cm.member.sexo || '').toUpperCase().trim().startsWith('M'));
-          if (manInCorpo) {
-            c.lideranca.push(manInCorpo);
-            c.corpo = c.corpo.filter(cm => cm.member.id !== manInCorpo.member.id);
-          } else {
-            // Caso absoluto em que não há homens no grupo, mantém a funcionalidade de fallback
-            if (c.ligamentos.length > 0) c.lideranca.push(c.ligamentos.shift()!);
-            else if (c.corpo.length > 0) c.lideranca.push(c.corpo.shift()!);
-          }
-        }
-      }
+      // Sem promover neófitos/novinhos à liderança! Se a célula não tem um líder masculino ordenado,
+      // ela permanece sob supervisão direta do presbitério local para respeitar 1 Timóteo 3:6.
       
       const allMins = new Set([...c.lideranca, ...c.ligamentos, ...c.corpo].map(m => m.ministry));
       c.coverage = allMins.size;
@@ -758,9 +742,21 @@ export const LabVision: React.FC = () => {
                       <h3 className="text-xs font-black text-violet-700 uppercase tracking-widest mb-3 flex items-center gap-2">
                         <Crown className="w-4 h-4" /> Liderança / Micro-Presbitério
                       </h3>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-                        {cell.lideranca.map(renderCellMember)}
-                      </div>
+                      {cell.lideranca.length > 0 ? (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                          {cell.lideranca.map(renderCellMember)}
+                        </div>
+                      ) : (
+                        <div className="bg-amber-50/80 border border-amber-200 rounded-2xl p-4 flex items-start gap-3 max-w-xl shadow-sm">
+                          <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-xs font-black text-amber-800 uppercase tracking-wide">Supervisão Pastoral Temporária (1 Tm 3:6)</p>
+                            <p className="text-[10px] text-amber-700 mt-1 leading-relaxed">
+                              Esta célula não possui um líder local ordenado para evitar a nomeação precipitada de novos convertidos (*"não seja neófito..."*). Ela está sob supervisão e mentoria direta do Presbitério local.
+                            </p>
+                          </div>
+                        </div>
+                      )}
                       <p className="text-[10px] text-gray-400 mt-2 font-medium italic">Responsáveis pela fundação, ensino e pastoreio da célula.</p>
                     </div>
 
