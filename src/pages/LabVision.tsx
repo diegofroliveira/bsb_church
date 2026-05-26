@@ -1,12 +1,16 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import {
-  Sparkles, Users, Home, Eye, TrendingUp,
-  CheckCircle2, AlertCircle, Zap, Heart, BookOpen,
-  Star, BarChart3, ArrowRight, Circle
+  Crown, Flame, MessageSquare, BookMarked, HandHeart,
+  Eye, Sparkles, ArrowDown, Users, AlertTriangle,
+  CheckCircle2, Circle, Shield, Star, Wifi, ChevronRight,
+  ChevronDown, TrendingUp, Info
 } from 'lucide-react';
 import clsx from 'clsx';
 
+// ─────────────────────────────────────────────────────────
+// TYPES
+// ─────────────────────────────────────────────────────────
 interface Member {
   id: any;
   nome: string;
@@ -17,533 +21,677 @@ interface Member {
   sexo?: string;
 }
 
-// 5 rings of spiritual maturity
-const RINGS = [
-  {
-    level: 1,
-    label: 'Presença',
-    sublabel: 'Membro Ativo',
-    icon: Circle,
-    gradient: 'from-slate-400 to-slate-600',
-    glow: 'shadow-slate-200',
-    ring: 'ring-slate-200',
-    bg: 'bg-slate-50',
-    border: 'border-slate-200',
-    text: 'text-slate-700',
-    desc: 'Cadastrado como Ativo na base',
-    verse: '"Não deixeis de congregar-vos" — Hb 10:25',
-    check: (m: Member) => m.status === 'Ativo',
+type MinistryKey = 'apostolo' | 'profeta' | 'evangelista' | 'pastor' | 'mestre';
+
+// ─────────────────────────────────────────────────────────
+// 5 MINISTÉRIOS — EF 4:11
+// ─────────────────────────────────────────────────────────
+const MIN: Record<MinistryKey, {
+  label: string; emoji: string; Icon: React.FC<any>;
+  gradient: string; light: string; border: string; text: string;
+  role: string;   // o que faz no corpo
+  eddy: string;   // como Eddy Leo descreveria
+  apostle: string; // o "pai" (ação que a metáfora física representa)
+}> = {
+  apostolo: {
+    label: 'Apóstolo', emoji: '🏛️', Icon: Crown,
+    gradient: 'from-violet-500 to-purple-700',
+    light: 'bg-violet-50', border: 'border-violet-200', text: 'text-violet-700',
+    role: 'Lança fundações, envia e define a visão',
+    eddy: 'O arquiteto do corpo — garante que tudo seja construído sobre Cristo e não sobre tradições humanas',
+    apostle: 'Ossos — sustenta e dá estrutura ao corpo',
   },
-  {
-    level: 2,
-    label: 'Comunidade',
-    sublabel: 'Conectado ao GC',
-    icon: Home,
-    gradient: 'from-blue-400 to-blue-600',
-    glow: 'shadow-blue-200',
-    ring: 'ring-blue-200',
-    bg: 'bg-blue-50',
-    border: 'border-blue-200',
-    text: 'text-blue-700',
-    desc: 'Pertence a um Grupo Caseiro ativo',
-    verse: '"Onde dois ou três estiverem reunidos em meu nome" — Mt 18:20',
-    check: (m: Member) =>
-      m.status === 'Ativo' &&
-      !!m.grupos_caseiros &&
-      m.grupos_caseiros.trim().toUpperCase() !== 'NENHUM' &&
-      m.grupos_caseiros.trim() !== '',
+  profeta: {
+    label: 'Profeta', emoji: '🔥', Icon: Flame,
+    gradient: 'from-amber-400 to-orange-600',
+    light: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700',
+    role: 'Revela, discerne, alerta e edifica',
+    eddy: 'A consciência do corpo — mantém a Igreja conectada à voz de Deus e expõe o que precisa ser purificado',
+    apostle: 'Sistema nervoso — transmite sinais vitais ao corpo',
   },
-  {
-    level: 3,
-    label: 'Discipulado',
-    sublabel: 'Sendo Transformado',
-    icon: BookOpen,
-    gradient: 'from-violet-400 to-violet-600',
-    glow: 'shadow-violet-200',
-    ring: 'ring-violet-200',
-    bg: 'bg-violet-50',
-    border: 'border-violet-200',
-    text: 'text-violet-700',
-    desc: 'Tem discipulador — está sendo formado',
-    verse: '"Fazei discípulos de todas as nações" — Mt 28:19',
-    check: (m: Member) =>
-      m.status === 'Ativo' &&
-      !!m.discipulador_nome &&
-      m.discipulador_nome.trim().toUpperCase() !== 'NENHUM' &&
-      m.discipulador_nome.trim() !== '',
+  evangelista: {
+    label: 'Evangelista', emoji: '🌍', Icon: MessageSquare,
+    gradient: 'from-emerald-400 to-teal-600',
+    light: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700',
+    role: 'Alcança os perdidos, colhe e integra ao corpo',
+    eddy: 'Os pés do corpo — sem ele, o corpo perde a mobilidade e para de crescer numericamente',
+    apostle: 'Pés — em movimento constante em direção ao mundo',
   },
-  {
-    level: 4,
-    label: 'Multiplicação',
-    sublabel: 'Discipulando Outros',
-    icon: Heart,
-    gradient: 'from-rose-400 to-pink-600',
-    glow: 'shadow-rose-200',
-    ring: 'ring-rose-200',
-    bg: 'bg-rose-50',
-    border: 'border-rose-200',
-    text: 'text-rose-700',
-    desc: 'Está reproduzindo — discipula alguém',
-    verse: '"O que aprendeste... ensina a outros" — 2 Tm 2:2',
-    check: (m: Member) =>
-      m.status === 'Ativo' &&
-      (m.tipo_de_pessoa?.toLowerCase().includes('discipulador') ||
-        m.tipo_de_pessoa?.toLowerCase().includes('líder') ||
-        m.tipo_de_pessoa?.toLowerCase().includes('lider')),
+  pastor: {
+    label: 'Pastor', emoji: '🕊️', Icon: HandHeart,
+    gradient: 'from-blue-400 to-blue-700',
+    light: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700',
+    role: 'Cuida, restaura, protege e reúne',
+    eddy: 'O coração do corpo — sem ele, os membros se sentem sem pertencimento e o corpo sangra',
+    apostle: 'Coração — bombeia vida a cada parte do corpo',
   },
-  {
-    level: 5,
-    label: 'Plenitude',
-    sublabel: 'Corpo Saudável',
-    icon: Star,
-    gradient: 'from-amber-400 to-orange-500',
-    glow: 'shadow-amber-200',
-    ring: 'ring-amber-200',
-    bg: 'bg-amber-50',
-    border: 'border-amber-200',
-    text: 'text-amber-700',
-    desc: 'Discipula E é discipulado — corpo completo',
-    verse: '"A plenitude daquele que tudo enche em todos" — Ef 1:23',
-    check: (m: Member) => {
-      const isDisc =
-        m.tipo_de_pessoa?.toLowerCase().includes('discipulador') ||
-        m.tipo_de_pessoa?.toLowerCase().includes('líder') ||
-        m.tipo_de_pessoa?.toLowerCase().includes('lider');
-      const hasDisc =
-        !!m.discipulador_nome &&
-        m.discipulador_nome.trim().toUpperCase() !== 'NENHUM' &&
-        m.discipulador_nome.trim() !== '';
-      return m.status === 'Ativo' && isDisc && hasDisc;
-    },
+  mestre: {
+    label: 'Mestre', emoji: '📖', Icon: BookMarked,
+    gradient: 'from-rose-400 to-pink-700',
+    light: 'bg-rose-50', border: 'border-rose-200', text: 'text-rose-700',
+    role: 'Ensina, equipa e forma discípulos',
+    eddy: 'A mente do corpo — sem ele, o corpo age mas não sabe por quê, e se torna ativista sem profundidade',
+    apostle: 'Mente — dá direção e coerência ao que o corpo faz',
   },
+};
+
+const MIN_KEYS: MinistryKey[] = ['apostolo', 'profeta', 'evangelista', 'pastor', 'mestre'];
+
+// ─────────────────────────────────────────────────────────
+// PRESBÍTÉRIO — ATRIBUIÇÕES MANUAIS (conforme o usuário)
+// ─────────────────────────────────────────────────────────
+const PRESB_CONFIG: Array<{
+  nameKey: string; displayName: string;
+  ministries: MinistryKey[]; note?: string; external?: boolean;
+}> = [
+  { nameKey: 'VINCI DO REGO BARROS', displayName: 'Vinci do Rego Barros',
+    ministries: ['apostolo'], external: true,
+    note: 'Cobertura apostólica externa — não reside em BSB, mas sustenta a fundação' },
+  { nameKey: 'WAGNER DE LIMA OLIVEIRA', displayName: 'Wagner de Lima Oliveira',
+    ministries: ['apostolo', 'mestre'],
+    note: 'Apóstolo + Mestre — arquiteto e professor do corpo local' },
+  { nameKey: 'WANDERLEY CLODOALDO LIMA DE FREITAS', displayName: 'Wanderley C. L. de Freitas',
+    ministries: ['apostolo', 'mestre'],
+    note: 'Apóstolo + Mestre — segunda coluna apostólica, consolida o ensino' },
+  { nameKey: 'CARLOS ALBERTO RIBEIRO DO NASCIMENTO', displayName: 'Carlos Alberto R. do Nascimento',
+    ministries: ['profeta'],
+    note: 'Profeta — discernimento e direção profética para o corpo' },
+  { nameKey: 'MARCELO BRAGA SILVA', displayName: 'Marcelo Braga Silva',
+    ministries: ['evangelista'],
+    note: 'Evangelista — paixão pelas almas, mobiliza o corpo para o alcance' },
 ];
 
-function getMemberLevel(m: Member): number {
-  for (let i = RINGS.length - 1; i >= 0; i--) {
-    if (RINGS[i].check(m)) return RINGS[i].level;
-  }
-  return 0;
+// ─────────────────────────────────────────────────────────
+// FILTER: tipos válidos para a visão do corpo
+// ─────────────────────────────────────────────────────────
+function normalizeType(t?: string): string {
+  const u = (t || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  if (u.includes('PRESB')) return 'PRESBÍTERO';
+  if (u.includes('APOSTOL')) return 'APÓSTOLO';
+  if (u.includes('LIDER')) return 'LÍDER';
+  if (u.includes('DIAC')) return 'DIÁCONO';
+  if (u.includes('PASTOR')) return 'PASTOR';
+  if (u.includes('MEMBRO')) return 'MEMBRO';
+  return u;
 }
 
-// Animated counter
-function AnimatedCount({ value, duration = 1200 }: { value: number; duration?: number }) {
-  const [display, setDisplay] = useState(0);
-  useEffect(() => {
-    if (value === 0) { setDisplay(0); return; }
-    const start = Date.now();
-    const tick = () => {
-      const elapsed = Date.now() - start;
-      const progress = Math.min(elapsed / duration, 1);
-      const ease = 1 - Math.pow(1 - progress, 3);
-      setDisplay(Math.round(ease * value));
-      if (progress < 1) requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
-  }, [value, duration]);
-  return <>{display}</>;
+const VALID_TIPOS = ['PRESBÍTERO', 'APÓSTOLO', 'LÍDER', 'DIÁCONO', 'PASTOR', 'MEMBRO'];
+
+// ─────────────────────────────────────────────────────────
+// MINISTRY ASSIGNMENT (simulação)
+// ─────────────────────────────────────────────────────────
+// Presbytery is manual. For everyone else:
+// - PASTOR → pastor
+// - LÍDER  → mestre + pastor (ensinam e cuidam de seu grupo)
+// - DIÁCONO → deterministic hash (dons motivacionais variados)
+// - MEMBRO  → deterministic hash
+function hashMin(nome: string): MinistryKey {
+  const h = nome.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
+  return MIN_KEYS[h % 5];
 }
 
+function assignMin(m: Member): MinistryKey[] {
+  const presb = PRESB_CONFIG.find(p => m.nome.trim().toUpperCase().includes(p.nameKey.split(' ')[0]));
+  // More precise presbytery check
+  const presbyExact = PRESB_CONFIG.find(p =>
+    p.nameKey.split(' ').every(part => m.nome.trim().toUpperCase().includes(part))
+  );
+  if (presbyExact) return presbyExact.ministries;
+
+  const tipo = normalizeType(m.tipo_de_pessoa);
+  if (tipo === 'PASTOR') return ['pastor'];
+  if (tipo === 'LÍDER') return ['mestre', 'pastor'];
+  if (tipo === 'DIÁCONO') return [hashMin(m.nome)];
+  // MEMBRO
+  return [hashMin(m.nome)];
+}
+
+// ─────────────────────────────────────────────────────────
+// IDEAL CELL FORMATION (Eddy Leo from scratch)
+// Given a pool of people, form cells of ~10 ensuring 5-min coverage
+// ─────────────────────────────────────────────────────────
+interface IdealCell {
+  index: number;
+  members: Member[];
+  coverage: Record<MinistryKey, Member[]>;
+  score: number;
+}
+
+function formIdealCells(pool: Member[], targetSize = 10): IdealCell[] {
+  // Sort members by ministry so we can spread them evenly
+  const byMin: Record<MinistryKey, Member[]> = {
+    apostolo: [], profeta: [], evangelista: [], pastor: [], mestre: [],
+  };
+  pool.forEach(m => {
+    assignMin(m).forEach(k => byMin[k].push(m));
+  });
+
+  const numCells = Math.ceil(pool.length / targetSize);
+  if (numCells === 0) return [];
+
+  const cells: IdealCell[] = Array.from({ length: numCells }, (_, i) => ({
+    index: i + 1, members: [], coverage: { apostolo: [], profeta: [], evangelista: [], pastor: [], mestre: [] }, score: 0,
+  }));
+
+  // Round-robin assign each member to a cell
+  const shuffled = [...pool].sort((a, b) => {
+    // Sort so ministry types interleave
+    const ma = assignMin(a)[0];
+    const mb = assignMin(b)[0];
+    return MIN_KEYS.indexOf(ma) - MIN_KEYS.indexOf(mb);
+  });
+
+  shuffled.forEach((m, i) => {
+    const cell = cells[i % numCells];
+    cell.members.push(m);
+    assignMin(m).forEach(k => cell.coverage[k].push(m));
+  });
+
+  cells.forEach(c => {
+    const covered = MIN_KEYS.filter(k => c.coverage[k].length > 0).length;
+    c.score = Math.round((covered / 5) * 100);
+  });
+
+  return cells;
+}
+
+// ─────────────────────────────────────────────────────────
+// COMPONENT
+// ─────────────────────────────────────────────────────────
 export const LabVision: React.FC = () => {
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedGC, setSelectedGC] = useState('Todos');
-  const [hoveredRing, setHoveredRing] = useState<number | null>(null);
+  const [expandedCell, setExpandedCell] = useState<number | null>(null);
+  const [hoveredMin, setHoveredMin] = useState<MinistryKey | null>(null);
 
   useEffect(() => {
     supabase
       .from('membros')
       .select('id, nome, tipo_de_pessoa, grupos_caseiros, discipulador_nome, status, sexo')
       .limit(10000)
-      .then(({ data }) => {
-        setMembers(data || []);
-        setLoading(false);
-      });
+      .then(({ data }) => { setMembers(data || []); setLoading(false); });
   }, []);
 
-  const activeMembers = useMemo(() => members.filter(m => m.status === 'Ativo'), [members]);
-  const uniqueGCs = useMemo(
-    () => ['Todos', ...Array.from(new Set(activeMembers.map(m => m.grupos_caseiros?.trim() || 'Sem GC').filter(Boolean))).sort()],
-    [activeMembers]
-  );
+  // Pool: active + valid tipo — excluding Vinci (external)
+  const bodyPool = useMemo(() =>
+    members.filter(m => {
+      if (!m.status?.includes('Ativ')) return false;
+      const tipo = normalizeType(m.tipo_de_pessoa);
+      if (!VALID_TIPOS.includes(tipo)) return false;
+      // Vinci is external — shown in presbytery but NOT in body pool
+      if (m.nome.toUpperCase().includes('VINCI')) return false;
+      return true;
+    }), [members]);
 
-  const filtered = useMemo(() => {
-    if (selectedGC === 'Todos') return activeMembers;
-    return activeMembers.filter(m => (m.grupos_caseiros?.trim() || 'Sem GC') === selectedGC);
-  }, [activeMembers, selectedGC]);
+  const localPresbytery = useMemo(() =>
+    PRESB_CONFIG.filter(p => !p.external).map(p => ({
+      ...p,
+      member: members.find(m => p.nameKey.split(' ').every(part => m.nome.toUpperCase().includes(part))),
+    })), [members]);
 
-  const counts = useMemo(() => {
-    const c = [0, 0, 0, 0, 0, 0];
-    filtered.forEach(m => { const l = getMemberLevel(m); c[l]++; });
+  const vinciConfig = PRESB_CONFIG.find(p => p.external)!;
+
+  // Pool excluding presbytery for the body layers
+  const presbyNames = PRESB_CONFIG.map(p => p.nameKey);
+  const nonPresb = useMemo(() =>
+    bodyPool.filter(m => !presbyNames.some(key => key.split(' ').every(part => m.nome.toUpperCase().includes(part)))),
+    [bodyPool]);
+
+  const pastors  = useMemo(() => nonPresb.filter(m => normalizeType(m.tipo_de_pessoa) === 'PASTOR'), [nonPresb]);
+  const deacons  = useMemo(() => nonPresb.filter(m => normalizeType(m.tipo_de_pessoa) === 'DIÁCONO'), [nonPresb]);
+  const leaders  = useMemo(() => nonPresb.filter(m => normalizeType(m.tipo_de_pessoa) === 'LÍDER'), [nonPresb]);
+  const regular  = useMemo(() => nonPresb.filter(m => normalizeType(m.tipo_de_pessoa) === 'MEMBRO'), [nonPresb]);
+
+  // Ministry distribution
+  const minDist = useMemo(() => {
+    const c: Record<MinistryKey, number> = { apostolo: 0, profeta: 0, evangelista: 0, pastor: 0, mestre: 0 };
+    bodyPool.forEach(m => assignMin(m).forEach(k => c[k]++));
     return c;
-  }, [filtered]);
+  }, [bodyPool]);
 
-  const total = filtered.length;
-  const plenitudeCount = counts[5];
-  const plenitudePct = total > 0 ? Math.round((plenitudeCount / total) * 100) : 0;
-  const healthScore = total > 0 ? Math.round(((counts[4] + counts[5]) / total) * 100) : 0;
+  const totalMinCounts = useMemo(() => Object.values(minDist).reduce((a, b) => a + b, 0), [minDist]);
 
-  // GC ranking
-  const gcRanking = useMemo(() => {
-    const map: Record<string, { total: number; level4: number; level5: number }> = {};
-    activeMembers.forEach(m => {
-      const gc = m.grupos_caseiros?.trim() || 'Sem GC';
-      if (!map[gc]) map[gc] = { total: 0, level4: 0, level5: 0 };
-      map[gc].total++;
-      const lvl = getMemberLevel(m);
-      if (lvl >= 4) map[gc].level4++;
-      if (lvl >= 5) map[gc].level5++;
-    });
-    return Object.entries(map)
-      .map(([gc, v]) => ({
-        gc: gc.replace(/^BSB[\s\-_]*/i, ''),
-        total: v.total,
-        level4: v.level4,
-        level5: v.level5,
-        health: Math.round((v.level4 / Math.max(v.total, 1)) * 100),
-      }))
-      .sort((a, b) => b.health - a.health)
-      .slice(0, 12);
-  }, [activeMembers]);
+  // Ideal cells formed from the NON-presbytery body
+  const idealCells = useMemo(() => formIdealCells(nonPresb, 10), [nonPresb]);
 
-  const level5Members = useMemo(
-    () => filtered.filter(m => getMemberLevel(m) >= 5).sort((a, b) => a.nome.localeCompare(b.nome)),
-    [filtered]
-  );
+  // Gap analysis
+  const presidGap = useMemo(() => {
+    const covered = new Set(PRESB_CONFIG.filter(p => !p.external).flatMap(p => p.ministries));
+    return MIN_KEYS.filter(k => !covered.has(k));
+  }, []);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-center space-y-4">
-          <div className="relative w-20 h-20 mx-auto">
-            {[0, 1, 2].map(i => (
-              <div
-                key={i}
-                className="absolute inset-0 border-2 border-amber-400 rounded-full animate-ping"
-                style={{ animationDelay: `${i * 300}ms`, animationDuration: '1.5s', opacity: 0.6 - i * 0.2 }}
-              />
-            ))}
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Star className="h-8 w-8 text-amber-400" />
-            </div>
-          </div>
-          <p className="text-gray-400 text-sm font-medium">Carregando visão da plenitude...</p>
+  if (loading) return (
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="text-center">
+        <div className="relative w-20 h-20 mx-auto mb-4">
+          {[0,1,2].map(i => (
+            <div key={i} className="absolute inset-0 border-2 border-violet-400 rounded-full animate-ping"
+              style={{ animationDelay: `${i*350}ms`, animationDuration:'1.8s', opacity: 0.5-i*0.15 }} />
+          ))}
+          <div className="absolute inset-0 flex items-center justify-center"><Crown className="h-8 w-8 text-violet-400" /></div>
         </div>
+        <p className="text-gray-400 text-sm">Construindo a visão do zero...</p>
       </div>
-    );
-  }
+    </div>
+  );
 
   return (
     <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
 
-      {/* ── Hero Section ── */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0a0a0f] via-[#0f0f1a] to-[#0a0a0f] p-10 text-white">
-        {/* Background rings */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {[400, 320, 240, 160].map((size, i) => (
-            <div
-              key={i}
-              className="absolute border border-white/[0.03] rounded-full"
-              style={{
-                width: size,
-                height: size,
-                top: '50%',
-                right: -size / 4,
-                transform: 'translateY(-50%)',
-              }}
-            />
+      {/* ══════════════════════════════════════════════════ */}
+      {/* HERO                                              */}
+      {/* ══════════════════════════════════════════════════ */}
+      <div className="relative overflow-hidden rounded-3xl bg-[#080810] p-10 text-white">
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          {/* Concentric rings */}
+          {[500, 400, 300, 200, 120].map((s, i) => (
+            <div key={i} className="absolute border border-white/[0.04] rounded-full"
+              style={{ width: s, height: s, bottom: -s/2, right: -s/4 }} />
           ))}
-          <div className="absolute top-0 left-0 w-96 h-96 bg-amber-500/10 rounded-full -translate-x-1/2 -translate-y-1/2 blur-3xl" />
-          <div className="absolute bottom-0 right-1/3 w-64 h-64 bg-violet-500/10 rounded-full blur-3xl" />
+          <div className="absolute top-0 left-0 w-80 h-80 bg-violet-600/10 rounded-full -translate-x-1/2 -translate-y-1/2 blur-3xl" />
+          <div className="absolute bottom-0 right-1/3 w-60 h-60 bg-amber-500/8 rounded-full blur-3xl" />
         </div>
 
-        <div className="relative max-w-2xl">
-          <div className="inline-flex items-center gap-2 bg-amber-400/10 text-amber-300 px-3 py-1.5 rounded-full text-xs font-bold mb-6 border border-amber-400/20">
-            <Eye className="h-3 w-3" /> LAB EXPERIMENTAL · Visão Restrita
+        <div className="relative max-w-3xl">
+          <div className="inline-flex items-center gap-2 bg-violet-400/10 text-violet-300 px-3 py-1.5 rounded-full text-xs font-bold mb-6 border border-violet-400/20">
+            <Eye className="h-3 w-3" /> LAB · Como Eddy Leo construiria do zero
           </div>
-          <h1 className="text-5xl font-black tracking-tight leading-none mb-4">
-            Igreja da<br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-orange-400 to-rose-400">
-              Plenitude de Cristo
+          <h1 className="text-5xl font-black tracking-tight leading-[1.05] mb-4">
+            Simulação da<br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-300 via-amber-300 to-rose-400">
+              Igreja da Plenitude
             </span>
           </h1>
-          <p className="text-gray-400 text-base leading-relaxed max-w-lg">
-            Como estaria nossa igreja se medíssemos cada membro pelos 5 anéis da maturidade espiritual?
-            Baseado nos dados reais e na visão de <strong className="text-gray-300">Efésios 1:23</strong>.
+          <p className="text-gray-400 leading-relaxed max-w-2xl">
+            Esqueça a estrutura atual. Partindo apenas das <strong className="text-gray-200">{bodyPool.length} pessoas ativas</strong> com
+            papel no corpo (Pastor, Líder, Diácono, Membro), como <strong className="text-gray-200">Eddy Leo</strong> as organizaria
+            para que Cristo se expresse em plenitude — segundo <strong className="text-gray-200">Ef 4:11-16</strong>?
           </p>
-
-          {/* Live stats inline */}
-          <div className="flex flex-wrap gap-6 mt-8">
-            {[
-              { label: 'Membros Ativos', value: total, color: 'text-blue-300' },
-              { label: 'No Nível de Plenitude', value: plenitudeCount, color: 'text-amber-300' },
-              { label: 'Índice de Saúde', value: `${healthScore}%`, color: 'text-emerald-300' },
-            ].map(s => (
-              <div key={s.label}>
-                <p className={clsx('text-3xl font-black', s.color)}>
-                  {typeof s.value === 'number' ? <AnimatedCount value={s.value} /> : s.value}
-                </p>
-                <p className="text-xs text-gray-500 mt-0.5">{s.label}</p>
-              </div>
-            ))}
-          </div>
         </div>
       </div>
 
-      {/* ── 5 Rings Visual ── */}
-      <div>
-        <div className="flex items-center gap-3 mb-6">
-          <h2 className="text-xl font-bold text-gray-900">Os 5 Anéis da Maturidade</h2>
-          <div className="flex-1 h-px bg-gray-100" />
-          {selectedGC !== 'Todos' && (
-            <span className="text-xs bg-gray-100 text-gray-600 px-3 py-1 rounded-full font-medium">{selectedGC}</span>
-          )}
+      {/* ══════════════════════════════════════════════════ */}
+      {/* PASSO 1 — OS 5 MINISTÉRIOS                       */}
+      {/* ══════════════════════════════════════════════════ */}
+      <section>
+        <div className="flex items-center gap-3 mb-1">
+          <span className="w-7 h-7 rounded-full bg-gray-900 text-white text-xs font-black flex items-center justify-center shrink-0">1</span>
+          <h2 className="text-xl font-black text-gray-900">Os 5 Ministérios: a anatomia do corpo</h2>
         </div>
-
-        {/* GC Filter */}
-        <div className="flex flex-wrap gap-2 mb-6">
-          {uniqueGCs.slice(0, 16).map(gc => (
-            <button
-              key={gc}
-              onClick={() => setSelectedGC(gc)}
-              className={clsx(
-                'text-xs font-semibold px-3 py-1.5 rounded-full border transition-all duration-200',
-                selectedGC === gc
-                  ? 'bg-gray-900 text-white border-gray-900 shadow-sm'
-                  : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400 hover:text-gray-700'
-              )}
-            >
-              {gc === 'Todos' ? 'Todos os GCs' : gc.replace(/^BSB[\s\-_]*/i, 'GC ')}
-            </button>
-          ))}
-        </div>
+        <p className="text-sm text-gray-400 ml-10 mb-5">
+          Eddy Leo começa por aqui — antes de qualquer estrutura, os 5 ministérios são a anatomia que o corpo precisa ter.
+        </p>
 
         <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-          {RINGS.map(ring => {
-            const count = counts[ring.level];
-            const pct = total > 0 ? Math.round((count / total) * 100) : 0;
-            const isHovered = hoveredRing === ring.level;
-            const Icon = ring.icon;
+          {MIN_KEYS.map(key => {
+            const m = MIN[key];
+            const isH = hoveredMin === key;
+            const Icon = m.Icon;
             return (
-              <div
-                key={ring.level}
-                onMouseEnter={() => setHoveredRing(ring.level)}
-                onMouseLeave={() => setHoveredRing(null)}
+              <div key={key}
+                onMouseEnter={() => setHoveredMin(key)}
+                onMouseLeave={() => setHoveredMin(null)}
                 className={clsx(
-                  'relative rounded-2xl border p-5 cursor-default transition-all duration-300 group',
-                  isHovered
-                    ? `${ring.bg} ${ring.border} shadow-xl ${ring.glow} -translate-y-1`
-                    : 'bg-white border-gray-100 shadow-sm'
-                )}
-              >
-                {/* Level badge */}
-                <div className={clsx(
-                  'absolute top-3 right-3 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black text-white bg-gradient-to-br transition-all',
-                  ring.gradient
+                  'rounded-2xl border p-5 transition-all duration-300 cursor-default',
+                  isH ? `${m.light} ${m.border} -translate-y-1 shadow-xl` : 'bg-white border-gray-100 shadow-sm'
                 )}>
-                  {ring.level}
+                <div className={clsx('w-11 h-11 rounded-2xl flex items-center justify-center mb-4 bg-gradient-to-br transition-all', m.gradient, isH && 'scale-110 shadow-lg')}>
+                  <Icon className="h-6 w-6 text-white" />
                 </div>
-
-                <div className={clsx(
-                  'w-10 h-10 rounded-xl flex items-center justify-center mb-4 bg-gradient-to-br transition-all duration-300',
-                  ring.gradient,
-                  isHovered ? 'shadow-lg scale-110' : ''
-                )}>
-                  <Icon className="h-5 w-5 text-white" />
-                </div>
-
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">{ring.label}</p>
-                <p className={clsx('text-2xl font-black mt-1 transition-colors', isHovered ? ring.text : 'text-gray-900')}>
-                  <AnimatedCount value={count} />
-                </p>
-                <div className="flex items-center gap-1 mt-1">
-                  <div className="flex-1 h-1 bg-gray-100 rounded-full overflow-hidden">
-                    <div
-                      className={clsx('h-full rounded-full bg-gradient-to-r transition-all duration-700', ring.gradient)}
-                      style={{ width: `${pct}%` }}
-                    />
+                <p className={clsx('text-lg font-black transition-colors', isH ? m.text : 'text-gray-900')}>{m.emoji} {m.label}</p>
+                <p className="text-[11px] text-gray-400 mt-1 leading-snug">{isH ? m.apostle : m.role}</p>
+                {isH && (
+                  <div className={clsx('mt-3 p-3 rounded-xl border text-[10px] leading-relaxed', m.light, m.border, m.text)}>
+                    <span className="font-bold">Eddy Leo:</span> {m.eddy}
                   </div>
-                  <span className="text-[10px] font-bold text-gray-400">{pct}%</span>
-                </div>
-                <p className={clsx('text-[10px] mt-3 leading-tight transition-colors', isHovered ? ring.text : 'text-gray-400')}>
-                  {isHovered ? ring.verse : ring.desc}
-                </p>
+                )}
               </div>
             );
           })}
         </div>
-      </div>
+      </section>
 
-      {/* ── Two columns: Funnel + GC Ranking ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+      {/* ══════════════════════════════════════════════════ */}
+      {/* PASSO 2 — O GOVERNO: PRESBÍTÉRIO                 */}
+      {/* ══════════════════════════════════════════════════ */}
+      <section>
+        <div className="flex items-center gap-3 mb-1">
+          <span className="w-7 h-7 rounded-full bg-gray-900 text-white text-xs font-black flex items-center justify-center shrink-0">2</span>
+          <h2 className="text-xl font-black text-gray-900">O Governo: Presbítério com os 5 Ministérios</h2>
+        </div>
+        <p className="text-sm text-gray-400 ml-10 mb-5">
+          Eddy Leo estabelece o governo primeiro. O Presbítério precisa cobrir todos os 5 ministérios — sem isso, o corpo cresce torto.
+        </p>
 
-        {/* Visual Funnel */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-          <h2 className="text-sm font-bold text-gray-900 flex items-center gap-2 mb-6">
-            <BarChart3 className="h-4 w-4 text-violet-500" /> Funil de Maturidade
-          </h2>
-          <div className="space-y-2">
-            {[...RINGS].reverse().map(ring => {
-              const count = counts[ring.level];
-              const widthPct = total > 0 ? (count / total) * 100 : 0;
-              const Icon = ring.icon;
-              return (
-                <div key={ring.level} className="flex items-center gap-3 group">
-                  <div className={clsx(
-                    'w-7 h-7 rounded-lg flex items-center justify-center bg-gradient-to-br shrink-0',
-                    ring.gradient
-                  )}>
-                    <Icon className="h-3.5 w-3.5 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex justify-between mb-1">
-                      <span className="text-xs font-semibold text-gray-600">{ring.sublabel}</span>
-                      <span className="text-xs font-black text-gray-900">{count}</span>
-                    </div>
-                    <div
-                      className="relative h-6 bg-gray-50 rounded-lg overflow-hidden"
-                      style={{ clipPath: 'inset(0 0 0 0 round 8px)' }}
-                    >
-                      <div
-                        className={clsx('h-full rounded-lg bg-gradient-to-r opacity-80 transition-all duration-700', ring.gradient)}
-                        style={{ width: `${widthPct}%` }}
-                      />
-                      <div className="absolute inset-0 flex items-center px-2">
-                        <span className="text-[9px] font-black text-white drop-shadow">
-                          {total > 0 ? Math.round((count / total) * 100) : 0}% do total
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-            <div className="pt-2 border-t border-gray-100 flex items-center gap-3">
-              <div className="w-7 h-7 rounded-lg bg-gray-200 flex items-center justify-center shrink-0">
-                <AlertCircle className="h-3.5 w-3.5 text-gray-400" />
-              </div>
-              <div className="flex-1">
-                <div className="flex justify-between">
-                  <span className="text-xs font-semibold text-gray-400">Sem classificação</span>
-                  <span className="text-xs font-black text-gray-400">{counts[0]}</span>
-                </div>
-              </div>
+        {/* Cobertura Externa: Vinci */}
+        <div className="mb-4 bg-gradient-to-r from-violet-950 to-purple-900 rounded-2xl p-5 border border-violet-800/50 flex items-start gap-4">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-400 to-purple-600 flex items-center justify-center shrink-0 shadow-lg">
+            <Wifi className="h-5 w-5 text-white" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <span className="text-[10px] font-black text-violet-300 uppercase tracking-widest bg-violet-900/50 px-2 py-0.5 rounded-full border border-violet-700">Cobertura Apostólica Externa</span>
+              <span className="text-xs font-bold text-violet-200">🏛️ Apóstolo</span>
             </div>
+            <p className="text-white font-black text-base">Vinci do Rego Barros</p>
+            <p className="text-violet-300 text-xs mt-1">{vinciConfig.note}</p>
+          </div>
+          <div className="hidden md:block text-right shrink-0">
+            <p className="text-violet-400 text-[10px] font-semibold">Eddy Leo diria:</p>
+            <p className="text-violet-300 text-[10px] max-w-48 text-right leading-relaxed mt-1">
+              "Toda Igreja local precisa de cobertura apostólica — mesmo que o apóstolo não more aqui."
+            </p>
           </div>
         </div>
 
-        {/* GC Ranking */}
-        <div className="lg:col-span-3 bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-          <h2 className="text-sm font-bold text-gray-900 flex items-center gap-2 mb-6">
-            <Zap className="h-4 w-4 text-amber-500" /> Ranking de Saúde por GC
-            <span className="ml-auto text-[10px] text-gray-400 font-normal">% com discipuladores ativos</span>
-          </h2>
-          <div className="space-y-2.5">
-            {gcRanking.map((gc, i) => {
-              const emoji = gc.health >= 70 ? '🔥' : gc.health >= 40 ? '🌱' : '🌧️';
-              const barColor = gc.health >= 70 ? 'bg-emerald-400' : gc.health >= 40 ? 'bg-amber-400' : 'bg-red-300';
-              const badge = gc.health >= 70 ? 'bg-emerald-100 text-emerald-700' : gc.health >= 40 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700';
-              return (
-                <div key={gc.gc} className="flex items-center gap-3 group">
-                  <span className="text-xs font-black text-gray-200 w-5 shrink-0 text-right">{i + 1}</span>
-                  <span className="text-sm">{emoji}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1 gap-2">
-                      <span className="text-xs font-semibold text-gray-700 truncate">{gc.gc || 'Sem GC'}</span>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <span className="text-[10px] text-gray-400">{gc.total} membros</span>
-                        <span className={clsx('text-[10px] font-black px-1.5 py-0.5 rounded-md', badge)}>{gc.health}%</span>
-                        {gc.level5 > 0 && (
-                          <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-md">
-                            ⭐{gc.level5}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div
-                        className={clsx('h-full rounded-full transition-all duration-700', barColor)}
-                        style={{ width: `${gc.health}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* ── Level 5: Members of Fullness ── */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 border border-amber-100 p-8">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-amber-200/30 rounded-full translate-x-1/2 -translate-y-1/2 blur-2xl pointer-events-none" />
-        <div className="relative">
-          <div className="flex items-start justify-between flex-wrap gap-4 mb-6">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-200">
-                  <Star className="h-4 w-4 text-white" />
-                </div>
-                <h2 className="text-base font-bold text-gray-900">Nível 5 — A Plenitude em Construção</h2>
+        {/* Presbítério Local */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+          {localPresbytery.map(p => (
+            <div key={p.nameKey} className="bg-gray-900 rounded-2xl p-5 border border-gray-800">
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {p.ministries.map(key => {
+                  const mc = MIN[key];
+                  const Icon = mc.Icon;
+                  return (
+                    <span key={key} className={clsx('inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full text-white bg-gradient-to-r', mc.gradient)}>
+                      <Icon className="h-3 w-3" /> {mc.label}
+                    </span>
+                  );
+                })}
               </div>
-              <p className="text-xs text-amber-700 max-w-lg">
-                Estes membros discipulam E são discipulados — o corpo funcionando como Cristo deseja.
-                São o "núcleo duro" da multiplicação da Igreja.
+              <p className="text-white font-black text-sm leading-tight">{p.displayName.split(' ').slice(0,2).join(' ')}</p>
+              <p className="text-gray-600 text-[10px] mt-0.5">{p.displayName.split(' ').slice(2).join(' ')}</p>
+              <p className="text-gray-500 text-[10px] mt-3 leading-relaxed border-t border-gray-800 pt-3">{p.note}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* GAP ANALYSIS */}
+        {presidGap.length > 0 ? (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 flex items-start gap-4">
+            <AlertTriangle className="h-6 w-6 text-amber-500 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-black text-amber-900 text-sm">Lacuna identificada no Presbítério Local</p>
+              <p className="text-amber-700 text-xs mt-1 leading-relaxed">
+                Os ministérios de <strong>{presidGap.map(k => MIN[k].label).join(' e ')}</strong> não estão cobertos no governo local.{' '}
+                {presidGap.includes('pastor') && (
+                  <>Eddy Leo diria que um corpo sem <strong>Pastor sênior</strong> no Presbítério vai sangrar — 
+                  os membros se sentirão sem cuidado, sem pertencimento. Esta é a lacuna mais urgente a ser preenchida.</>
+                )}
               </p>
             </div>
-            <div className="flex items-center gap-4">
-              <div className="text-center">
-                <p className="text-3xl font-black text-amber-600"><AnimatedCount value={plenitudeCount} /></p>
-                <p className="text-[10px] text-amber-500 font-bold uppercase">Pessoas</p>
-              </div>
-              <div className="w-px h-10 bg-amber-200" />
-              <div className="text-center">
-                <p className="text-3xl font-black text-orange-600">{plenitudePct}%</p>
-                <p className="text-[10px] text-orange-500 font-bold uppercase">do Total</p>
-              </div>
-            </div>
           </div>
+        ) : (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center gap-3">
+            <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
+            <p className="text-emerald-700 text-sm font-semibold">Presbítério cobre todos os 5 ministérios ✓</p>
+          </div>
+        )}
+      </section>
 
-          {level5Members.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
-              {level5Members.map(m => (
-                <div
-                  key={m.id}
-                  className="bg-white/80 backdrop-blur-sm rounded-xl px-3 py-2.5 border border-amber-100 flex items-center gap-2 hover:border-amber-300 hover:shadow-sm transition-all"
-                >
-                  <CheckCircle2 className="h-4 w-4 text-amber-500 shrink-0" />
-                  <span className="text-xs font-semibold text-gray-700 truncate">
-                    {m.nome.split(' ').slice(0, 2).join(' ')}
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="bg-white/60 rounded-2xl p-8 text-center border border-amber-100">
-              <Star className="h-10 w-10 text-amber-200 mx-auto mb-3" />
-              <p className="text-amber-700 font-semibold text-sm">Nenhum membro atingiu o Nível 5 ainda</p>
-              <p className="text-amber-500 text-xs mt-1">Há muito campo para crescer — esta é a oportunidade! 🌱</p>
-            </div>
-          )}
+      {/* ══════════════════════════════════════════════════ */}
+      {/* PASSO 3 — FLUXO MINISTERIAL                      */}
+      {/* ══════════════════════════════════════════════════ */}
+      <section>
+        <div className="flex items-center gap-3 mb-1">
+          <span className="w-7 h-7 rounded-full bg-gray-900 text-white text-xs font-black flex items-center justify-center shrink-0">3</span>
+          <h2 className="text-xl font-black text-gray-900">Como o fluxo ministerial desce para o corpo</h2>
         </div>
-      </div>
+        <p className="text-sm text-gray-400 ml-10 mb-5">
+          Eddy Leo não cria hierarquias — cria <em>fluxos de equipamento</em>. Cada camada equipa a próxima (Ef 4:12).
+        </p>
 
-      {/* ── Vision Quote ── */}
-      <div className="bg-gray-900 rounded-3xl p-8 text-center relative overflow-hidden">
-        <div className="absolute inset-0 opacity-5 pointer-events-none">
-          <div className="absolute top-0 left-1/4 w-48 h-48 bg-amber-400 rounded-full blur-2xl" />
-          <div className="absolute bottom-0 right-1/4 w-48 h-48 bg-violet-400 rounded-full blur-2xl" />
+        <div className="bg-gray-950 rounded-3xl p-8 space-y-0">
+          {[
+            {
+              tag: 'GOVERNO', icon: Crown,
+              title: 'Presbítério — Apostólico, Profético, Evangelístico, Pastoral, Mestre',
+              sub: 'Definem a visão, lançam fundações, cobrem os 5 ministérios',
+              count: localPresbytery.length,
+              gradient: 'from-violet-500 to-purple-700',
+            },
+            {
+              tag: 'SERVIÇO', icon: Shield,
+              title: 'Diáconos — Libertam os ministros para oração e Palavra (At 6:2-4)',
+              sub: `${deacons.length} pessoas que servem ao corpo, removendo obstáculos práticos`,
+              count: deacons.length,
+              gradient: 'from-slate-400 to-slate-600',
+            },
+            {
+              tag: 'LIDERANÇA LOCAL', icon: BookMarked,
+              title: 'Líderes — Ensinam e pastoreiam na unidade básica',
+              sub: `${leaders.length} líderes, cada um equipando sua célula com Ensino + Cuidado Pastoral`,
+              count: leaders.length,
+              gradient: 'from-rose-400 to-pink-600',
+            },
+            {
+              tag: 'O CORPO', icon: Users,
+              title: 'Membros — Cada um com um dom para edificar',
+              sub: `${regular.length} membros — o corpo de Cristo, cada um com um ministério`,
+              count: regular.length,
+              gradient: 'from-blue-400 to-blue-700',
+            },
+          ].map((layer, i, arr) => {
+            const Icon = layer.icon;
+            const widthPct = Math.max(20, 100 - i * 18);
+            return (
+              <div key={layer.tag}>
+                <div className="flex justify-center">
+                  <div style={{ width: `${widthPct}%` }}
+                    className="relative rounded-2xl overflow-hidden group transition-all">
+                    <div className={clsx('absolute inset-0 bg-gradient-to-r opacity-20', layer.gradient)} />
+                    <div className="relative flex items-center gap-4 px-6 py-4 border border-white/10 rounded-2xl">
+                      <div className={clsx('w-9 h-9 rounded-xl flex items-center justify-center bg-gradient-to-br shrink-0', layer.gradient)}>
+                        <Icon className="h-5 w-5 text-white" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">{layer.tag}</span>
+                          <span className="text-[9px] text-gray-600 bg-white/5 px-1.5 py-0.5 rounded font-bold">{layer.count} pessoas</span>
+                        </div>
+                        <p className="text-white text-xs font-bold truncate">{layer.title}</p>
+                        <p className="text-gray-500 text-[10px] mt-0.5 truncate">{layer.sub}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {i < arr.length - 1 && (
+                  <div className="flex justify-center py-2">
+                    <div className="flex flex-col items-center gap-0.5">
+                      <div className="w-px h-4 bg-white/10" />
+                      <ArrowDown className="h-3 w-3 text-gray-700" />
+                      <p className="text-[9px] text-gray-600 font-semibold">EQUIPA</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════════════ */}
+      {/* PASSO 4 — DISTRIBUIÇÃO DOS DONS                  */}
+      {/* ══════════════════════════════════════════════════ */}
+      <section>
+        <div className="flex items-center gap-3 mb-1">
+          <span className="w-7 h-7 rounded-full bg-gray-900 text-white text-xs font-black flex items-center justify-center shrink-0">4</span>
+          <h2 className="text-xl font-black text-gray-900">Distribuição dos dons no corpo</h2>
+        </div>
+        <p className="text-sm text-gray-400 ml-10 mb-5">
+          Simulação dos {bodyPool.length} membros distribuídos pelos 5 ministérios — base para a formação das células ideais.
+          <span className="ml-1 text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-semibold">
+            Presbíteros por designação · Líderes = Mestre+Pastor · Diáconos e Membros por dom simulado
+          </span>
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+          {MIN_KEYS.map(key => {
+            const mc = MIN[key];
+            const count = minDist[key];
+            const pct = totalMinCounts > 0 ? Math.round((count / totalMinCounts) * 100) : 0;
+            const Icon = mc.Icon;
+            return (
+              <div key={key} className={clsx('rounded-2xl border p-5', mc.light, mc.border)}>
+                <div className={clsx('w-10 h-10 rounded-xl flex items-center justify-center mb-3 bg-gradient-to-br shadow-sm', mc.gradient)}>
+                  <Icon className="h-5 w-5 text-white" />
+                </div>
+                <p className={clsx('text-xs font-black uppercase tracking-wide', mc.text)}>{mc.label}</p>
+                <p className="text-3xl font-black text-gray-900 mt-1">{count}</p>
+                <div className="flex items-center gap-1 mt-2">
+                  <div className="flex-1 h-1.5 bg-white/60 rounded-full overflow-hidden">
+                    <div className={clsx('h-full rounded-full bg-gradient-to-r', mc.gradient)} style={{ width: `${pct}%` }} />
+                  </div>
+                  <span className={clsx('text-[10px] font-black', mc.text)}>{pct}%</span>
+                </div>
+                <p className={clsx('text-[10px] mt-2 leading-tight', mc.text)}>do corpo</p>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════════════ */}
+      {/* PASSO 5 — CÉLULAS IDEAIS                         */}
+      {/* ══════════════════════════════════════════════════ */}
+      <section>
+        <div className="flex items-center gap-3 mb-1">
+          <span className="w-7 h-7 rounded-full bg-gray-900 text-white text-xs font-black flex items-center justify-center shrink-0">5</span>
+          <h2 className="text-xl font-black text-gray-900">Células ideais — como Eddy Leo as formaria</h2>
+        </div>
+        <p className="text-sm text-gray-400 ml-10 mb-2">
+          Partindo do zero, com grupos de ~10 pessoas, formados para ter todos os 5 ministérios representados — não por bairro, mas por <em>cobertura ministerial</em>.
+        </p>
+
+        <div className="grid grid-cols-3 md:grid-cols-4 gap-3 mb-5">
+          {[
+            { label: 'Células possíveis', value: idealCells.length },
+            { label: 'Com cobertura total (5/5)', value: idealCells.filter(c => c.score === 100).length },
+            { label: 'Com 3-4 ministérios', value: idealCells.filter(c => c.score >= 60 && c.score < 100).length },
+            { label: 'Com menos de 3', value: idealCells.filter(c => c.score < 60).length },
+          ].map(s => (
+            <div key={s.label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+              <p className="text-2xl font-black text-gray-900">{s.value}</p>
+              <p className="text-xs text-gray-500 mt-0.5">{s.label}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="space-y-2">
+          {idealCells.map(cell => {
+            const isExpanded = expandedCell === cell.index;
+            const covered = MIN_KEYS.filter(k => cell.coverage[k].length > 0).length;
+            const scoreColor = cell.score === 100 ? 'text-emerald-600' : cell.score >= 60 ? 'text-amber-600' : 'text-red-500';
+            const scoreBg   = cell.score === 100 ? 'bg-emerald-100' : cell.score >= 60 ? 'bg-amber-100' : 'bg-red-100';
+            return (
+              <div key={cell.index} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                <button
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
+                  onClick={() => setExpandedCell(isExpanded ? null : cell.index)}
+                >
+                  {/* Ministry coverage pills */}
+                  <div className="flex gap-1 shrink-0">
+                    {MIN_KEYS.map(key => {
+                      const mc = MIN[key];
+                      const ok = cell.coverage[key].length > 0;
+                      return (
+                        <div key={key} title={mc.label}
+                          className={clsx('w-5 h-5 rounded-md flex items-center justify-center text-[9px]',
+                            ok ? `bg-gradient-to-br ${mc.gradient} text-white shadow-sm` : 'bg-gray-100 text-gray-300')}>
+                          {mc.emoji}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <span className="text-sm font-bold text-gray-700">Célula {cell.index}</span>
+                  <span className="text-xs text-gray-400">{cell.members.length} membros</span>
+                  <span className={clsx('text-xs font-black px-2 py-0.5 rounded-lg ml-auto shrink-0', scoreBg, scoreColor)}>
+                    {covered}/5 min.
+                  </span>
+                  {isExpanded ? <ChevronDown className="h-4 w-4 text-gray-400 shrink-0" /> : <ChevronRight className="h-4 w-4 text-gray-400 shrink-0" />}
+                </button>
+
+                {isExpanded && (
+                  <div className="border-t border-gray-100 p-4 bg-gray-50/50">
+                    <div className="grid grid-cols-5 gap-2 mb-3">
+                      {MIN_KEYS.map(key => {
+                        const mc = MIN[key];
+                        const ms = cell.coverage[key];
+                        const Icon = mc.Icon;
+                        return (
+                          <div key={key} className={clsx('rounded-xl p-3 border', ms.length > 0 ? `${mc.light} ${mc.border}` : 'bg-gray-100 border-gray-200')}>
+                            <div className="flex items-center gap-1.5 mb-2">
+                              <div className={clsx('w-5 h-5 rounded-md flex items-center justify-center bg-gradient-to-br', mc.gradient)}>
+                                <Icon className="h-3 w-3 text-white" />
+                              </div>
+                              <span className={clsx('text-[9px] font-black', ms.length > 0 ? mc.text : 'text-gray-400')}>{mc.label}</span>
+                            </div>
+                            {ms.length > 0 ? (
+                              <div className="space-y-0.5">
+                                {ms.slice(0,4).map(m => (
+                                  <p key={m.id} className={clsx('text-[9px] font-medium truncate', mc.text)}>
+                                    {m.nome.split(' ')[0]}
+                                  </p>
+                                ))}
+                                {ms.length > 4 && <p className={clsx('text-[9px]', mc.text)}>+{ms.length-4}</p>}
+                              </div>
+                            ) : (
+                              <p className="text-[9px] text-gray-400">Ausente</p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {covered < 5 && (
+                      <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
+                        <p className="text-[10px] text-amber-700">
+                          <span className="font-black">💡 Eddy Leo diria:</span> Esta célula precisa de alguém com dom de{' '}
+                          <strong>{MIN_KEYS.filter(k => cell.coverage[k].length === 0).map(k => MIN[k].label).join(' e ')}</strong>.
+                          Um corpo incompleto limita o que Cristo pode expressar nesta comunidade.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════════════ */}
+      {/* CONCLUSÃO                                         */}
+      {/* ══════════════════════════════════════════════════ */}
+      <div className="relative overflow-hidden rounded-3xl bg-gray-950 p-8">
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-0 left-1/4 w-48 h-48 bg-violet-500/10 rounded-full blur-3xl" />
+          <div className="absolute bottom-0 right-1/4 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl" />
         </div>
         <div className="relative">
-          <Sparkles className="h-8 w-8 text-amber-400 mx-auto mb-4" />
-          <p className="text-white text-lg font-light leading-relaxed max-w-2xl mx-auto italic">
-            "A Igreja, que é o seu corpo, a plenitude daquele que tudo enche em todos."
-          </p>
-          <p className="text-gray-500 text-sm mt-3 font-medium">Efésios 1:23</p>
-          <div className="mt-6 flex items-center justify-center gap-3">
-            <ArrowRight className="h-4 w-4 text-gray-600" />
-            <p className="text-gray-500 text-xs max-w-lg text-center">
-              LAB · Dados reais da Igreja BSB · Esta visão é experimental e pode ser refinada conforme a estratégia pastoral evoluir.
+          <div className="flex items-center gap-3 mb-5">
+            <Sparkles className="h-6 w-6 text-amber-400" />
+            <h2 className="text-white font-black text-base">O que Eddy Leo concluiria sobre BSB</h2>
+          </div>
+          <div className="space-y-3">
+            {[
+              { icon: '✅', text: `Cobertura apostólica dupla forte (Wagner + Wanderley) — fundação sólida para construir` },
+              { icon: '✅', text: `Presença profética (Carlos Alberto) e evangelística (Marcelo Braga) no governo — corpo com voz e missão` },
+              { icon: '✅', text: `Vinci como cobertura apostólica externa — conexão com o corpo maior de Cristo` },
+              { icon: presidGap.includes('pastor') ? '⚠️' : '✅', text: presidGap.includes('pastor') ? `LACUNA CRÍTICA: Ministério Pastoral sênior ausente no Presbítério — prioridade número 1 para resolver` : `Pastoral coberto no Presbítério ✓` },
+              { icon: '📌', text: `Com ${bodyPool.length} pessoas, BSB pode formar ${idealCells.length} células equilibradas — mas a formação por dom (não por bairro) maximiza a saúde de cada grupo` },
+              { icon: '📌', text: `O próximo passo prático: mapeamento real dos dons motivacionais (Rm 12) de cada membro — isso tornaria a simulação real` },
+            ].map((item, i) => (
+              <div key={i} className="flex items-start gap-3 bg-white/5 rounded-xl p-4 border border-white/5">
+                <span className="text-lg shrink-0">{item.icon}</span>
+                <p className="text-gray-300 text-sm leading-relaxed">{item.text}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-5 bg-white/5 rounded-2xl p-5 border border-white/10">
+            <p className="text-gray-400 text-xs leading-relaxed italic text-center">
+              "A Igreja, que é o seu corpo, a plenitude daquele que tudo enche em todos."
             </p>
+            <p className="text-gray-600 text-[10px] mt-2 text-center font-semibold">Efésios 1:23 · LAB BSB — Simulação Experimental</p>
           </div>
         </div>
       </div>
