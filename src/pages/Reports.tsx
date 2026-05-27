@@ -529,8 +529,8 @@ export const Reports: React.FC = () => {
 
     const worksheet = XLSX.utils.json_to_sheet(allMismatches);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Incongruências de Setor");
-    XLSX.writeFile(workbook, `incongruencias_setores_${new Date().getTime()}.xlsx`);
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Setores Distintos");
+    XLSX.writeFile(workbook, `setores_distintos_${new Date().getTime()}.xlsx`);
   };
 
   const handleExportExcel = () => {
@@ -938,7 +938,7 @@ export const Reports: React.FC = () => {
               </span>
               <h2 className="text-2xl md:text-3xl font-extrabold mb-2">Censo & Comparativo de Setores</h2>
               <p className="text-slate-350 text-xs leading-relaxed max-w-2xl">
-                Compare a distribuição demográfica dos setores da igreja. Analise o desalinhamento geográfico (membros residindo em um setor mas congregando em GC de outro) e otimize o cuidado pastoral de forma direcionada.
+                Compare a distribuição demográfica dos setores da igreja. Analise a participação intersetorial (membros residindo em um setor mas participando de GC de outro) e otimize o cuidado pastoral de forma direcionada.
               </p>
             </div>
           </div>
@@ -1051,13 +1051,13 @@ export const Reports: React.FC = () => {
 
           </div>
 
-          {/* Card 3: Incongruência e Desalinhamento Residência vs GC */}
+          {/* Card 3: Participação Intersetorial (Residência vs GC) */}
           <div className="bg-white p-6 rounded-2xl border border-gray-150 shadow-sm">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4 mb-4">
               <div>
                 <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
                   <ShieldAlert className="h-4.5 w-4.5 text-amber-500" />
-                  Membros Fora do Setor (Desalinhamento Residência vs GC)
+                  Membros em Setores Distintos (Residência vs GC)
                 </h3>
                 <p className="text-[10px] text-gray-400 mt-0.5">Representa membros que residem em um setor geográfico, mas participam ativamente de GCs vinculados a outro setor.</p>
               </div>
@@ -1077,7 +1077,7 @@ export const Reports: React.FC = () => {
                   <div key={sName} className="p-4 rounded-2xl border border-amber-100 bg-amber-50/20 text-center">
                     <span className="block text-[9px] font-black text-gray-400 uppercase tracking-wider">{sName}</span>
                     <span className="text-xl font-black text-amber-700 block mt-1">{count}</span>
-                    <span className="text-[9px] text-amber-600 font-bold block">pessoas desalinhadas</span>
+                    <span className="text-[9px] text-amber-600 font-bold block">participações distintas</span>
                   </div>
                 );
               })}
@@ -1086,7 +1086,7 @@ export const Reports: React.FC = () => {
             {/* Mismatches List Table */}
             <div>
               <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                🔎 Lista de Membros Desalinhados (Primeiros 100)
+                🔎 Lista de Membros em Setores Distintos (Primeiros 100)
               </h4>
               <div className="overflow-x-auto rounded-2xl border border-gray-250 max-h-80 overflow-y-auto">
                 <table className="min-w-full divide-y divide-gray-200 text-xs">
