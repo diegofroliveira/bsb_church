@@ -18,6 +18,7 @@ interface VisitRecord {
   receivedAt: string | null;
   notes: string;
   updatedAt: string;
+  receivedMembers?: Record<string, boolean>;
 }
 
 type VisitationState = Record<string, VisitRecord>;
@@ -91,11 +92,13 @@ export const LabVisits: React.FC = () => {
       received: false,
       receivedAt: null,
       notes: '',
-      updatedAt: nowStr
+      updatedAt: nowStr,
+      receivedMembers: {}
     };
 
     const nextRecord: VisitRecord = {
       ...current,
+      receivedMembers: current.receivedMembers || {},
       ...updatedRecord,
       updatedAt: nowStr
     };
@@ -144,10 +147,11 @@ export const LabVisits: React.FC = () => {
       const record = visitationRecords[headId];
       const isVisited = record?.visited ?? false;
       const isReceived = record?.received ?? false;
+      const hasAnyReceived = isReceived || Object.values(record?.receivedMembers || {}).some(Boolean);
 
       if (isVisited) visitedCount++;
-      if (isReceived) receivedCount++;
-      if (isVisited || isReceived) reachedCount++;
+      if (hasAnyReceived) receivedCount++;
+      if (isVisited || hasAnyReceived) reachedCount++;
     });
 
     return {
@@ -172,6 +176,50 @@ export const LabVisits: React.FC = () => {
     setActiveNotesFamilyId(null);
   };
 
+  // Handle Individual Member Received Toggle
+  const toggleMemberReceived = (familyHeadId: string, memberId: string, familyMembers: Member[]) => {
+    const record = visitationRecords[familyHeadId] || {
+      visited: false,
+      visitedAt: null,
+      received: false,
+      receivedAt: null,
+      notes: '',
+      updatedAt: new Date().toISOString().split('T')[0],
+      receivedMembers: {}
+    };
+
+    const currentReceivedMembers = record.receivedMembers || {};
+    const nextReceivedMembers = { ...currentReceivedMembers };
+
+    if (record.received) {
+      // If family-level is currently true, and we are untoggling an individual member:
+      // We set family-level received to false, set all OTHER members to true, and this member to false.
+      familyMembers.forEach(m => {
+        const mId = m.id.toString();
+        nextReceivedMembers[mId] = mId !== memberId;
+      });
+      
+      saveRecord(familyHeadId, {
+        received: false,
+        receivedAt: null,
+        receivedMembers: nextReceivedMembers
+      });
+    } else {
+      // If family-level is false, toggle the member state
+      const isCurrentlyReceived = !!nextReceivedMembers[memberId];
+      nextReceivedMembers[memberId] = !isCurrentlyReceived;
+
+      // If all members are now received, set family-level received to true
+      const allReceived = familyMembers.every(m => nextReceivedMembers[m.id.toString()]);
+      
+      saveRecord(familyHeadId, {
+        received: allReceived,
+        receivedAt: allReceived ? new Date().toISOString().split('T')[0] : record.receivedAt,
+        receivedMembers: nextReceivedMembers
+      });
+    }
+  };
+
   // Compile final filtered list of nuclear families
   const filteredFamilyList = useMemo(() => {
     const list: any[] = [];
@@ -188,6 +236,10 @@ export const LabVisits: React.FC = () => {
       const isVisited = record?.visited ?? false;
       const isReceived = record?.received ?? false;
       const notes = record?.notes || '';
+
+      const receivedMembers = record?.receivedMembers || {};
+      const receivedCount = familyMembers.filter(m => isReceived || !!receivedMembers[m.id.toString()]).length;
+      const hasIndividualReceived = !isReceived && receivedCount > 0;
 
       const headRA = getAdministrativeRegion(headMember.bairro);
       const attendedGCs = Array.from(new Set(familyMembers.map(m => m.grupos_caseiros).filter(Boolean)));
@@ -209,9 +261,9 @@ export const LabVisits: React.FC = () => {
       // 4. Status Filter
       let matchesStatus = true;
       if (filterStatus === 'Visited') matchesStatus = isVisited;
-      else if (filterStatus === 'Received') matchesStatus = isReceived;
-      else if (filterStatus === 'Pending') matchesStatus = !isVisited && !isReceived;
-      else if (filterStatus === 'Pastored') matchesStatus = isVisited || isReceived;
+      else if (filterStatus === 'Received') matchesStatus = isReceived || receivedCount > 0;
+      else if (filterStatus === 'Pending') matchesStatus = !isVisited && !isReceived && receivedCount === 0;
+      else if (filterStatus === 'Pastored') matchesStatus = isVisited || isReceived || receivedCount > 0;
 
       if (matchesSearch && matchesRA && matchesGC && matchesStatus) {
         list.push({
@@ -228,15 +280,18 @@ export const LabVisits: React.FC = () => {
           isReceived,
           notes,
           visitedAt: record?.visitedAt,
-          receivedAt: record?.receivedAt
+          receivedAt: record?.receivedAt,
+          receivedMembers,
+          receivedCount,
+          hasIndividualReceived
         });
       }
     });
 
     // Sort: unvisited first, then by size desc, then alphabetically by head name
     return list.sort((a, b) => {
-      const aDone = a.isVisited || a.isReceived;
-      const bDone = b.isVisited || b.isReceived;
+      const aDone = a.isVisited || a.isReceived || a.hasIndividualReceived;
+      const bDone = b.isVisited || b.isReceived || b.hasIndividualReceived;
       if (aDone && !bDone) return 1;
       if (!aDone && bDone) return -1;
       if (b.membersCount !== a.membersCount) return b.membersCount - a.membersCount;
@@ -434,15 +489,21 @@ export const LabVisits: React.FC = () => {
                   "bg-white rounded-3xl border shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between overflow-hidden relative",
                   (fam.isVisited || fam.isReceived) 
                     ? "border-emerald-100/70 bg-white" 
+                    : fam.hasIndividualReceived
+                    ? "border-amber-100/70 bg-white"
                     : "border-slate-100 bg-slate-50/10"
                 )}
               >
                 {/* Visual indicator corner */}
-                {(fam.isVisited || fam.isReceived) && (
+                {(fam.isVisited || fam.isReceived) ? (
                   <div className="absolute top-0 right-0 w-16 h-16 pointer-events-none overflow-hidden">
                     <div className="absolute top-[-10px] right-[-10px] w-8 h-8 bg-emerald-500/10 rotate-45" />
                   </div>
-                )}
+                ) : fam.hasIndividualReceived ? (
+                  <div className="absolute top-0 right-0 w-16 h-16 pointer-events-none overflow-hidden">
+                    <div className="absolute top-[-10px] right-[-10px] w-8 h-8 bg-amber-500/10 rotate-45" />
+                  </div>
+                ) : null}
 
                 {/* Card Header */}
                 <div className="p-5 border-b border-slate-50">
@@ -468,7 +529,12 @@ export const LabVisits: React.FC = () => {
                           <Home className="w-2.5 h-2.5 text-amber-600 shrink-0" /> Recebido
                         </span>
                       )}
-                      {!fam.isVisited && !fam.isReceived && (
+                      {fam.hasIndividualReceived && (
+                        <span className="inline-flex items-center gap-0.5 text-[8px] bg-amber-50/60 text-amber-800 border border-amber-100/50 px-2 py-0.5 rounded-full font-black uppercase tracking-wider">
+                          <Home className="w-2.5 h-2.5 text-amber-600 shrink-0" /> {fam.receivedCount}/{fam.membersCount} Recebidos
+                        </span>
+                      )}
+                      {!fam.isVisited && !fam.isReceived && !fam.hasIndividualReceived && (
                         <span className="inline-flex items-center text-[8px] bg-slate-50 text-slate-500 border border-slate-150 px-2 py-0.5 rounded-full font-black uppercase tracking-wider">
                           Pendente
                         </span>
@@ -508,6 +574,8 @@ export const LabVisits: React.FC = () => {
                       }
                     }
 
+                    const isMemberCurrentlyReceived = fam.isReceived || !!(fam.receivedMembers?.[m.id.toString()]);
+
                     return (
                       <div key={m.id} className="flex items-center justify-between gap-3 text-xs">
                         <div className="flex items-center gap-2 min-w-0">
@@ -539,16 +607,33 @@ export const LabVisits: React.FC = () => {
                           </div>
                         </div>
 
-                        {/* GC Allocated */}
-                        {m.grupos_caseiros ? (
-                          <span className="text-[8px] font-black px-2 py-0.5 rounded-md border text-slate-700 bg-slate-50 border-slate-200/50 truncate max-w-[100px] shrink-0">
-                            {m.grupos_caseiros}
-                          </span>
-                        ) : (
-                          <span className="text-[8px] text-slate-400 bg-slate-50/50 border border-slate-100 px-2 py-0.5 rounded-md shrink-0 font-bold">
-                            Sem GC
-                          </span>
-                        )}
+                        <div className="flex items-center gap-2 shrink-0">
+                          {/* GC Allocated */}
+                          {m.grupos_caseiros ? (
+                            <span className="text-[8px] font-black px-2 py-0.5 rounded-md border text-slate-700 bg-slate-50 border-slate-200/50 truncate max-w-[80px] shrink-0">
+                              {m.grupos_caseiros}
+                            </span>
+                          ) : (
+                            <span className="text-[8px] text-slate-400 bg-slate-50/50 border border-slate-100 px-2 py-0.5 rounded-md shrink-0 font-bold">
+                              Sem GC
+                            </span>
+                          )}
+
+                          {/* Individual Received Toggle Button */}
+                          <button
+                            onClick={() => toggleMemberReceived(fam.headId, m.id.toString(), fam.familyMembers)}
+                            title={isMemberCurrentlyReceived ? "Remover marcação de recebido individual" : "Marcar como recebido individualmente"}
+                            className={clsx(
+                              "h-6 px-2 rounded-lg border text-[9px] font-black flex items-center gap-1 transition-all duration-200 cursor-pointer active:scale-95",
+                              isMemberCurrentlyReceived
+                                ? "bg-amber-500 text-white border-amber-500 hover:bg-amber-600 shadow-sm"
+                                : "bg-slate-50 text-slate-500 border-slate-200 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200"
+                            )}
+                          >
+                            <Home className={clsx("w-3 h-3", isMemberCurrentlyReceived ? "fill-white text-white" : "")} />
+                            <span>{isMemberCurrentlyReceived ? "Recebido" : "Receber"}</span>
+                          </button>
+                        </div>
                       </div>
                     );
                   })}
@@ -624,16 +709,31 @@ export const LabVisits: React.FC = () => {
 
                   {/* Recebi Button */}
                   <button
-                    onClick={() => saveRecord(fam.headId, { received: !fam.isReceived, receivedAt: !fam.isReceived ? new Date().toISOString().split('T')[0] : null })}
+                    onClick={() => {
+                      const willBeReceived = !fam.isReceived;
+                      const nextReceivedMembers: Record<string, boolean> = {};
+                      if (willBeReceived) {
+                        fam.familyMembers.forEach((m: Member) => {
+                          nextReceivedMembers[m.id.toString()] = true;
+                        });
+                      }
+                      saveRecord(fam.headId, {
+                        received: willBeReceived,
+                        receivedAt: willBeReceived ? new Date().toISOString().split('T')[0] : null,
+                        receivedMembers: nextReceivedMembers
+                      });
+                    }}
                     className={clsx(
                       "py-2.5 px-3 rounded-2xl text-[10px] font-black flex items-center justify-center gap-1.5 border transition-all duration-300 cursor-pointer shadow-sm active:scale-95",
                       fam.isReceived
                         ? "bg-amber-500 text-white border-amber-500 hover:bg-amber-600 shadow-amber-500/10"
+                        : fam.hasIndividualReceived
+                        ? "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 hover:border-amber-300 shadow-sm"
                         : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:border-slate-300"
                     )}
                   >
                     <Home className="w-3.5 h-3.5 shrink-0" />
-                    {fam.isReceived ? "Recebi!" : "Recebi em Casa"}
+                    {fam.isReceived ? "Recebi Todos!" : fam.hasIndividualReceived ? "Recebi (Parcial)" : "Recebi em Casa"}
                   </button>
                 </div>
 
