@@ -25,6 +25,8 @@ export interface Member {
   tipo_de_pessoa?: string | null;
   cidade?: string | null;
   estado?: string | null;
+  setor_eclesiastico?: string | null;
+  setor_residencial?: string | null;
 }
 
 export interface Cell {

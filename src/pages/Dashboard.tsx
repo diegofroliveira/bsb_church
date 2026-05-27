@@ -48,7 +48,7 @@ export const Dashboard: React.FC = () => {
     const fetchDashboardData = async () => {
       setIsLoading(true);
       try {
-        let membrosQuery = supabase.from('membros').select('nome, status, tipo_cadastro, nascimento, grupos_caseiros, sexo, bairro, cidade, estado, tipo_de_pessoa, data_de_cadastro, data_atualizacao, estado_civil');
+        let membrosQuery = supabase.from('membros').select('nome, status, tipo_cadastro, nascimento, grupos_caseiros, sexo, bairro, cidade, estado, tipo_de_pessoa, data_de_cadastro, data_atualizacao, estado_civil, setor_eclesiastico, setor_residencial');
         let celulasQuery = supabase.from('celulas').select('grupo_caseiro, lider, auxiliar, setor');
 
         if (user?.assigned_gc) {
@@ -103,7 +103,12 @@ export const Dashboard: React.FC = () => {
     };
 
     const getMemberSector = (m: any): string => {
-      // Leader/Auxiliar Sector Override: leaders represent the sector of the cell they lead
+      // Use pre-calculated resident sector from Supabase if available
+      if (m.setor_residencial) {
+        return getNormalizedSectorName(m.setor_residencial);
+      }
+
+      // Leader/Auxiliar Sector Override fallback
       const matchingCell = rawCelulas.find(c => 
         (c.lider && c.lider.trim().toUpperCase() === m.nome?.trim().toUpperCase()) ||
         (c.auxiliar && c.auxiliar.trim().toUpperCase() === m.nome?.trim().toUpperCase())

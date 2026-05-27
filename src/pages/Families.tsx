@@ -31,7 +31,7 @@ export const Families: React.FC = () => {
         setIsLoading(true);
         const [membrosRes, celulasRes, relationsRes] = await Promise.all([
           supabase.from('membros')
-            .select('id, nome, grupos_caseiros, status, sexo, bairro, pai, mae, logradouro, celular_principal_sms, telefone_fixo, estado_civil, nascimento, latitude, longitude, cidade, estado')
+            .select('id, nome, grupos_caseiros, status, sexo, bairro, pai, mae, logradouro, celular_principal_sms, telefone_fixo, estado_civil, nascimento, latitude, longitude, cidade, estado, setor_eclesiastico, setor_residencial')
             .eq('status', 'Ativo'),
           supabase.from('celulas')
             .select('grupo_caseiro, lider, auxiliar, setor'),
@@ -283,6 +283,17 @@ export const Families: React.FC = () => {
   const filteredFamilies = useMemo(() => {
     const getMemberSector = (m: Member | undefined): string => {
       if (!m) return 'Sem Setor';
+      
+      // Use pre-calculated resident sector from Supabase if available
+      if (m.setor_residencial) {
+        const norm = m.setor_residencial.trim().toUpperCase();
+        if (norm.includes('NORTE')) return 'Setor Norte';
+        if (norm.includes('CENTRAL')) return 'Setor Central';
+        if (norm.includes('AGUAS CLARAS') || norm.includes('ÁGUAS CLARAS')) return 'Setor Águas Claras';
+        if (norm.includes('SUL')) return 'Setor Sul';
+        return 'Sem Setor';
+      }
+
       const matchingCell = cells.find(c => 
         (c.lider && c.lider.trim().toUpperCase() === m.nome.trim().toUpperCase()) ||
         (c.auxiliar && c.auxiliar.trim().toUpperCase() === m.nome.trim().toUpperCase())

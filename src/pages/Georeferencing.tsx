@@ -50,6 +50,7 @@ interface LocationData {
   tipo: 'membro' | 'grupo';
   metadata: {
     setor?: string;
+    setor_eclesiastico?: string;
     grupo?: string;
     genero?: string;
     faixaEtaria?: number;
@@ -137,7 +138,7 @@ const Georeferencing: React.FC = () => {
       let celQuery = supabase.from('celulas').select('id, grupo_caseiro, latitude, longitude, lider, setor');
       let membQuery = supabase.from('membros').select(`
         id, nome, latitude, longitude, grupos_caseiros, estado_civil, sexo, nascimento, tipo_de_pessoa,
-        logradouro, bairro, cidade, estado
+        logradouro, bairro, cidade, estado, setor_eclesiastico, setor_residencial
       `).eq('status', 'Ativo');
 
       if (user?.assigned_gc) {
@@ -203,6 +204,16 @@ const Georeferencing: React.FC = () => {
       const geoMembros = (membros || []).filter(m => m.latitude && m.longitude);
       const geoGrupos = (grupos || []).filter(g => g.latitude && g.longitude);
 
+      const getNormalizedSectorName = (dbSector: string | null | undefined): string => {
+        if (!dbSector) return 'Sem Setor';
+        const norm = dbSector.trim().toUpperCase();
+        if (norm.includes('NORTE')) return 'Setor Norte';
+        if (norm.includes('CENTRAL')) return 'Setor Central';
+        if (norm.includes('AGUAS CLARAS') || norm.includes('ÁGUAS CLARAS')) return 'Setor Águas Claras';
+        if (norm.includes('SUL')) return 'Setor Sul';
+        return 'Sem Setor';
+      };
+
       const formattedLocations: LocationData[] = [
         ...geoMembros.map(m => {
           let idade = 0;
@@ -241,7 +252,8 @@ const Georeferencing: React.FC = () => {
               genero: m.sexo,
               faixaEtaria: idade,
               vinculo: m.tipo_de_pessoa,
-              setor: m.grupos_caseiros ? setorPorGrupo[m.grupos_caseiros] : undefined,
+              setor: m.setor_residencial ? getNormalizedSectorName(m.setor_residencial) : (m.grupos_caseiros ? getNormalizedSectorName(setorPorGrupo[m.grupos_caseiros]) : 'Sem Setor'),
+              setor_eclesiastico: m.setor_eclesiastico ? getNormalizedSectorName(m.setor_eclesiastico) : (m.grupos_caseiros ? getNormalizedSectorName(setorPorGrupo[m.grupos_caseiros]) : 'Sem Setor'),
               distanciaAteGrupo: distGrupo || undefined,
               distanciaAteDiscipulador: distDisc || undefined,
               coordsGrupo: coordsGrupo || undefined,
@@ -257,7 +269,7 @@ const Georeferencing: React.FC = () => {
           latitude: g.latitude,
           longitude: g.longitude,
           tipo: 'grupo' as const,
-          metadata: { lider: g.lider, setor: g.setor }
+          metadata: { lider: g.lider, setor: getNormalizedSectorName(g.setor) }
         }))
       ];
 
@@ -544,7 +556,8 @@ const Georeferencing: React.FC = () => {
                         </div>
                       )}
                       <p><strong>Endereço:</strong> {loc.metadata.enderecoCompleto}</p>
-                      <p><strong>Grupo:</strong> {loc.metadata.grupo || 'Nenhum'}</p>
+                      <p><strong>Setor de Residência:</strong> {loc.metadata.setor}</p>
+                      <p><strong>Grupo Caseiro (GC):</strong> {loc.metadata.grupo || 'Nenhum'} ({loc.metadata.setor_eclesiastico || 'Sem Setor'})</p>
                       <p><strong>Discipulador:</strong> {loc.metadata.discipuladorNome || 'Nenhum'}</p>
                       <div className="grid grid-cols-1 gap-1 mt-2">
                         {loc.metadata.distanciaAteGrupo && (
@@ -690,7 +703,7 @@ const Georeferencing: React.FC = () => {
                       <td className="px-6 py-4 text-emerald-600 font-medium text-xs">{m.metadata.discipuladorNome || '-'}</td>
                       <td className="px-6 py-4">
                         <div className="text-blue-600 font-bold text-xs">{m.metadata.grupo || '-'}</div>
-                        <div className="text-[10px] text-gray-400">{m.metadata.setor}</div>
+                        <div className="text-[10px] text-gray-400">Res.: {m.metadata.setor} | GC: {m.metadata.setor_eclesiastico}</div>
                       </td>
                       <td className="px-6 py-4 text-center">
                         <div className="flex flex-col gap-1 items-center">

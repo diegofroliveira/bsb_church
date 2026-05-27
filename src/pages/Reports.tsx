@@ -86,6 +86,7 @@ export const Reports: React.FC = () => {
   const [filterAgeCategory, setFilterAgeCategory] = useState('Todas');
   const [filterState, setFilterState] = useState<string[]>([]);
   const [filterSetor, setFilterSetor] = useState<string[]>([]);
+  const [filterSetorEcl, setFilterSetorEcl] = useState<string[]>([]);
   const [filterMestre, setFilterMestre] = useState<string[]>([]);
   const [filterMaritalStatus, setFilterMaritalStatus] = useState<string[]>([]);
   const [filterMinAge, setFilterMinAge] = useState<number>(0);
@@ -107,14 +108,15 @@ export const Reports: React.FC = () => {
   };
   
   const [selectedColumns, setSelectedColumns] = useState<string[]>([
-    'nome', 'tipo_cadastro', 'grupos_caseiros', 'setor', 'discipulador', 'celular_principal_sms', 'email', 'nascimento', 'idade', 'sexo', 'estado_civil'
+    'nome', 'tipo_cadastro', 'grupos_caseiros', 'setor', 'setor_eclesiastico_display', 'discipulador', 'celular_principal_sms', 'email', 'nascimento', 'idade', 'sexo', 'estado_civil'
   ]);
 
   const columnOptions = [
     { key: 'nome', label: 'Nome' },
     { key: 'tipo_cadastro', label: 'Vínculo' },
     { key: 'grupos_caseiros', label: 'GC' },
-    { key: 'setor', label: 'Setor' },
+    { key: 'setor', label: 'Setor de Residência' },
+    { key: 'setor_eclesiastico_display', label: 'Setor do GC' },
     { key: 'discipulador', label: 'Discipulador' },
     { key: 'celular_principal_sms', label: 'Telefone' },
     { key: 'email', label: 'E-mail' },
@@ -160,13 +162,34 @@ export const Reports: React.FC = () => {
            }
         });
 
+        const getNormalizedSectorName = (dbSector: string | null | undefined): string => {
+          if (!dbSector) return 'Sem Setor';
+          const norm = dbSector.trim().toUpperCase();
+          if (norm.includes('NORTE')) return 'Setor Norte';
+          if (norm.includes('CENTRAL')) return 'Setor Central';
+          if (norm.includes('AGUAS CLARAS') || norm.includes('ÁGUAS CLARAS')) return 'Setor Águas Claras';
+          if (norm.includes('SUL')) return 'Setor Sul';
+          return 'Sem Setor';
+        };
+
         // Enrich members with relational data
         const enrichedMembers = allMembros.map((m: any) => {
            const nomeLower = (m.nome || m.name || '').trim().toLowerCase();
            const gcLower = (m.grupos_caseiros || '').trim().toLowerCase();
+           
+           // Ecclesiastical Sector: database column with GC mapping fallback
+           const rawEcl = m.setor_eclesiastico || setorMap[gcLower] || 'Sem Setor';
+           const setorEcl = getNormalizedSectorName(rawEcl);
+           
+           // Resident Sector: database column with in-memory fallback (simulated via Prover sectors or empty)
+           const rawRes = m.setor_residencial || m.setor_residencial_calculado || '';
+           const setorRes = rawRes ? getNormalizedSectorName(rawRes) : (setorMap[gcLower] ? getNormalizedSectorName(setorMap[gcLower]) : 'Sem Setor');
+           
            return {
                ...m,
-               setor: setorMap[gcLower] || 'Sem Setor',
+               setor: setorRes, // default filter and display represents residence
+               setor_eclesiastico_display: setorEcl,
+               setor_residencial_display: setorRes,
                discipulador: discipuladorMap[nomeLower] || 'Sem Discipulador'
            };
         });
@@ -187,6 +210,7 @@ export const Reports: React.FC = () => {
   const uniqueGenders = useMemo(() => Array.from(new Set(members.map(m => m.sexo || m.sex).filter(Boolean))).sort(), [members]);
   const uniqueStates = useMemo(() => Array.from(new Set(members.map(m => m.uf || m.estado).filter(Boolean))).sort(), [members]);
   const uniqueSetores = useMemo(() => Array.from(new Set(members.map(m => m.setor).filter(s => s !== 'Sem Setor'))).sort(), [members]);
+  const uniqueSetoresEcl = useMemo(() => Array.from(new Set(members.map(m => m.setor_eclesiastico_display).filter(s => s !== 'Sem Setor'))).sort(), [members]);
   const uniqueMestres = useMemo(() => Array.from(new Set(members.map(m => m.discipulador).filter(d => d !== 'Sem Discipulador'))).sort(), [members]);
   const uniqueMaritalStatuses = useMemo(() => Array.from(new Set(members.map(m => m.estado_civil).filter(Boolean))).sort(), [members]);
   const uniquePersonTypes = useMemo(() => Array.from(new Set(members.map(m => m.tipo_de_pessoa).filter(Boolean))).sort(), [members]);
@@ -232,6 +256,7 @@ export const Reports: React.FC = () => {
       if (filterType.length > 0 && !filterType.includes(m.tipo_cadastro)) return false;
       if (filterGC.length > 0 && !filterGC.includes(m.grupos_caseiros)) return false;
       if (filterSetor.length > 0 && !filterSetor.includes(m.setor)) return false;
+      if (filterSetorEcl.length > 0 && !filterSetorEcl.includes(m.setor_eclesiastico_display)) return false;
       if (filterMestre.length > 0 && !filterMestre.includes(m.discipulador)) return false;
       
       const gender = m.sexo || m.sex || '';
@@ -259,7 +284,7 @@ export const Reports: React.FC = () => {
     }).sort((a, b) => {
       let valA: any = '';
       let valB: any = '';
-
+  
       if (sortField === 'nome') {
         valA = a.nome || a.name || '';
         valB = b.nome || b.name || '';
@@ -276,12 +301,12 @@ export const Reports: React.FC = () => {
         valA = a[sortField] || '';
         valB = b[sortField] || '';
       }
-
+  
       if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
       if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [members, filterQuery, filterType, filterGC, filterGender, filterAgeCategory, filterMinAge, filterMaxAge, filterMaritalStatus, filterState, filterSetor, filterMestre, filterPersonType, filterStatusPessoa, filterNoChildren, allParentsNames, sortField, sortDirection]);
+  }, [members, filterQuery, filterType, filterGC, filterGender, filterAgeCategory, filterMinAge, filterMaxAge, filterMaritalStatus, filterState, filterSetor, filterSetorEcl, filterMestre, filterPersonType, filterStatusPessoa, filterNoChildren, allParentsNames, sortField, sortDirection]);tion]);
 
   const handleExportExcel = () => {
     if (filteredMembers.length === 0) return;
@@ -361,7 +386,11 @@ export const Reports: React.FC = () => {
           </div>
 
           <div className="xl:col-span-1">
-             <MultiSelect label="Setor" options={uniqueSetores} selected={filterSetor} onChange={setFilterSetor} />
+             <MultiSelect label="Setor de Residência" options={uniqueSetores} selected={filterSetor} onChange={setFilterSetor} />
+          </div>
+
+          <div className="xl:col-span-1">
+             <MultiSelect label="Setor do GC" options={uniqueSetoresEcl} selected={filterSetorEcl} onChange={setFilterSetorEcl} />
           </div>
 
           <div className="xl:col-span-1">
@@ -495,9 +524,12 @@ export const Reports: React.FC = () => {
                              </div>
                           </td>
                           <td className="whitespace-nowrap px-3 py-4">
-                             <div className="flex flex-col min-w-0 max-w-[150px]">
-                                <span className="text-sm text-gray-900 truncate">{m.grupos_caseiros || 'Sem Grupo'}</span>
-                                <span className="text-xs text-indigo-500 font-medium truncate mt-1">{m.setor}</span>
+                             <div className="flex flex-col min-w-0 max-w-[180px]">
+                                <span className="text-sm text-gray-900 truncate font-medium">{m.grupos_caseiros || 'Sem Grupo'}</span>
+                                <div className="flex flex-col gap-0.5 mt-1 shrink-0">
+                                  <span className="text-[10px] text-indigo-600 font-semibold truncate">Res.: {m.setor}</span>
+                                  <span className="text-[10px] text-teal-600 font-semibold truncate">GC: {m.setor_eclesiastico_display}</span>
+                                </div>
                              </div>
                           </td>
                           <td className="whitespace-nowrap px-3 py-4">
