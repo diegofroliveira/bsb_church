@@ -19,6 +19,8 @@ interface MemberData {
   tipo_cadastro: string;
   grupos_caseiros: string;
   data_de_cadastro: string;
+  setor_eclesiastico?: string;
+  setor_residencial?: string;
 }
 
 const calculateAge = (birthDateString: string | null): number | string => {
@@ -232,6 +234,47 @@ export const MemberProfile: React.FC = () => {
                     <p className="text-xs text-gray-500">Idade</p>
                   </div>
                </div>
+
+                <div className="flex items-start gap-3">
+                   <MapPin className="w-5 h-5 text-indigo-500 mt-0.5" />
+                   <div>
+                     <p className="text-sm font-medium text-gray-900">
+                       {member.setor_residencial ? (() => {
+                         const norm = member.setor_residencial.trim().toUpperCase();
+                         if (norm.includes('NORTE')) return 'Setor Norte';
+                         if (norm.includes('CENTRAL')) return 'Setor Central';
+                         if (norm.includes('AGUAS CLARAS') || norm.includes('ÁGUAS CLARAS')) return 'Setor Águas Claras';
+                         if (norm.includes('SUL')) return 'Setor Sul';
+                         return member.setor_residencial;
+                       })() : 'Não informado'}
+                     </p>
+                     <p className="text-xs text-gray-500">Setor de Residência</p>
+                   </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                   <Users className="w-5 h-5 text-teal-500 mt-0.5" />
+                   <div>
+                     <p className="text-sm font-medium text-gray-900">
+                       {member.setor_eclesiastico ? (() => {
+                         const norm = member.setor_eclesiastico.trim().toUpperCase();
+                         if (norm.includes('NORTE')) return 'Setor Norte';
+                         if (norm.includes('CENTRAL')) return 'Setor Central';
+                         if (norm.includes('AGUAS CLARAS') || norm.includes('ÁGUAS CLARAS')) return 'Setor Águas Claras';
+                         if (norm.includes('SUL')) return 'Setor Sul';
+                         return member.setor_eclesiastico;
+                       })() : (cellInfo?.setor ? (() => {
+                         const norm = cellInfo.setor.trim().toUpperCase();
+                         if (norm.includes('NORTE')) return 'Setor Norte';
+                         if (norm.includes('CENTRAL')) return 'Setor Central';
+                         if (norm.includes('AGUAS CLARAS') || norm.includes('ÁGUAS CLARAS')) return 'Setor Águas Claras';
+                         if (norm.includes('SUL')) return 'Setor Sul';
+                         return cellInfo.setor;
+                       })() : 'Não informado')}
+                     </p>
+                     <p className="text-xs text-gray-500">Setor do GC (Eclesiástico)</p>
+                   </div>
+                </div>
             </div>
          </div>
 

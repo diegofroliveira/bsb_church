@@ -14,6 +14,16 @@ import {
 } from 'lucide-react';
 import clsx from 'clsx';
 
+const getNormalizedSectorName = (dbSector: string | null | undefined): string => {
+  if (!dbSector) return 'Sem Setor';
+  const norm = dbSector.trim().toUpperCase();
+  if (norm.includes('NORTE')) return 'Setor Norte';
+  if (norm.includes('CENTRAL')) return 'Setor Central';
+  if (norm.includes('AGUAS CLARAS') || norm.includes('ÁGUAS CLARAS')) return 'Setor Águas Claras';
+  if (norm.includes('SUL')) return 'Setor Sul';
+  return 'Sem Setor';
+};
+
 export const Families: React.FC = () => {
   const [members, setMembers] = useState<Member[]>([]);
   const [cells, setCells] = useState<Cell[]>([]);
@@ -21,6 +31,7 @@ export const Families: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSector, setFilterSector] = useState('Todos');
+  const [filterSectorEcl, setFilterSectorEcl] = useState('Todos');
   const [filterStatus, setFilterStatus] = useState('Todos');
   const [activeTab, setActiveTab] = useState<'nucleos' | 'parentelas'>('nucleos');
 
@@ -279,36 +290,36 @@ export const Families: React.FC = () => {
     return parentelasList.sort((a, b) => b.totalMembersCount - a.totalMembersCount);
   }, [familyData, members, families]);
 
+  const getMemberSector = (m: Member | undefined): string => {
+    if (!m) return 'Sem Setor';
+    
+    // Use pre-calculated resident sector from Supabase if available
+    if (m.setor_residencial) {
+      const norm = m.setor_residencial.trim().toUpperCase();
+      if (norm.includes('NORTE')) return 'Setor Norte';
+      if (norm.includes('CENTRAL')) return 'Setor Central';
+      if (norm.includes('AGUAS CLARAS') || norm.includes('ÁGUAS CLARAS')) return 'Setor Águas Claras';
+      if (norm.includes('SUL')) return 'Setor Sul';
+      return 'Sem Setor';
+    }
+
+    const matchingCell = cells.find(c => 
+      (c.lider && c.lider.trim().toUpperCase() === m.nome.trim().toUpperCase()) ||
+      (c.auxiliar && c.auxiliar.trim().toUpperCase() === m.nome.trim().toUpperCase())
+    );
+    if (matchingCell) {
+      const norm = (matchingCell.setor || '').trim().toUpperCase();
+      if (norm.includes('NORTE')) return 'Setor Norte';
+      if (norm.includes('CENTRAL')) return 'Setor Central';
+      if (norm.includes('AGUAS CLARAS') || norm.includes('ÁGUAS CLARAS')) return 'Setor Águas Claras';
+      if (norm.includes('SUL')) return 'Setor Sul';
+      return 'Sem Setor';
+    }
+    return getSectorByResidence(m.bairro, m.cidade, m.estado);
+  };
+
   // Filtering nuclear family cards
   const filteredFamilies = useMemo(() => {
-    const getMemberSector = (m: Member | undefined): string => {
-      if (!m) return 'Sem Setor';
-      
-      // Use pre-calculated resident sector from Supabase if available
-      if (m.setor_residencial) {
-        const norm = m.setor_residencial.trim().toUpperCase();
-        if (norm.includes('NORTE')) return 'Setor Norte';
-        if (norm.includes('CENTRAL')) return 'Setor Central';
-        if (norm.includes('AGUAS CLARAS') || norm.includes('ÁGUAS CLARAS')) return 'Setor Águas Claras';
-        if (norm.includes('SUL')) return 'Setor Sul';
-        return 'Sem Setor';
-      }
-
-      const matchingCell = cells.find(c => 
-        (c.lider && c.lider.trim().toUpperCase() === m.nome.trim().toUpperCase()) ||
-        (c.auxiliar && c.auxiliar.trim().toUpperCase() === m.nome.trim().toUpperCase())
-      );
-      if (matchingCell) {
-        const norm = (matchingCell.setor || '').trim().toUpperCase();
-        if (norm.includes('NORTE')) return 'Setor Norte';
-        if (norm.includes('CENTRAL')) return 'Setor Central';
-        if (norm.includes('AGUAS CLARAS') || norm.includes('ÁGUAS CLARAS')) return 'Setor Águas Claras';
-        if (norm.includes('SUL')) return 'Setor Sul';
-        return 'Sem Setor';
-      }
-      return getSectorByResidence(m.bairro, m.cidade, m.estado);
-    };
-
     return familyData.list.filter(fam => {
       // 1. Text search
       const matchesSearch = searchTerm === '' || 
@@ -323,14 +334,18 @@ export const Families: React.FC = () => {
       const residentSector = getMemberSector(headMember);
       const matchesSector = filterSector === 'Todos' || residentSector === filterSector;
 
+      const rawEcl = headMember?.setor_eclesiastico || (headMember?.grupos_caseiros ? (cells.find(c => c.grupo_caseiro === headMember.grupos_caseiros)?.setor || '') : '');
+      const eclSector = getNormalizedSectorName(rawEcl);
+      const matchesSectorEcl = filterSectorEcl === 'Todos' || eclSector === filterSectorEcl;
+
       // 3. GC Status Filter
       const matchesStatus = filterStatus === 'Todos' ||
         (filterStatus === 'Unified' && !fam.isDivided) ||
         (filterStatus === 'Divided' && fam.isDivided);
 
-      return matchesSearch && matchesSector && matchesStatus;
+      return matchesSearch && matchesSector && matchesSectorEcl && matchesStatus;
     });
-  }, [familyData, searchTerm, filterSector, filterStatus, cells]);
+  }, [familyData, searchTerm, filterSector, filterSectorEcl, filterStatus, cells]);
 
   if (isLoading) {
     return (
@@ -441,8 +456,8 @@ export const Families: React.FC = () => {
               />
             </div>
 
-            {/* Sector Filter */}
-            <div className="relative w-full md:w-56 shrink-0">
+            {/* Sector de Residência Filter */}
+            <div className="relative w-full md:w-52 shrink-0">
               <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
               <select
                 value={filterSector}
@@ -450,6 +465,23 @@ export const Families: React.FC = () => {
                 className="w-full pl-9 pr-4 py-2 border-gray-200 rounded-xl focus:ring-primary-500 focus:border-primary-500 text-sm bg-gray-50/50 font-semibold text-gray-700"
               >
                 <option value="Todos">Setor de Residência (Todos)</option>
+                <option value="Setor Norte">Setor Norte</option>
+                <option value="Setor Central">Setor Central</option>
+                <option value="Setor Águas Claras">Setor Águas Claras</option>
+                <option value="Setor Sul">Setor Sul</option>
+                <option value="Sem Setor">Sem Setor</option>
+              </select>
+            </div>
+
+            {/* Sector do GC Filter */}
+            <div className="relative w-full md:w-48 shrink-0">
+              <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+              <select
+                value={filterSectorEcl}
+                onChange={e => setFilterSectorEcl(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 border-gray-200 rounded-xl focus:ring-primary-500 focus:border-primary-500 text-sm bg-gray-50/50 font-semibold text-gray-700"
+              >
+                <option value="Todos">Setor do GC (Todos)</option>
                 <option value="Setor Norte">Setor Norte</option>
                 <option value="Setor Central">Setor Central</option>
                 <option value="Setor Águas Claras">Setor Águas Claras</option>
@@ -522,6 +554,28 @@ export const Families: React.FC = () => {
                           📍 {fam.headBairro}
                         </span>
                       </div>
+
+                      {/* Parallel Sectors Badges */}
+                      {(() => {
+                        const residentSector = getMemberSector(headMember);
+                        const rawEcl = headMember?.setor_eclesiastico || (headMember?.grupos_caseiros ? (cells.find(c => c.grupo_caseiro === headMember.grupos_caseiros)?.setor || '') : '');
+                        const eclSector = getNormalizedSectorName(rawEcl);
+
+                        return (
+                          <div className="flex flex-wrap gap-1.5 mt-2">
+                            {residentSector !== 'Sem Setor' && (
+                              <span className="text-[9px] bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded font-semibold border border-indigo-100">
+                                Res.: {residentSector}
+                              </span>
+                            )}
+                            {eclSector !== 'Sem Setor' && (
+                              <span className="text-[9px] bg-teal-50 text-teal-700 px-1.5 py-0.5 rounded font-semibold border border-teal-100">
+                                GC: {eclSector}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     {/* Members List */}

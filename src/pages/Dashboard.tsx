@@ -22,6 +22,8 @@ export const Dashboard: React.FC = () => {
   const [filterGroup, setFilterGroup] = useState('Todos');
   const [filterDisc, setFilterDisc] = useState('Todos');
   const [filterSector, setFilterSector] = useState('Todos');
+  const [filterSectorEcl, setFilterSectorEcl] = useState('Todos');
+  const [sectorViewMode, setSectorViewMode] = useState<'residencial' | 'eclesiastico'>('residencial');
   const [filterMinAge, setFilterMinAge] = useState<number>(0);
   const [filterMaxAge, setFilterMaxAge] = useState<number>(120);
   const [filterMaritalStatus, setFilterMaritalStatus] = useState('Todos');
@@ -170,7 +172,12 @@ export const Dashboard: React.FC = () => {
         const matchType = selectedTypes.length === 0 || selectedTypes.includes(m.tipo_de_pessoa?.trim() || '');
         const residentSector = getMemberSector(m);
         const matchSector = filterSector === 'Todos' || residentSector === filterSector;
-        return matchGender && matchGroup && matchDisc && matchAge && matchMarital && matchStatus && matchType && matchSector;
+        
+        const rawEcl = m.setor_eclesiastico || (m.grupos_caseiros ? (rawCelulas.find(c => c.grupo_caseiro === m.grupos_caseiros)?.setor || '') : '');
+        const eclSector = getNormalizedSectorName(rawEcl);
+        const matchSectorEcl = filterSectorEcl === 'Todos' || eclSector === filterSectorEcl;
+        
+        return matchGender && matchGroup && matchDisc && matchAge && matchMarital && matchStatus && matchType && matchSector && matchSectorEcl;
     });
 
     const ativosOnly = filteredMembros.filter(m => m.status === 'Ativo');
@@ -248,7 +255,9 @@ export const Dashboard: React.FC = () => {
     };
 
     filteredMembros.forEach(m => {
-      const sec = getMemberSector(m);
+      const sec = sectorViewMode === 'eclesiastico'
+        ? (m.setor_eclesiastico ? getNormalizedSectorName(m.setor_eclesiastico) : (m.grupos_caseiros ? getNormalizedSectorName(rawCelulas.find(c => c.grupo_caseiro === m.grupos_caseiros)?.setor) : 'Sem Setor'))
+        : getMemberSector(m);
       if (sectorCounts[sec]) {
         sectorCounts[sec].membros += 1;
       }
@@ -278,7 +287,7 @@ export const Dashboard: React.FC = () => {
             discipuladores: discList
         }
     };
-  }, [isLoading, rawMembros, rawCelulas, rawDiscipulado, filterGender, filterGroup, filterDisc, filterSector, filterMinAge, filterMaxAge, filterMaritalStatus, filterStatus, selectedTypes]);
+  }, [isLoading, rawMembros, rawCelulas, rawDiscipulado, filterGender, filterGroup, filterDisc, filterSector, filterSectorEcl, sectorViewMode, filterMinAge, filterMaxAge, filterMaritalStatus, filterStatus, selectedTypes]);
 
   const handleOpenModal = async (type: 'grupo' | 'setor' | 'discipulador', title: string) => {
     setModalType(type); setModalTitle(title); setIsModalLoading(true);
@@ -354,7 +363,22 @@ export const Dashboard: React.FC = () => {
 
       <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-wrap gap-4 items-center mb-6">
         <div className="flex items-center gap-2 text-gray-400 mr-2"><Search className="w-4 h-4" /><span className="text-xs font-bold uppercase tracking-wider">Filtros Rápidos:</span></div>
-        <select value={filterSector} onChange={e => setFilterSector(e.target.value)} className="text-sm border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50"><option value="Todos">Setor (Todos)</option><option value="Setor Norte">Setor Norte</option><option value="Setor Central">Setor Central</option><option value="Setor Águas Claras">Setor Águas Claras</option><option value="Setor Sul">Setor Sul</option><option value="Sem Setor">Sem Setor</option></select>
+        <select value={filterSector} onChange={e => setFilterSector(e.target.value)} className="text-sm border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50">
+          <option value="Todos">Setor de Residência (Todos)</option>
+          <option value="Setor Norte">Setor Norte</option>
+          <option value="Setor Central">Setor Central</option>
+          <option value="Setor Águas Claras">Setor Águas Claras</option>
+          <option value="Setor Sul">Setor Sul</option>
+          <option value="Sem Setor">Sem Setor</option>
+        </select>
+        <select value={filterSectorEcl} onChange={e => setFilterSectorEcl(e.target.value)} className="text-sm border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50">
+          <option value="Todos">Setor do GC (Todos)</option>
+          <option value="Setor Norte">Setor Norte</option>
+          <option value="Setor Central">Setor Central</option>
+          <option value="Setor Águas Claras">Setor Águas Claras</option>
+          <option value="Setor Sul">Setor Sul</option>
+          <option value="Sem Setor">Sem Setor</option>
+        </select>
         <select value={filterGender} onChange={e => setFilterGender(e.target.value)} className="text-sm border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50"><option value="Todos">Todos os Sexos</option><option value="Masculino">Masculino</option><option value="Feminino">Feminino</option></select>
         <select value={filterGroup} onChange={e => setFilterGroup(e.target.value)} className="text-sm border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50 max-w-[200px]"><option value="Todos">Todos os Grupos</option>{rawCelulas.map(c => <option key={c.grupo_caseiro} value={c.grupo_caseiro}>{c.grupo_caseiro}</option>)}</select>
         <select value={filterDisc} onChange={e => setFilterDisc(e.target.value)} className="text-sm border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50 max-w-[200px]"><option value="Todos">Todos os Discipuladores</option>{Array.from(new Set(rawDiscipulado.map(d => d.discipulador))).sort().map(d => <option key={d} value={d}>{d}</option>)}</select>
@@ -427,13 +451,14 @@ export const Dashboard: React.FC = () => {
            <input type="number" value={filterMaxAge} onChange={e => setFilterMaxAge(parseInt(e.target.value) || 120)} className="w-12 bg-transparent text-sm font-semibold outline-none border-b border-transparent focus:border-primary-500" placeholder="Max" />
         </div>
 
-        {(filterGender !== 'Todos' || filterGroup !== 'Todos' || filterDisc !== 'Todos' || filterSector !== 'Todos' || filterMinAge !== 0 || filterMaxAge !== 120 || filterMaritalStatus !== 'Todos' || filterStatus !== 'Todos' || selectedTypes.length > 0) && (
+        {(filterGender !== 'Todos' || filterGroup !== 'Todos' || filterDisc !== 'Todos' || filterSector !== 'Todos' || filterSectorEcl !== 'Todos' || filterMinAge !== 0 || filterMaxAge !== 120 || filterMaritalStatus !== 'Todos' || filterStatus !== 'Todos' || selectedTypes.length > 0) && (
           <button 
             onClick={() => { 
               setFilterGender('Todos'); 
               setFilterGroup('Todos'); 
               setFilterDisc('Todos'); 
               setFilterSector('Todos');
+              setFilterSectorEcl('Todos');
               setFilterMinAge(0); 
               setFilterMaxAge(120); 
               setFilterMaritalStatus('Todos'); 
@@ -481,7 +506,62 @@ export const Dashboard: React.FC = () => {
             <div className="overflow-x-auto"><table className="min-w-full divide-y divide-gray-200 mt-4"><thead className="bg-gray-50/50"><tr><th className="py-3 pl-4 pr-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Grupo Caseiro</th><th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Líder</th><th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Membros</th><th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ação</th></tr></thead><tbody className="divide-y divide-gray-100 bg-white">{dashboardData?.charts.groups.slice(0, 10).map((group: any, idx: number) => (<tr key={idx} className="hover:bg-gray-50/50 transition-colors"><td className="whitespace-nowrap py-3 pl-4 pr-3 text-sm font-medium text-gray-900">{group.nome}</td><td className="whitespace-nowrap px-3 py-3 text-sm text-gray-500">{group.lider}</td><td className="whitespace-nowrap px-3 py-3 text-sm text-center font-bold text-gray-700"><span className="bg-primary-50 text-primary-700 py-1 px-3 rounded-full">{group.membros}</span></td><td className="whitespace-nowrap px-3 py-3 text-sm text-right"><button onClick={() => handleOpenModal('grupo', group.nome)} className="text-primary-600 font-medium hover:underline text-xs outline-none">Ver Detalhes</button></td></tr>))}</tbody></table></div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100 flex flex-col"><div className="pb-4 border-b border-gray-100"><h3 className="text-lg font-semibold leading-6 text-gray-900 flex items-center gap-2"><Layers className="h-5 w-5 text-indigo-500" /> Setores</h3><p className="mt-1 text-sm text-gray-500">Agrupamento de células</p></div><div className="overflow-x-auto"><table className="min-w-full divide-y divide-gray-200 mt-4"><thead className="bg-gray-50/50"><tr><th className="py-3 pl-4 pr-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Setor</th><th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">GCs</th><th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Membros</th><th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ação</th></tr></thead><tbody className="divide-y divide-gray-100 bg-white">{dashboardData?.charts.sectors.map((setor: any, idx: number) => (<tr key={idx} className="hover:bg-gray-50/50"><td className="whitespace-nowrap py-3 pl-4 pr-3 text-sm font-medium text-gray-900">{setor.nome}</td><td className="whitespace-nowrap px-3 py-3 text-sm text-center"><span className="bg-gray-100 text-gray-600 py-1 px-2 rounded-md font-bold">{setor.grupos}</span></td><td className="whitespace-nowrap px-3 py-3 text-sm text-center"><span className="bg-indigo-50 text-indigo-600 py-1 px-2 rounded-md font-bold">{setor.membros}</span></td><td className="whitespace-nowrap px-3 py-3 text-sm text-right"><button onClick={() => handleOpenModal('setor', setor.nome)} className="text-indigo-600 font-medium hover:underline text-xs">Acessar</button></td></tr>))}</tbody></table></div></div>
+            <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100 flex flex-col">
+              <div className="pb-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div>
+                  <h3 className="text-lg font-semibold leading-6 text-gray-900 flex items-center gap-2">
+                    <Layers className="h-5 w-5 text-indigo-500" /> Setores
+                  </h3>
+                  <p className="mt-1 text-sm text-gray-500">
+                    {sectorViewMode === 'eclesiastico' ? 'Membros agrupados por Setor do GC' : 'Membros agrupados por Setor de Residência'}
+                  </p>
+                </div>
+                <div className="flex bg-gray-100 p-0.5 rounded-lg shrink-0">
+                  <button 
+                    type="button"
+                    onClick={() => setSectorViewMode('residencial')}
+                    className={clsx("px-2.5 py-1 text-xs font-bold rounded-md transition-colors", sectorViewMode === 'residencial' ? "bg-white text-indigo-600 shadow-sm" : "text-gray-500 hover:text-gray-700")}
+                  >
+                    Residência
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setSectorViewMode('eclesiastico')}
+                    className={clsx("px-2.5 py-1 text-xs font-bold rounded-md transition-colors", sectorViewMode === 'eclesiastico' ? "bg-white text-indigo-600 shadow-sm" : "text-gray-500 hover:text-gray-700")}
+                  >
+                    Célula (GC)
+                  </button>
+                </div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200 mt-4">
+                  <thead className="bg-gray-50/50">
+                    <tr>
+                      <th className="py-3 pl-4 pr-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Setor</th>
+                      <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">GCs</th>
+                      <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Membros</th>
+                      <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ação</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 bg-white">
+                    {dashboardData?.charts.sectors.map((setor: any, idx: number) => (
+                      <tr key={idx} className="hover:bg-gray-50/50">
+                        <td className="whitespace-nowrap py-3 pl-4 pr-3 text-sm font-medium text-gray-900">{setor.nome}</td>
+                        <td className="whitespace-nowrap px-3 py-3 text-sm text-center">
+                          <span className="bg-gray-100 text-gray-600 py-1 px-2 rounded-md font-bold">{setor.grupos}</span>
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-3 text-sm text-center">
+                          <span className="bg-indigo-50 text-indigo-600 py-1 px-2 rounded-md font-bold">{setor.membros}</span>
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-3 text-sm text-right">
+                          <button onClick={() => handleOpenModal('setor', setor.nome)} className="text-indigo-600 font-medium hover:underline text-xs">Acessar</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
             <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100 flex flex-col"><div className="pb-4 border-b border-gray-100"><h3 className="text-lg font-semibold leading-6 text-gray-900 flex items-center gap-2"><UserCheck className="h-5 w-5 text-emerald-500" /> Discipuladores Cadastrados</h3><p className="mt-1 text-sm text-gray-500">Rede de Discipulado Ativa</p></div><div className="overflow-x-auto max-h-[300px]"><table className="min-w-full divide-y divide-gray-200 mt-4"><thead className="bg-gray-50/50 sticky top-0"><tr><th className="py-3 pl-4 pr-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Discipulador</th><th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Discípulos</th><th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ação</th></tr></thead><tbody className="divide-y divide-gray-100 bg-white">{dashboardData?.charts.discipuladores.slice(0, 15).map((disc: any, idx: number) => (<tr key={idx} className="hover:bg-gray-50/50"><td className="whitespace-nowrap py-3 pl-4 pr-3 text-sm font-medium text-gray-900">{disc.nome}</td><td className="whitespace-nowrap px-3 py-3 text-sm text-center"><span className="bg-emerald-50 text-emerald-600 py-1 px-2 rounded-md font-bold">{disc.discipulos}</span></td><td className="whitespace-nowrap px-3 py-3 text-sm text-right"><button onClick={() => handleOpenModal('discipulador', disc.nome)} className="text-emerald-600 font-medium hover:underline text-xs">Exibir Vidas</button></td></tr>))}</tbody></table></div></div>
           </div>
         </div>

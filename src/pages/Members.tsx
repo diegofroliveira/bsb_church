@@ -4,6 +4,16 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import clsx from 'clsx';
 
+const getNormalizedSectorName = (dbSector: string | null | undefined): string => {
+  if (!dbSector) return 'Sem Setor';
+  const norm = dbSector.trim().toUpperCase();
+  if (norm.includes('NORTE')) return 'Setor Norte';
+  if (norm.includes('CENTRAL')) return 'Setor Central';
+  if (norm.includes('AGUAS CLARAS') || norm.includes('ÁGUAS CLARAS')) return 'Setor Águas Claras';
+  if (norm.includes('SUL')) return 'Setor Sul';
+  return 'Sem Setor';
+};
+
 export const Members: React.FC = () => {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
@@ -19,6 +29,7 @@ export const Members: React.FC = () => {
   const [filterAgeCategory, setFilterAgeCategory] = useState('Todas');
   const [filterState, setFilterState] = useState('Todos');
   const [filterSetor, setFilterSetor] = useState('Todos');
+  const [filterSetorEcl, setFilterSetorEcl] = useState('Todos');
   const [filterMestre, setFilterMestre] = useState('Todos');
   const [filterMaritalStatus, setFilterMaritalStatus] = useState('Todos');
   const [filterMinAge, setFilterMinAge] = useState<number>(0);
@@ -57,11 +68,20 @@ export const Members: React.FC = () => {
         });
 
         const enriched = allMembros.map(m => {
-           const nomeLower = (m.nome || m.name || '').toLowerCase();
-           const gcLower = (m.grupos_caseiros || '').toLowerCase();
+           const nomeLower = (m.nome || m.name || '').trim().toLowerCase();
+           const gcLower = (m.grupos_caseiros || '').trim().toLowerCase();
+           
+           const rawEcl = m.setor_eclesiastico || setorMap[gcLower] || 'Sem Setor';
+           const setorEcl = getNormalizedSectorName(rawEcl);
+           
+           const rawRes = m.setor_residencial || m.setor_residencial_calculado || '';
+           const setorRes = rawRes ? getNormalizedSectorName(rawRes) : (setorMap[gcLower] ? getNormalizedSectorName(setorMap[gcLower]) : 'Sem Setor');
+
            return {
                ...m,
-               setor: setorMap[gcLower] || 'Sem Setor',
+               setor: setorRes,
+               setor_eclesiastico_display: setorEcl,
+               setor_residencial_display: setorRes,
                discipulador: mestreMap[nomeLower] || 'Sem Discipulador'
            };
         });
@@ -102,7 +122,8 @@ export const Members: React.FC = () => {
   const uniqueGCs = useMemo(() => Array.from(new Set(members.map(m => m.grupos_caseiros).filter(Boolean))).sort(), [members]);
   const uniqueGenders = useMemo(() => Array.from(new Set(members.map(m => m.sexo || m.sex).filter(Boolean))).sort(), [members]);
   const uniqueStates = useMemo(() => Array.from(new Set(members.map(m => m.uf || m.estado).filter(Boolean))).sort(), [members]);
-  const uniqueSetores = useMemo(() => Array.from(new Set(members.map(m => m.setor).filter(s => s !== 'Sem Setor'))).sort(), [members]);
+  const uniqueSetores = useMemo(() => Array.from(new Set(members.map(m => m.setor_residencial_display).filter(s => s !== 'Sem Setor'))).sort(), [members]);
+  const uniqueSetoresEcl = useMemo(() => Array.from(new Set(members.map(m => m.setor_eclesiastico_display).filter(s => s !== 'Sem Setor'))).sort(), [members]);
   const uniqueMestres = useMemo(() => Array.from(new Set(members.map(m => m.discipulador).filter(d => d !== 'Sem Discipulador'))).sort(), [members]);
   const uniqueMaritalStatuses = useMemo(() => Array.from(new Set(members.map(m => m.estado_civil).filter(Boolean))).sort(), [members]);
 
@@ -115,6 +136,7 @@ export const Members: React.FC = () => {
       if (filterType !== 'Todos' && m.tipo_cadastro !== filterType) return false;
       if (filterGC !== 'Todos' && m.grupos_caseiros !== filterGC) return false;
       if (filterSetor !== 'Todos' && m.setor !== filterSetor) return false;
+      if (filterSetorEcl !== 'Todos' && m.setor_eclesiastico_display !== filterSetorEcl) return false;
       if (filterMestre !== 'Todos' && m.discipulador !== filterMestre) return false;
       if (filterGender !== 'Todos' && (m.sexo || m.sex) !== filterGender) return false;
       if (filterState !== 'Todos' && (m.uf || m.estado) !== filterState) return false;
@@ -126,7 +148,7 @@ export const Members: React.FC = () => {
       
       return true;
     });
-  }, [members, filterQuery, filterType, filterGC, filterGender, filterAgeCategory, filterMinAge, filterMaxAge, filterMaritalStatus, filterState, filterSetor, filterMestre]);
+  }, [members, filterQuery, filterType, filterGC, filterGender, filterAgeCategory, filterMinAge, filterMaxAge, filterMaritalStatus, filterState, filterSetor, filterSetorEcl, filterMestre]);
 
   const totalCount = filteredMembers.length;
   const paginatedMembers = filteredMembers.slice((page - 1) * pageSize, page * pageSize);
@@ -159,7 +181,7 @@ export const Members: React.FC = () => {
           <button 
             onClick={() => {
               setFilterQuery(''); setFilterType('Todos'); setFilterGC('Todos'); setFilterGender('Todos');
-              setFilterAgeCategory('Todas'); setFilterState('Todos'); setFilterSetor('Todos'); setFilterMestre('Todos');
+              setFilterAgeCategory('Todas'); setFilterState('Todos'); setFilterSetor('Todos'); setFilterSetorEcl('Todos'); setFilterMestre('Todos');
               setFilterMinAge(0); setFilterMaxAge(120); setFilterMaritalStatus('Todos');
             }}
             className="text-xs text-red-600 font-medium hover:underline"
@@ -205,10 +227,18 @@ export const Members: React.FC = () => {
           </div>
 
           <div>
-             <label className="block text-xs font-medium text-gray-500 mb-1">Setor</label>
+             <label className="block text-xs font-medium text-gray-500 mb-1">Setor de Residência</label>
              <select value={filterSetor} onChange={e => { setFilterSetor(e.target.value); setPage(1); }} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white">
                  <option value="Todos">Todos</option>
                  {uniqueSetores.map(t => <option key={t as string} value={t as string}>{t as string}</option>)}
+             </select>
+          </div>
+
+          <div>
+             <label className="block text-xs font-medium text-gray-500 mb-1">Setor do GC (Ecl.)</label>
+             <select value={filterSetorEcl} onChange={e => { setFilterSetorEcl(e.target.value); setPage(1); }} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white">
+                 <option value="Todos">Todos</option>
+                 {uniqueSetoresEcl.map(t => <option key={t as string} value={t as string}>{t as string}</option>)}
              </select>
           </div>
 
@@ -302,12 +332,23 @@ export const Members: React.FC = () => {
                                </span>
                             </div>
                          </td>
-                         <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                            <div className="flex flex-col">
-                               <span className="truncate max-w-[150px]">{person.grupos_caseiros || '-'}</span>
-                               <span className="text-[10px] text-indigo-500 font-medium">{person.setor !== 'Sem Setor' ? person.setor : ''}</span>
-                            </div>
-                         </td>
+                          <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                             <div className="flex flex-col">
+                                <span className="truncate max-w-[150px] font-medium text-gray-800">{person.grupos_caseiros || '-'}</span>
+                                <div className="flex flex-col gap-0.5 mt-0.5">
+                                  {person.setor !== 'Sem Setor' && (
+                                    <span className="text-[10px] text-indigo-600 font-semibold truncate">
+                                      Res.: {person.setor}
+                                    </span>
+                                  )}
+                                  {person.setor_eclesiastico_display !== 'Sem Setor' && (
+                                    <span className="text-[10px] text-teal-600 font-semibold truncate">
+                                      GC: {person.setor_eclesiastico_display}
+                                    </span>
+                                  )}
+                                </div>
+                             </div>
+                          </td>
                          <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                             <div className="flex flex-col gap-1">
                                {person.email && <div className="flex items-center gap-1.5"><Mail className="w-3.5 h-3.5 text-gray-400" /> {person.email}</div>}

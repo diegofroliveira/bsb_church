@@ -114,7 +114,7 @@
       "Necessidades Especiais",
       "Cuidados Alimentícios"
     ],
-    "total_registros": 454,
+    "total_registros": 466,
     "amostra": [
       {
         "id": 750040,
@@ -460,6 +460,344 @@
       }
     ]
   },
+  "pessoas_familiares": {
+    "colunas": [
+      "ID Pessoa A",
+      "Pessoa A",
+      "Parentesco",
+      "ID Pessoa B",
+      "Pessoa B",
+      "Mesmo Domicílio",
+      "Data"
+    ],
+    "total_registros": 1980,
+    "amostra": [
+      {
+        "ID Pessoa A": 756540,
+        "Pessoa A": "ADRIELLE DE MORAIS MOURA",
+        "Parentesco": "Mãe",
+        "ID Pessoa B": 756557,
+        "Pessoa B": "PATRÍCIA DE MORAIS SILVA MOURA",
+        "Mesmo Domicílio": "Sim",
+        "Data": ""
+      },
+      {
+        "ID Pessoa A": 2401807,
+        "Pessoa A": "ALESSANDRA FRANÇA LANA",
+        "Parentesco": "Esposo(a)",
+        "ID Pessoa B": 2401810,
+        "Pessoa B": "RODRIGO CASIMIRO REDONDO",
+        "Mesmo Domicílio": "Não",
+        "Data": ""
+      },
+      {
+        "ID Pessoa A": 2401807,
+        "Pessoa A": "ALESSANDRA FRANÇA LANA",
+        "Parentesco": "Filho(a)",
+        "ID Pessoa B": 2401813,
+        "Pessoa B": "MEL FRANÇA LANA REDONDO",
+        "Mesmo Domicílio": "Sim",
+        "Data": ""
+      }
+    ]
+  },
+  "pessoas_historico": {
+    "colunas": [
+      "Ocorrência",
+      "Data",
+      "ID Pessoa",
+      "Pessoa",
+      "Anotação",
+      "ID Grupo Caseiro",
+      "Grupo Caseiro",
+      "Celular Principal SMS",
+      "Email"
+    ],
+    "total_registros": 1071,
+    "amostra": [
+      {
+        "Ocorrência": "BATISMO",
+        "Data": "2001-07-07",
+        "ID Pessoa": 750040,
+        "Pessoa": "DIEGO DE FREITAS OLIVEIRA",
+        "Anotação": "",
+        "ID Grupo Caseiro": "",
+        "Grupo Caseiro": "",
+        "Celular Principal SMS": 61981741176.0,
+        "Email": "diego.fjddf@gmail.com"
+      },
+      {
+        "Ocorrência": "DATA DE VÍNCULO",
+        "Data": "2001-07-07",
+        "ID Pessoa": 750040,
+        "Pessoa": "DIEGO DE FREITAS OLIVEIRA",
+        "Anotação": "",
+        "ID Grupo Caseiro": "",
+        "Grupo Caseiro": "",
+        "Celular Principal SMS": 61981741176.0,
+        "Email": "diego.fjddf@gmail.com"
+      },
+      {
+        "Ocorrência": "DATA DE VÍNCULO",
+        "Data": "2018-07-28",
+        "ID Pessoa": 756449,
+        "Pessoa": "ALINE MENEZES BRAGA",
+        "Anotação": "28/07/2018",
+        "ID Grupo Caseiro": "",
+        "Grupo Caseiro": "",
+        "Celular Principal SMS": 61996836211.0,
+        "Email": "alinemenezes_snt@hotmail.com"
+      }
+    ]
+  },
+  "pessoas_funcoes": {
+    "colunas": [
+      "ID Pessoa",
+      "Pessoa",
+      "Função",
+      "Data Início",
+      "Data Término",
+      "Situação",
+      "Celular Principal SMS",
+      "Email"
+    ],
+    "total_registros": 107,
+    "amostra": [
+      {
+        "ID Pessoa": 750040,
+        "Pessoa": "DIEGO DE FREITAS OLIVEIRA",
+        "Função": "DISCIPULADOR(A)",
+        "Data Início": "2017-10-01",
+        "Data Término": "0000-00-00",
+        "Situação": "Ativo",
+        "Celular Principal SMS": 61981741176,
+        "Email": "diego.fjddf@gmail.com"
+      },
+      {
+        "ID Pessoa": 750040,
+        "Pessoa": "DIEGO DE FREITAS OLIVEIRA",
+        "Função": "DISCIPULADOR(A)",
+        "Data Início": "2017-10-01",
+        "Data Término": "",
+        "Situação": "Ativo",
+        "Celular Principal SMS": 61981741176,
+        "Email": "diego.fjddf@gmail.com"
+      },
+      {
+        "ID Pessoa": 756449,
+        "Pessoa": "ALINE MENEZES BRAGA",
+        "Função": "DISCIPULADOR(A)",
+        "Data Início": "2026-04-09",
+        "Data Término": "",
+        "Situação": "Ativo",
+        "Celular Principal SMS": 61996836211,
+        "Email": "alinemenezes_snt@hotmail.com"
+      }
+    ]
+  },
+  "pessoas_protocolos": {
+    "colunas": [
+      "Nenhum Registro Localizado"
+    ],
+    "total_registros": 0,
+    "amostra": []
+  },
+  "visitantes": {
+    "colunas": [
+      "Nenhum Registro Localizado"
+    ],
+    "total_registros": 0,
+    "amostra": []
+  },
+  "localidade": {
+    "colunas": [
+      "id",
+      "Localidade",
+      "Tipo",
+      "Status",
+      "Data Criação",
+      "Setor",
+      "Horário Início",
+      "Horário Fim",
+      "Dia da Semana",
+      "Limite de Pessoas",
+      "Telefone Fixo",
+      "Celular Principal SMS",
+      "Operadora (Principal)",
+      "Celular secundário",
+      "Operadora (Secundário)",
+      "Telefone Contato",
+      "Email",
+      "CEP",
+      "Logradouro",
+      "Número",
+      "Complemento",
+      "Bairro",
+      "Cidade",
+      "Estado",
+      "Líder/Missionário",
+      "ID Grupo Caseiro Vinculado",
+      "Grupo Caseiro Vinculado"
+    ],
+    "total_registros": 5,
+    "amostra": [
+      {
+        "id": 35011,
+        "Localidade": "IG ALTAMIRA",
+        "Tipo": "MISSÕES",
+        "Status": "Ativo",
+        "Data Criação": "2015-01-01",
+        "Setor": "MISSÕES",
+        "Horário Início": "",
+        "Horário Fim": "",
+        "Dia da Semana": "",
+        "Limite de Pessoas": "",
+        "Telefone Fixo": "",
+        "Celular Principal SMS": "",
+        "Operadora (Principal)": "",
+        "Celular secundário": "",
+        "Operadora (Secundário)": "",
+        "Telefone Contato": "",
+        "Email": "",
+        "CEP": "",
+        "Logradouro": "",
+        "Número": "",
+        "Complemento": "",
+        "Bairro": "",
+        "Cidade": "",
+        "Estado": "",
+        "Líder/Missionário": "WILLIAM CESAR LOPES DOMINGUES",
+        "ID Grupo Caseiro Vinculado": 0,
+        "Grupo Caseiro Vinculado": ""
+      },
+      {
+        "id": 49726,
+        "Localidade": "IG ANÁPOLIS",
+        "Tipo": "LOCALIDADE",
+        "Status": "Ativo",
+        "Data Criação": "2010-12-01",
+        "Setor": "DEMAIS LOCALIDADES",
+        "Horário Início": "",
+        "Horário Fim": "",
+        "Dia da Semana": "",
+        "Limite de Pessoas": 100.0,
+        "Telefone Fixo": "",
+        "Celular Principal SMS": "",
+        "Operadora (Principal)": "",
+        "Celular secundário": "",
+        "Operadora (Secundário)": "",
+        "Telefone Contato": "",
+        "Email": "",
+        "CEP": "",
+        "Logradouro": "",
+        "Número": "",
+        "Complemento": "",
+        "Bairro": "",
+        "Cidade": "",
+        "Estado": "",
+        "Líder/Missionário": "LAERTE ANTONIO ZORZETTI",
+        "ID Grupo Caseiro Vinculado": 0,
+        "Grupo Caseiro Vinculado": ""
+      },
+      {
+        "id": 49725,
+        "Localidade": "IG ARAGUARI",
+        "Tipo": "LOCALIDADE",
+        "Status": "Ativo",
+        "Data Criação": "2000-12-01",
+        "Setor": "DEMAIS LOCALIDADES",
+        "Horário Início": "",
+        "Horário Fim": "",
+        "Dia da Semana": "",
+        "Limite de Pessoas": 100.0,
+        "Telefone Fixo": "",
+        "Celular Principal SMS": "",
+        "Operadora (Principal)": "",
+        "Celular secundário": "",
+        "Operadora (Secundário)": "",
+        "Telefone Contato": "",
+        "Email": "",
+        "CEP": "",
+        "Logradouro": "",
+        "Número": "",
+        "Complemento": "",
+        "Bairro": "",
+        "Cidade": "",
+        "Estado": "",
+        "Líder/Missionário": "JOSÉ CARLOS ALVES NASCIMENTO",
+        "ID Grupo Caseiro Vinculado": 0,
+        "Grupo Caseiro Vinculado": ""
+      }
+    ]
+  },
+  "localidade_participantes": {
+    "colunas": [
+      "ID Grupo Caseiro",
+      "Localidade",
+      "ID Pessoa",
+      "Pessoa",
+      "Cargo",
+      "Permissão Gerenciar",
+      "Data Entrada",
+      "Email",
+      "Celular Principal SMS",
+      "Telefone Fixo",
+      "Celular secundário",
+      "Telefone Contato"
+    ],
+    "total_registros": 19,
+    "amostra": [
+      {
+        "ID Grupo Caseiro": 35011,
+        "Localidade": "IG ALTAMIRA",
+        "ID Pessoa": 756713,
+        "Pessoa": "VANN CLEYD DE LUCENA DOMINGUES",
+        "Cargo": "",
+        "Permissão Gerenciar": "Não",
+        "Data Entrada": "2020-01-08",
+        "Email": "vann.domingues@gmail.com",
+        "Celular Principal SMS": 91992331388.0,
+        "Telefone Fixo": "",
+        "Celular secundário": "",
+        "Telefone Contato": ""
+      },
+      {
+        "ID Grupo Caseiro": 35011,
+        "Localidade": "IG ALTAMIRA",
+        "ID Pessoa": 756714,
+        "Pessoa": "WILLIAM CESAR LOPES DOMINGUES",
+        "Cargo": "",
+        "Permissão Gerenciar": "Não",
+        "Data Entrada": "2020-01-08",
+        "Email": "uwiraete@gmail.com",
+        "Celular Principal SMS": 91992901388.0,
+        "Telefone Fixo": "",
+        "Celular secundário": "",
+        "Telefone Contato": ""
+      },
+      {
+        "ID Grupo Caseiro": 49725,
+        "Localidade": "IG ARAGUARI",
+        "ID Pessoa": 756702,
+        "Pessoa": "ALEX STOPA MACHADO",
+        "Cargo": "",
+        "Permissão Gerenciar": "Não",
+        "Data Entrada": "2021-12-07",
+        "Email": "",
+        "Celular Principal SMS": 34988208666.0,
+        "Telefone Fixo": 3432429887.0,
+        "Celular secundário": "",
+        "Telefone Contato": ""
+      }
+    ]
+  },
+  "localidade_visitantes": {
+    "colunas": [
+      "Nenhum Registro Localizado"
+    ],
+    "total_registros": 0,
+    "amostra": []
+  },
   "celulas": {
     "colunas": [
       "id",
@@ -491,8 +829,8 @@
       "Estado",
       "Coordenador",
       "Líder",
-      "Anfitrião",
-      "Auxiliar",
+      "Auxiliar 1:",
+      "Auxiliar 2:",
       "ID Grupo Caseiro Vinculado",
       "Grupo Caseiro Vinculado",
       "Data de status"
@@ -529,8 +867,8 @@
         "Estado": "Distrito Federal",
         "Coordenador": "",
         "Líder": "CARLOS ALBERTO RIBEIRO DO NASCIMENTO",
-        "Anfitrião": "",
-        "Auxiliar": "FILIPE FREITAS DE OLIVEIRA",
+        "Auxiliar 1:": "",
+        "Auxiliar 2:": "FILIPE FREITAS DE OLIVEIRA",
         "ID Grupo Caseiro Vinculado": 0,
         "Grupo Caseiro Vinculado": "",
         "Data de status": ""
@@ -565,8 +903,8 @@
         "Estado": "Distrito Federal",
         "Coordenador": "",
         "Líder": "JOSÉ ANTONIO DE SOUZA RIBEIRO",
-        "Anfitrião": "",
-        "Auxiliar": "EDUARDO ANTONIO MELLO FREITAS",
+        "Auxiliar 1:": "",
+        "Auxiliar 2:": "EDUARDO ANTONIO MELLO FREITAS",
         "ID Grupo Caseiro Vinculado": 0,
         "Grupo Caseiro Vinculado": "",
         "Data de status": ""
@@ -601,13 +939,355 @@
         "Estado": "Distrito Federal",
         "Coordenador": "",
         "Líder": "CLEMESON BARBOZA SILVA",
-        "Anfitrião": "",
-        "Auxiliar": "GABRIEL DE ARAUJO SILVA",
+        "Auxiliar 1:": "",
+        "Auxiliar 2:": "GABRIEL DE ARAUJO SILVA",
         "ID Grupo Caseiro Vinculado": 34098,
         "Grupo Caseiro Vinculado": "BSB AGUAS CLARAS - \"B\"",
         "Data de status": ""
       }
     ]
+  },
+  "celulas_participantes": {
+    "colunas": [
+      "ID Grupo Caseiro",
+      "Grupo Caseiro",
+      "ID Pessoa",
+      "Pessoa",
+      "Email",
+      "Celular Principal SMS",
+      "Telefone Fixo",
+      "Celular secundário",
+      "Telefone Contato",
+      "Cargo",
+      "Permissão Gerenciar",
+      "Data Entrada",
+      "Data de saída"
+    ],
+    "total_registros": 593,
+    "amostra": [
+      {
+        "ID Grupo Caseiro": 34097,
+        "Grupo Caseiro": "BSB AGUAS CLARAS - \"A\"",
+        "ID Pessoa": 750040,
+        "Pessoa": "DIEGO DE FREITAS OLIVEIRA",
+        "Email": "diego.fjddf@gmail.com",
+        "Celular Principal SMS": 61981741176.0,
+        "Telefone Fixo": "",
+        "Celular secundário": "",
+        "Telefone Contato": "",
+        "Cargo": "MEMBRO",
+        "Permissão Gerenciar": "Não",
+        "Data Entrada": "2024-03-02",
+        "Data de saída": "2025-04-14"
+      },
+      {
+        "ID Grupo Caseiro": 34097,
+        "Grupo Caseiro": "BSB AGUAS CLARAS - \"A\"",
+        "ID Pessoa": 756449,
+        "Pessoa": "ALINE MENEZES BRAGA",
+        "Email": "alinemenezes_snt@hotmail.com",
+        "Celular Principal SMS": 61996836211.0,
+        "Telefone Fixo": "",
+        "Celular secundário": "",
+        "Telefone Contato": "",
+        "Cargo": "",
+        "Permissão Gerenciar": "Não",
+        "Data Entrada": "2019-11-13",
+        "Data de saída": "2021-03-10"
+      },
+      {
+        "ID Grupo Caseiro": 34097,
+        "Grupo Caseiro": "BSB AGUAS CLARAS - \"A\"",
+        "ID Pessoa": 756450,
+        "Pessoa": "ANDRÉ MATOS BENJAMIM",
+        "Email": "",
+        "Celular Principal SMS": 61983411427.0,
+        "Telefone Fixo": 6130342573.0,
+        "Celular secundário": "",
+        "Telefone Contato": "",
+        "Cargo": "",
+        "Permissão Gerenciar": "Não",
+        "Data Entrada": "2023-12-28",
+        "Data de saída": ""
+      }
+    ]
+  },
+  "celulas_visitantes": {
+    "colunas": [
+      "Nenhum Registro Localizado"
+    ],
+    "total_registros": 0,
+    "amostra": []
+  },
+  "celulas_encontros": {
+    "colunas": [
+      "Nenhum Registro Localizado"
+    ],
+    "total_registros": 0,
+    "amostra": []
+  },
+  "celulas_encontros_presenca_participantes": {
+    "colunas": [
+      "Nenhum Registro Localizado"
+    ],
+    "total_registros": 0,
+    "amostra": []
+  },
+  "celulas_encontros_presenca_visitantes": {
+    "colunas": [
+      "Nenhum Registro Localizado"
+    ],
+    "total_registros": 0,
+    "amostra": []
+  },
+  "reuniao_presenca": {
+    "colunas": [
+      "Nenhum Registro Localizado"
+    ],
+    "total_registros": 0,
+    "amostra": []
+  },
+  "eventos": {
+    "colunas": [
+      "id",
+      "Tipo",
+      "Tema",
+      "Data Início",
+      "Data Fim",
+      "Observação",
+      "ID Responsável",
+      "Responsável",
+      "Divulgar Aplicativo",
+      "Divulgar Portal",
+      "Inscrição Portal",
+      "CEP",
+      "Logradouro",
+      "Número",
+      "Complemento",
+      "Bairro",
+      "Cidade",
+      "Estado",
+      "uuid"
+    ],
+    "total_registros": 16,
+    "amostra": [
+      {
+        "id": 74503,
+        "Tipo": "RETIRO",
+        "Tema": "Retiro de Parauapebas",
+        "Data Início": "",
+        "Data Fim": "",
+        "Observação": "",
+        "ID Responsável": "",
+        "Responsável": "",
+        "Divulgar Aplicativo": "Sim",
+        "Divulgar Portal": "Sim",
+        "Inscrição Portal": "Não",
+        "CEP": "70340000",
+        "Logradouro": "SRTVS",
+        "Número": "209",
+        "Complemento": "SALA",
+        "Bairro": "ASA SUL",
+        "Cidade": "Brasília",
+        "Estado": "Distrito Federal",
+        "uuid": "ac8c6967-3ec2-4700-b526-48c547a79656"
+      },
+      {
+        "id": 22588,
+        "Tipo": "REUNIÃO",
+        "Tema": "SISTEMA PROVER",
+        "Data Início": "2020-01-01",
+        "Data Fim": "2020-02-12",
+        "Observação": "IMPLANTAÇÃO",
+        "ID Responsável": 750040.0,
+        "Responsável": "DIEGO DE FREITAS OLIVEIRA",
+        "Divulgar Aplicativo": "Sim",
+        "Divulgar Portal": "Sim",
+        "Inscrição Portal": "Não",
+        "CEP": "70340000",
+        "Logradouro": "SRTVS",
+        "Número": "209",
+        "Complemento": "SALA",
+        "Bairro": "ASA SUL",
+        "Cidade": "Brasília",
+        "Estado": "Distrito Federal",
+        "uuid": "0810e7e2-2608-11ec-9fc9-0253d2d61fb9"
+      },
+      {
+        "id": 21962,
+        "Tipo": "REUNIÃO",
+        "Tema": "REUNIÃO GERAL 11/01/2020",
+        "Data Início": "2020-01-11",
+        "Data Fim": "2020-01-11",
+        "Observação": "",
+        "ID Responsável": 756516.0,
+        "Responsável": "WANDERLEY CLODOALDO LIMA DE FREITAS",
+        "Divulgar Aplicativo": "Sim",
+        "Divulgar Portal": "Sim",
+        "Inscrição Portal": "Não",
+        "CEP": "70340000",
+        "Logradouro": "SRTVS",
+        "Número": "209",
+        "Complemento": "SALA",
+        "Bairro": "ASA SUL",
+        "Cidade": "Brasília",
+        "Estado": "Distrito Federal",
+        "uuid": "080f0468-2608-11ec-9fc9-0253d2d61fb9"
+      }
+    ]
+  },
+  "eventos_encontros": {
+    "colunas": [
+      "ID Evento",
+      "Tema",
+      "ID Encontro",
+      "ID Responsável",
+      "Responsável",
+      "Email",
+      "Celular Principal SMS",
+      "Telefone Fixo",
+      "Celular secundário",
+      "Telefone Contato",
+      "Matéria",
+      "Data Início",
+      "Data Fim",
+      "Observação",
+      "Pauta",
+      "Resumo"
+    ],
+    "total_registros": 23,
+    "amostra": [
+      {
+        "ID Evento": 22588,
+        "Tema": "SISTEMA PROVER",
+        "ID Encontro": 132845,
+        "ID Responsável": 750040.0,
+        "Responsável": "DIEGO DE FREITAS OLIVEIRA",
+        "Email": "diego.fjddf@gmail.com",
+        "Celular Principal SMS": 61981741176.0,
+        "Telefone Fixo": "",
+        "Celular secundário": "",
+        "Telefone Contato": "",
+        "Matéria": "",
+        "Data Início": "2020-01-01 08:00:00",
+        "Data Fim": "2020-01-01 18:00:00",
+        "Observação": "",
+        "Pauta": "",
+        "Resumo": ""
+      },
+      {
+        "ID Evento": 22588,
+        "Tema": "SISTEMA PROVER",
+        "ID Encontro": 132846,
+        "ID Responsável": 750040.0,
+        "Responsável": "DIEGO DE FREITAS OLIVEIRA",
+        "Email": "diego.fjddf@gmail.com",
+        "Celular Principal SMS": 61981741176.0,
+        "Telefone Fixo": "",
+        "Celular secundário": "",
+        "Telefone Contato": "",
+        "Matéria": "",
+        "Data Início": "2020-01-08 08:00:00",
+        "Data Fim": "2020-01-08 18:00:00",
+        "Observação": "",
+        "Pauta": "",
+        "Resumo": ""
+      },
+      {
+        "ID Evento": 22588,
+        "Tema": "SISTEMA PROVER",
+        "ID Encontro": 132847,
+        "ID Responsável": 750040.0,
+        "Responsável": "DIEGO DE FREITAS OLIVEIRA",
+        "Email": "diego.fjddf@gmail.com",
+        "Celular Principal SMS": 61981741176.0,
+        "Telefone Fixo": "",
+        "Celular secundário": "",
+        "Telefone Contato": "",
+        "Matéria": "",
+        "Data Início": "2020-01-15 08:00:00",
+        "Data Fim": "2020-01-15 18:00:00",
+        "Observação": "",
+        "Pauta": "",
+        "Resumo": ""
+      }
+    ]
+  },
+  "eventos_inscricoes": {
+    "colunas": [
+      "ID Evento",
+      "Tema",
+      "ID Pessoa",
+      "Pessoa",
+      "Data Inscrição",
+      "Email",
+      "Celular Principal SMS",
+      "Telefone Fixo",
+      "Celular secundário",
+      "Telefone Contato",
+      "Servico",
+      "ValorServico",
+      "Lote",
+      "ValorLote",
+      "ValorTotal",
+      "FormaPagamento"
+    ],
+    "total_registros": 1,
+    "amostra": [
+      {
+        "ID Evento": 21962,
+        "Tema": "REUNIÃO GERAL 11/01/2020",
+        "ID Pessoa": 750040,
+        "Pessoa": "DIEGO DE FREITAS OLIVEIRA",
+        "Data Inscrição": "2020-01-08 22:16:29",
+        "Email": "diego.fjddf@gmail.com",
+        "Celular Principal SMS": 61981741176,
+        "Telefone Fixo": "",
+        "Celular secundário": "",
+        "Telefone Contato": "",
+        "Servico": "",
+        "ValorServico": 0,
+        "Lote": "REUNIÃO GERAL 11/01/2020",
+        "ValorLote": 0,
+        "ValorTotal": 0,
+        "FormaPagamento": ""
+      }
+    ]
+  },
+  "eventos_presencas": {
+    "colunas": [
+      "Nenhum Registro Localizado"
+    ],
+    "total_registros": 0,
+    "amostra": []
+  },
+  "ensinos": {
+    "colunas": [
+      "Nenhum Registro Localizado"
+    ],
+    "total_registros": 0,
+    "amostra": []
+  },
+  "ensinos_encontros": {
+    "colunas": [
+      "Nenhum Registro Localizado"
+    ],
+    "total_registros": 0,
+    "amostra": []
+  },
+  "ensinos_inscricoes": {
+    "colunas": [
+      "Nenhum Registro Localizado"
+    ],
+    "total_registros": 0,
+    "amostra": []
+  },
+  "ensinos_presencas": {
+    "colunas": [
+      "Nenhum Registro Localizado"
+    ],
+    "total_registros": 0,
+    "amostra": []
   },
   "financeiro": {
     "colunas": [
@@ -653,7 +1333,7 @@
       "Pessoa Última Alteração",
       "Data Última Alteração"
     ],
-    "total_registros": 15621,
+    "total_registros": 15733,
     "amostra": [
       {
         "id": 2323220,
@@ -786,66 +1466,10 @@
       }
     ]
   },
-  "eventos": {
-    "colunas": [
-      "ID Grupo Caseiro",
-      "Localidade",
-      "ID Pessoa",
-      "Pessoa",
-      "Cargo",
-      "Permissão Gerenciar",
-      "Data Entrada",
-      "Email",
-      "Celular Principal SMS",
-      "Telefone Fixo",
-      "Celular secundário",
-      "Telefone Contato"
-    ],
-    "total_registros": 19,
-    "amostra": [
-      {
-        "ID Grupo Caseiro": 35011,
-        "Localidade": "IG ALTAMIRA",
-        "ID Pessoa": 756713,
-        "Pessoa": "VANN CLEYD DE LUCENA DOMINGUES",
-        "Cargo": "",
-        "Permissão Gerenciar": "Não",
-        "Data Entrada": "2020-01-08",
-        "Email": "vann.domingues@gmail.com",
-        "Celular Principal SMS": 91992331388.0,
-        "Telefone Fixo": "",
-        "Celular secundário": "",
-        "Telefone Contato": ""
-      },
-      {
-        "ID Grupo Caseiro": 35011,
-        "Localidade": "IG ALTAMIRA",
-        "ID Pessoa": 756714,
-        "Pessoa": "WILLIAM CESAR LOPES DOMINGUES",
-        "Cargo": "",
-        "Permissão Gerenciar": "Não",
-        "Data Entrada": "2020-01-08",
-        "Email": "uwiraete@gmail.com",
-        "Celular Principal SMS": 91992901388.0,
-        "Telefone Fixo": "",
-        "Celular secundário": "",
-        "Telefone Contato": ""
-      },
-      {
-        "ID Grupo Caseiro": 49725,
-        "Localidade": "IG ARAGUARI",
-        "ID Pessoa": 756702,
-        "Pessoa": "ALEX STOPA MACHADO",
-        "Cargo": "",
-        "Permissão Gerenciar": "Não",
-        "Data Entrada": "2021-12-07",
-        "Email": "",
-        "Celular Principal SMS": 34988208666.0,
-        "Telefone Fixo": 3432429887.0,
-        "Celular secundário": "",
-        "Telefone Contato": ""
-      }
-    ]
+  "fotos_cadastros": {
+    "colunas": [],
+    "total_registros": 0,
+    "amostra": []
   },
   "discipulado": {
     "colunas": [
@@ -919,6 +1543,40 @@
         "Grupos Caseiros": "BSB AGUAS CLARAS - \"A\""
       },
       {
+        "id": 44681,
+        "Observação": "",
+        "ID Discípulo": 2401807,
+        "Discípulo": "ALESSANDRA FRANÇA LANA",
+        "Celular Principal SMS Discípulo": 61981202444.0,
+        "Email Discípulo": "alessandralana@hotmail.com",
+        "Tipo de pessoa Discípulo": "MEMBRO",
+        "Tipo Cadastro Discípulo": "Pessoa",
+        "ID Discipulador": 756695,
+        "Discipulador": "MIRIAN MACEDO DO NASCIMENTO",
+        "Celular Principal SMS Discipulador": 61981389522.0,
+        "Email Discipulador": "miriannascimentodf@gmail.com",
+        "Tipo de pessoa Discipulador": "MEMBRO",
+        "Tipo Cadastro Discipulador": "Pessoa",
+        "ID Encontro": "",
+        "Data": "",
+        "Descrição": "",
+        "Removido": "",
+        "Data Confirma Discipulador": "",
+        "Data Confirma Discípulo": "",
+        "Status": "",
+        "Alterador Encontro": "",
+        "Logradouro": "",
+        "Número": "",
+        "CEP": "",
+        "Complemento": "",
+        "Bairro": "",
+        "Cidade": "",
+        "ID Resumo": "",
+        "Resumo": "",
+        "Ocorrência": "",
+        "Grupos Caseiros": "BSB AGUAS CLARAS - \"A\""
+      },
+      {
         "id": 40685,
         "Observação": "",
         "ID Discípulo": 756574,
@@ -930,7 +1588,7 @@
         "ID Discipulador": 872409,
         "Discipulador": "CARLOS VINICIUS BRITO REIS",
         "Celular Principal SMS Discipulador": 61992712505.0,
-        "Email Discipulador": "",
+        "Email Discipulador": "c.viniciusreis@gmail.com",
         "Tipo de pessoa Discipulador": "MEMBRO",
         "Tipo Cadastro Discipulador": "Pessoa",
         "ID Encontro": "",
@@ -951,44 +1609,17 @@
         "Resumo": "",
         "Ocorrência": "",
         "Grupos Caseiros": "BSB VICENTE PIRES"
-      },
-      {
-        "id": 39141,
-        "Observação": "",
-        "ID Discípulo": 756720,
-        "Discípulo": "ALICE BRAGA SILVA",
-        "Celular Principal SMS Discípulo": 61986740270.0,
-        "Email Discípulo": "",
-        "Tipo de pessoa Discípulo": "MEMBRO",
-        "Tipo Cadastro Discípulo": "Pessoa",
-        "ID Discipulador": 756627,
-        "Discipulador": "JÉSSICA ALVES DUTRA GOMES",
-        "Celular Principal SMS Discipulador": 61982335091.0,
-        "Email Discipulador": "jessica.araujoalves@hotmail.com",
-        "Tipo de pessoa Discipulador": "MEMBRO",
-        "Tipo Cadastro Discipulador": "Pessoa",
-        "ID Encontro": "",
-        "Data": "",
-        "Descrição": "",
-        "Removido": "",
-        "Data Confirma Discipulador": "",
-        "Data Confirma Discípulo": "",
-        "Status": "",
-        "Alterador Encontro": "",
-        "Logradouro": "",
-        "Número": "",
-        "CEP": "",
-        "Complemento": "",
-        "Bairro": "",
-        "Cidade": "",
-        "ID Resumo": "",
-        "Resumo": "",
-        "Ocorrência": "",
-        "Grupos Caseiros": "BSB GUARÁ I"
       }
     ]
   },
   "orcamento": {
+    "colunas": [
+      "Nenhum Registro Localizado"
+    ],
+    "total_registros": 0,
+    "amostra": []
+  },
+  "noticias": {
     "colunas": [
       "Nenhum Registro Localizado"
     ],
