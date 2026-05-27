@@ -7,6 +7,7 @@ import {
 } from 'recharts';
 import { Users, UserPlus, Home, TrendingUp, Loader2, X, Search, Layers, UserCheck, MapPin } from 'lucide-react';
 import clsx from 'clsx';
+import { getSectorByResidence } from '../lib/geoUtils';
 
 export const Dashboard: React.FC = () => {
   const { user } = useAuth();
@@ -20,6 +21,7 @@ export const Dashboard: React.FC = () => {
   const [filterGender, setFilterGender] = useState('Todos');
   const [filterGroup, setFilterGroup] = useState('Todos');
   const [filterDisc, setFilterDisc] = useState('Todos');
+  const [filterSector, setFilterSector] = useState('Todos');
   const [filterMinAge, setFilterMinAge] = useState<number>(0);
   const [filterMaxAge, setFilterMaxAge] = useState<number>(120);
   const [filterMaritalStatus, setFilterMaritalStatus] = useState('Todos');
@@ -46,7 +48,7 @@ export const Dashboard: React.FC = () => {
     const fetchDashboardData = async () => {
       setIsLoading(true);
       try {
-        let membrosQuery = supabase.from('membros').select('nome, status, tipo_cadastro, nascimento, grupos_caseiros, sexo, cidade, estado, tipo_de_pessoa, data_de_cadastro, data_atualizacao, estado_civil');
+        let membrosQuery = supabase.from('membros').select('nome, status, tipo_cadastro, nascimento, grupos_caseiros, sexo, bairro, cidade, estado, tipo_de_pessoa, data_de_cadastro, data_atualizacao, estado_civil');
         let celulasQuery = supabase.from('celulas').select('grupo_caseiro, lider, auxiliar, setor');
 
         if (user?.assigned_gc) {
@@ -139,7 +141,9 @@ export const Dashboard: React.FC = () => {
         const matchMarital = filterMaritalStatus === 'Todos' || m.estado_civil === filterMaritalStatus;
         const matchStatus = filterStatus === 'Todos' || m.status === filterStatus;
         const matchType = selectedTypes.length === 0 || selectedTypes.includes(m.tipo_de_pessoa?.trim() || '');
-        return matchGender && matchGroup && matchDisc && matchAge && matchMarital && matchStatus && matchType;
+        const residentSector = getSectorByResidence(m.bairro, m.cidade, m.estado);
+        const matchSector = filterSector === 'Todos' || residentSector === filterSector;
+        return matchGender && matchGroup && matchDisc && matchAge && matchMarital && matchStatus && matchType && matchSector;
     });
 
     const ativosOnly = filteredMembros.filter(m => m.status === 'Ativo');
@@ -208,11 +212,36 @@ export const Dashboard: React.FC = () => {
       nome: c.grupo_caseiro, lider: c.lider || 'Sem Lider', setor: c.setor || 'Sem Setor', membros: grupoCounts[c.grupo_caseiro] || 0
     })).sort((a, b) => b.membros - a.membros);
 
-    const sectorCounts: any = {};
-    groupsList.forEach(g => {
-      if (!sectorCounts[g.setor]) sectorCounts[g.setor] = { nome: g.setor, grupos: 0, membros: 0 };
-      sectorCounts[g.setor].grupos += 1;
-      sectorCounts[g.setor].membros += g.membros;
+    const sectorCounts: Record<string, { nome: string, grupos: number, membros: number }> = {
+      'Setor Norte': { nome: 'Setor Norte', grupos: 0, membros: 0 },
+      'Setor Central': { nome: 'Setor Central', grupos: 0, membros: 0 },
+      'Setor Águas Claras': { nome: 'Setor Águas Claras', grupos: 0, membros: 0 },
+      'Setor Sul': { nome: 'Setor Sul', grupos: 0, membros: 0 },
+      'Sem Setor': { nome: 'Sem Setor', grupos: 0, membros: 0 }
+    };
+
+    const getNormalizedSectorName = (dbSector: string | null | undefined): string => {
+      if (!dbSector) return 'Sem Setor';
+      const norm = dbSector.trim().toUpperCase();
+      if (norm.includes('NORTE')) return 'Setor Norte';
+      if (norm.includes('CENTRAL')) return 'Setor Central';
+      if (norm.includes('AGUAS CLARAS') || norm.includes('ÁGUAS CLARAS')) return 'Setor Águas Claras';
+      if (norm.includes('SUL')) return 'Setor Sul';
+      return 'Sem Setor';
+    };
+
+    filteredMembros.forEach(m => {
+      const sec = getSectorByResidence(m.bairro, m.cidade, m.estado);
+      if (sectorCounts[sec]) {
+        sectorCounts[sec].membros += 1;
+      }
+    });
+
+    rawCelulas.forEach(c => {
+      const sec = getNormalizedSectorName(c.setor);
+      if (sectorCounts[sec]) {
+        sectorCounts[sec].grupos += 1;
+      }
     });
 
     const mestreCounts: any = {};
@@ -232,7 +261,7 @@ export const Dashboard: React.FC = () => {
             discipuladores: discList
         }
     };
-  }, [isLoading, rawMembros, rawCelulas, rawDiscipulado, filterGender, filterGroup, filterDisc, filterMinAge, filterMaxAge, filterMaritalStatus, filterStatus, selectedTypes]);
+  }, [isLoading, rawMembros, rawCelulas, rawDiscipulado, filterGender, filterGroup, filterDisc, filterSector, filterMinAge, filterMaxAge, filterMaritalStatus, filterStatus, selectedTypes]);
 
   const handleOpenModal = async (type: 'grupo' | 'setor' | 'discipulador', title: string) => {
     setModalType(type); setModalTitle(title); setIsModalLoading(true);
@@ -249,8 +278,17 @@ export const Dashboard: React.FC = () => {
           return { col1: d.nome, col2: d.sexo || '-', col3: age, col4: role, col5: discSet.has(d.nome?.trim().toUpperCase()) ? 'Sim' : 'Não' };
         });
       } else if (type === 'setor') {
-        const { data } = await supabase.from('celulas').select('grupo_caseiro, lider, auxiliar').eq('setor', title);
-        dataResp = (data || []).map(d => ({ col1: d.grupo_caseiro, col2: d.lider || 'Sem Líder', col3: 'Grupo Caseiro', col4: 'Detalhar', isAction: true }));
+        const getNormalizedSectorName = (dbSector: string | null | undefined): string => {
+          if (!dbSector) return 'Sem Setor';
+          const norm = dbSector.trim().toUpperCase();
+          if (norm.includes('NORTE')) return 'Setor Norte';
+          if (norm.includes('CENTRAL')) return 'Setor Central';
+          if (norm.includes('AGUAS CLARAS') || norm.includes('ÁGUAS CLARAS')) return 'Setor Águas Claras';
+          if (norm.includes('SUL')) return 'Setor Sul';
+          return 'Sem Setor';
+        };
+        const sectorCells = rawCelulas.filter(c => getNormalizedSectorName(c.setor) === title);
+        dataResp = sectorCells.map(d => ({ col1: d.grupo_caseiro, col2: d.lider || 'Sem Líder', col3: 'Grupo Caseiro', col4: 'Detalhar', isAction: true }));
       } else if (type === 'discipulador') {
         const { data } = await supabase.from('discipulado').select('discipulo, status, tipo').eq('discipulador', title);
         dataResp = (data || []).map(d => ({ col1: d.discipulo, col2: d.status || 'Ativo', col3: d.tipo || '-', col4: '-', col5: '-' }));
@@ -299,6 +337,7 @@ export const Dashboard: React.FC = () => {
 
       <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-wrap gap-4 items-center mb-6">
         <div className="flex items-center gap-2 text-gray-400 mr-2"><Search className="w-4 h-4" /><span className="text-xs font-bold uppercase tracking-wider">Filtros Rápidos:</span></div>
+        <select value={filterSector} onChange={e => setFilterSector(e.target.value)} className="text-sm border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50"><option value="Todos">Setor (Todos)</option><option value="Setor Norte">Setor Norte</option><option value="Setor Central">Setor Central</option><option value="Setor Águas Claras">Setor Águas Claras</option><option value="Setor Sul">Setor Sul</option><option value="Sem Setor">Sem Setor</option></select>
         <select value={filterGender} onChange={e => setFilterGender(e.target.value)} className="text-sm border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50"><option value="Todos">Todos os Sexos</option><option value="Masculino">Masculino</option><option value="Feminino">Feminino</option></select>
         <select value={filterGroup} onChange={e => setFilterGroup(e.target.value)} className="text-sm border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50 max-w-[200px]"><option value="Todos">Todos os Grupos</option>{rawCelulas.map(c => <option key={c.grupo_caseiro} value={c.grupo_caseiro}>{c.grupo_caseiro}</option>)}</select>
         <select value={filterDisc} onChange={e => setFilterDisc(e.target.value)} className="text-sm border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50 max-w-[200px]"><option value="Todos">Todos os Discipuladores</option>{Array.from(new Set(rawDiscipulado.map(d => d.discipulador))).sort().map(d => <option key={d} value={d}>{d}</option>)}</select>
@@ -371,12 +410,13 @@ export const Dashboard: React.FC = () => {
            <input type="number" value={filterMaxAge} onChange={e => setFilterMaxAge(parseInt(e.target.value) || 120)} className="w-12 bg-transparent text-sm font-semibold outline-none border-b border-transparent focus:border-primary-500" placeholder="Max" />
         </div>
 
-        {(filterGender !== 'Todos' || filterGroup !== 'Todos' || filterDisc !== 'Todos' || filterMinAge !== 0 || filterMaxAge !== 120 || filterMaritalStatus !== 'Todos' || filterStatus !== 'Todos' || selectedTypes.length > 0) && (
+        {(filterGender !== 'Todos' || filterGroup !== 'Todos' || filterDisc !== 'Todos' || filterSector !== 'Todos' || filterMinAge !== 0 || filterMaxAge !== 120 || filterMaritalStatus !== 'Todos' || filterStatus !== 'Todos' || selectedTypes.length > 0) && (
           <button 
             onClick={() => { 
               setFilterGender('Todos'); 
               setFilterGroup('Todos'); 
               setFilterDisc('Todos'); 
+              setFilterSector('Todos');
               setFilterMinAge(0); 
               setFilterMaxAge(120); 
               setFilterMaritalStatus('Todos'); 

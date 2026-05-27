@@ -4,7 +4,8 @@ import { useFamilyEngine } from '../hooks/useFamilyEngine';
 import type { Member, Cell, Family, FamilyRelation } from '../hooks/useFamilyEngine';
 import { 
   getAdministrativeRegion, 
-  getGCRegion 
+  getGCRegion,
+  getSectorByResidence
 } from '../lib/geoUtils';
 import { 
   Heart, Search, Users, MapPin, AlertCircle, Phone, 
@@ -19,7 +20,7 @@ export const Families: React.FC = () => {
   const [relations, setRelations] = useState<FamilyRelation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterRA, setFilterRA] = useState('Todos');
+  const [filterSector, setFilterSector] = useState('Todos');
   const [filterStatus, setFilterStatus] = useState('Todos');
   const [activeTab, setActiveTab] = useState<'nucleos' | 'parentelas'>('nucleos');
 
@@ -30,7 +31,7 @@ export const Families: React.FC = () => {
         setIsLoading(true);
         const [membrosRes, celulasRes, relationsRes] = await Promise.all([
           supabase.from('membros')
-            .select('id, nome, grupos_caseiros, status, sexo, bairro, pai, mae, logradouro, celular_principal_sms, telefone_fixo, estado_civil, nascimento, latitude, longitude')
+            .select('id, nome, grupos_caseiros, status, sexo, bairro, pai, mae, logradouro, celular_principal_sms, telefone_fixo, estado_civil, nascimento, latitude, longitude, cidade, estado')
             .eq('status', 'Ativo'),
           supabase.from('celulas')
             .select('grupo_caseiro, lider, auxiliar, setor'),
@@ -289,17 +290,19 @@ export const Families: React.FC = () => {
         fam.familyMembers.some((m: Member) => m.nome.toLowerCase().includes(searchTerm.toLowerCase())) ||
         fam.gcsAttended.some((g: string) => g.toLowerCase().includes(searchTerm.toLowerCase()));
 
-      // 2. RA Filter
-      const matchesRA = filterRA === 'Todos' || fam.headRA === filterRA;
+      // 2. Sector Filter
+      const headMember = fam.familyMembers.find((m: Member) => m.id.toString() === fam.headId);
+      const residentSector = getSectorByResidence(headMember?.bairro, headMember?.cidade, headMember?.estado);
+      const matchesSector = filterSector === 'Todos' || residentSector === filterSector;
 
       // 3. GC Status Filter
       const matchesStatus = filterStatus === 'Todos' ||
         (filterStatus === 'Unified' && !fam.isDivided) ||
         (filterStatus === 'Divided' && fam.isDivided);
 
-      return matchesSearch && matchesRA && matchesStatus;
+      return matchesSearch && matchesSector && matchesStatus;
     });
-  }, [familyData, searchTerm, filterRA, filterStatus]);
+  }, [familyData, searchTerm, filterSector, filterStatus]);
 
   if (isLoading) {
     return (
@@ -410,18 +413,20 @@ export const Families: React.FC = () => {
               />
             </div>
 
-            {/* Region Filter */}
-            <div className="relative w-full md:w-48 shrink-0">
+            {/* Sector Filter */}
+            <div className="relative w-full md:w-56 shrink-0">
               <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
               <select
-                value={filterRA}
-                onChange={e => setFilterRA(e.target.value)}
+                value={filterSector}
+                onChange={e => setFilterSector(e.target.value)}
                 className="w-full pl-9 pr-4 py-2 border-gray-200 rounded-xl focus:ring-primary-500 focus:border-primary-500 text-sm bg-gray-50/50 font-semibold text-gray-700"
               >
-                <option value="Todos">Setor / Região (Todas)</option>
-                {familyData.uniqueRAs.map(ra => (
-                  <option key={ra} value={ra}>{ra}</option>
-                ))}
+                <option value="Todos">Setor de Residência (Todos)</option>
+                <option value="Setor Norte">Setor Norte</option>
+                <option value="Setor Central">Setor Central</option>
+                <option value="Setor Águas Claras">Setor Águas Claras</option>
+                <option value="Setor Sul">Setor Sul</option>
+                <option value="Sem Setor">Sem Setor</option>
               </select>
             </div>
 

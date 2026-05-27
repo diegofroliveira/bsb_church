@@ -135,3 +135,99 @@ export const getFallbackRegion = (memberRA: string): string => {
   };
   return fallbackRules[memberRA] || '';
 };
+
+export const getSectorByResidence = (
+  bairro: string | null | undefined, 
+  cidade: string | null | undefined,
+  estado: string | null | undefined
+): string => {
+  const ra = getAdministrativeRegion(bairro);
+  const normRA = ra.trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const normCidade = (cidade || '').trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const normBairro = (bairro || '').trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const normEstado = (estado || '').trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+  // 1. Setor Central
+  if (
+    normBairro.includes('COLONIA AGRICOLA SAMAMBAIA') ||
+    normBairro.includes('COL. AGR. SAMAMBAIA') ||
+    normRA === 'VICENTE PIRES' ||
+    normRA === 'GUARÁ' ||
+    normRA === 'NÚCLEO BANDEIRANTE'
+  ) {
+    return 'Setor Central';
+  }
+
+  // 2. Setor Águas Claras
+  if (normRA === 'ÁGUAS CLARAS' || normRA === 'ARNIQUEIRA') {
+    return 'Setor Águas Claras';
+  }
+
+  // 3. Setor Norte
+  if (
+    normRA === 'ASA SUL' ||
+    normRA === 'ASA NORTE' ||
+    normRA === 'NOROESTE' ||
+    normRA === 'LAGO NORTE' ||
+    normRA === 'SOBRADINHO' ||
+    normRA === 'JARDIM BOTÂNICO' ||
+    normBairro.includes('SUDOESTE') ||
+    normBairro.includes('CRUZEIRO') ||
+    normBairro.includes('OCTOGONAL') ||
+    normBairro.includes('ITAPOA') ||
+    normBairro.includes('VARJAO') ||
+    normBairro.includes('GRANJA DO TORTO') ||
+    normBairro.includes('PLANALTINA') ||
+    normBairro.includes('TAQUARI')
+  ) {
+    // Planaltina de Goiás is in Goias (Setor Sul), Planaltina DF is Setor Norte
+    const isGoias = normEstado.includes('GO') || normEstado.includes('GOIAS') || normCidade.includes('GOIAS');
+    if (normCidade.includes('PLANALTINA') && isGoias) {
+      return 'Setor Sul';
+    }
+    return 'Setor Norte';
+  }
+
+  // 4. Setor Sul
+  if (
+    normRA === 'TAGUATINGA' ||
+    normRA === 'SAMAMBAIA' ||
+    normRA === 'CEILÂNDIA' ||
+    normRA === 'RECANTO-ENTORNO' ||
+    normRA === 'RIACHO FUNDO' ||
+    normRA === 'GAMA' ||
+    normRA === 'SANTA MARIA' ||
+    normBairro.includes('BRAZLANDIA')
+  ) {
+    return 'Setor Sul';
+  }
+
+  // Fallbacks by City Name
+  if (normCidade.includes('SOBRADINHO')) return 'Setor Norte';
+  if (normCidade.includes('PLANALTINA')) {
+    if (normEstado.includes('GO') || normEstado.includes('GOIAS')) return 'Setor Sul';
+    return 'Setor Norte';
+  }
+  if (normCidade.includes('TAGUATINGA') || normCidade.includes('SAMAMBAIA') || normCidade.includes('CEILANDIA') || normCidade.includes('GAMA')) return 'Setor Sul';
+  if (normCidade.includes('GUARA') || normCidade.includes('VICENTE PIRES')) return 'Setor Central';
+  if (normCidade.includes('AGUAS CLARAS') || normCidade.includes('ARNIQUEIRA')) return 'Setor Águas Claras';
+
+  // Official RIDE / Entorno (33 municipalities)
+  const rideCities = [
+    'ABADIANIA', 'AGUA FRIA', 'AGUAS LINDAS', 'ALEXANIA', 'ALTO PARAISO', 'ALVORADA DO NORTE',
+    'BARRO ALTO', 'CABECEIRAS', 'CAVALCANTE', 'OCIDENTAL', 'COCALZINHO', 'CORUMBA',
+    'CRISTALINA', 'FLORES DE GOIAS', 'FORMOSA', 'GOIANESIA', 'LUZIANIA', 'MIMOSO',
+    'NIQUELANDIA', 'NOVO GAMA', 'PADRE BERNARDO', 'PIRENOPOLIS', 'PLANALTINA DE GOIAS',
+    'DESCOBERTO', 'SAO JOAO', 'SIMOLANDIA', 'VALPARAISO', 'VILA BOA', 'VILA PROPICIO',
+    'ARINOS', 'BURITIS', 'CABECEIRA GRANDE', 'UNAI'
+  ];
+  
+  if (
+    rideCities.some(city => normCidade.includes(city) || normBairro.includes(city) || normRA.includes(city))
+  ) {
+    return 'Setor Sul';
+  }
+
+  return 'Sem Setor';
+};
+
