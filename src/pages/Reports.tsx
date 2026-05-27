@@ -306,7 +306,7 @@ export const Reports: React.FC = () => {
       if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [members, filterQuery, filterType, filterGC, filterGender, filterAgeCategory, filterMinAge, filterMaxAge, filterMaritalStatus, filterState, filterSetor, filterSetorEcl, filterMestre, filterPersonType, filterStatusPessoa, filterNoChildren, allParentsNames, sortField, sortDirection]);tion]);
+  }, [members, filterQuery, filterType, filterGC, filterGender, filterAgeCategory, filterMinAge, filterMaxAge, filterMaritalStatus, filterState, filterSetor, filterSetorEcl, filterMestre, filterPersonType, filterStatusPessoa, filterNoChildren, allParentsNames, sortField, sortDirection]);
 
   const handleExportExcel = () => {
     if (filteredMembers.length === 0) return;
