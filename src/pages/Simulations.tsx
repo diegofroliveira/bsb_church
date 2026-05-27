@@ -67,7 +67,7 @@ import {
   getFallbackRegion
 } from '../lib/geoUtils';
 import { useFamilyEngine } from '../hooks/useFamilyEngine';
-import type { Member, Cell, DiscipleshipLink } from '../hooks/useFamilyEngine';
+import type { Member, Cell, DiscipleshipLink, FamilyRelation } from '../hooks/useFamilyEngine';
 
 // Componente auxiliar para alterar dinamicamente o centro e zoom do mapa Leaflet
 const ChangeMapView: React.FC<{ center: [number, number]; zoom: number }> = ({ center, zoom }) => {
@@ -121,6 +121,7 @@ export const Simulations: React.FC = () => {
   const [draftMembers, setDraftMembers] = useState<Member[]>([]);
   const [draftCells, setDraftCells] = useState<Cell[]>([]);
   const [draftLinks, setDraftLinks] = useState<DiscipleshipLink[]>([]);
+  const [familyRelations, setFamilyRelations] = useState<FamilyRelation[]>([]);
   
   // Baseline (to compare)
   const [baselineMembers, setBaselineMembers] = useState<Member[]>([]);
@@ -249,10 +250,11 @@ export const Simulations: React.FC = () => {
   const loadBaseline = async () => {
     setIsLoading(true);
     try {
-      const [membersRes, cellsRes, discRes] = await Promise.all([
+      const [membersRes, cellsRes, discRes, relationsRes] = await Promise.all([
         supabase.from('membros').select('id, nome, grupos_caseiros, status, sexo, bairro, pai, mae, logradouro, celular_principal_sms, telefone_fixo, estado_civil, nascimento, latitude, longitude, tipo_de_pessoa'),
         supabase.from('celulas').select('id, grupo_caseiro, lider, setor, latitude, longitude'),
-        supabase.from('discipulado').select('discipulador, discipulo')
+        supabase.from('discipulado').select('discipulador, discipulo'),
+        supabase.from('pessoas_familiares').select('id_pessoa_a, pessoa_a, parentesco, id_pessoa_b, pessoa_b, mesmo_domicilio')
       ]);
 
       if (membersRes.data) {
@@ -274,6 +276,9 @@ export const Simulations: React.FC = () => {
       if (discRes.data) {
         setDraftLinks(discRes.data);
         setBaselineLinks(discRes.data.map((l: any) => ({ ...l })));
+      }
+      if (relationsRes.data) {
+        setFamilyRelations(relationsRes.data as FamilyRelation[]);
       }
       
     } catch (err) {
@@ -837,7 +842,7 @@ export const Simulations: React.FC = () => {
   };
 
   // --- FAMILY GROUPING ENGINE ---
-  const families = useFamilyEngine(draftMembers);
+  const families = useFamilyEngine(draftMembers, familyRelations);
 
   // Expand families by default if they are in source
   useEffect(() => {
