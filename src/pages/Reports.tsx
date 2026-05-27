@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
-import { Filter, Download, Loader2, Search, FileText, ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react';
+import { Filter, Download, Loader2, Search, FileText, ArrowUpDown, ChevronUp, ChevronDown, Home, ShieldAlert } from 'lucide-react';
 import clsx from 'clsx';
 import * as XLSX from 'xlsx';
 
@@ -77,6 +77,7 @@ const MultiSelect: React.FC<{
 export const Reports: React.FC = () => {
   const [members, setMembers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'members' | 'sectors'>('members');
 
   // Filters
   const [filterQuery, setFilterQuery] = useState('');
@@ -396,6 +397,127 @@ export const Reports: React.FC = () => {
     };
   }, [filteredMembers]);
 
+  // Sector census and mismatch comparative calculations
+  const sectorStats = useMemo(() => {
+    const list = members;
+    const sectors = ['Setor Norte', 'Setor Central', 'Setor Águas Claras', 'Setor Sul', 'Sem Setor'];
+    
+    // Initialize stats
+    const stats: Record<string, {
+      total: number;
+      gcTotal: number;
+      members: number;
+      visitors: number;
+      children: number; // 0-11
+      teens: number; // 12-17
+      youth: number; // 18-29
+      adults: number; // 30-59
+      seniors: number; // 60+
+      discipled: number;
+      mismatched: number;
+      mismatchedList: any[];
+    }> = {};
+
+    sectors.forEach(s => {
+      stats[s] = {
+        total: 0,
+        gcTotal: 0,
+        members: 0,
+        visitors: 0,
+        children: 0,
+        teens: 0,
+        youth: 0,
+        adults: 0,
+        seniors: 0,
+        discipled: 0,
+        mismatched: 0,
+        mismatchedList: []
+      };
+    });
+
+    list.forEach(m => {
+      // 1. Residential Sector
+      const sector = m.setor || 'Sem Setor';
+      const current = stats[sector] || stats['Sem Setor'];
+      current.total++;
+
+      // 2. Ecclesiastical Sector (GC)
+      const eclSector = m.setor_eclesiastico_display || 'Sem Setor';
+      const currentEcl = stats[eclSector] || stats['Sem Setor'];
+      currentEcl.gcTotal++;
+
+      // Vínculo
+      const t = (m.tipo_cadastro || '').trim().toUpperCase();
+      if (t === 'VISITANTE') current.visitors++;
+      else current.members++;
+
+      // Age category
+      const age = calculateAge(m.nascimento || m.data_nascimento || m.birth_date);
+      if (age >= 0) {
+        if (age < 12) current.children++;
+        else if (age < 18) current.teens++;
+        else if (age < 30) current.youth++;
+        else if (age < 60) current.adults++;
+        else current.seniors++;
+      }
+
+      // Discipleship
+      if (m.discipulador && m.discipulador !== 'Sem Discipulador') {
+        current.discipled++;
+      }
+
+      // Mismatch
+      const resSector = m.setor;
+      if (resSector && eclSector && resSector !== 'Sem Setor' && eclSector !== 'Sem Setor' && resSector !== eclSector) {
+        current.mismatched++;
+        current.mismatchedList.push(m);
+      }
+    });
+
+    return stats;
+  }, [members]);
+
+  const allMismatchedList = useMemo(() => {
+    const list: any[] = [];
+    const sectors = ['Setor Norte', 'Setor Central', 'Setor Águas Claras', 'Setor Sul', 'Sem Setor'];
+    sectors.forEach(s => {
+      const stats = sectorStats[s];
+      if (stats && stats.mismatchedList) {
+        list.push(...stats.mismatchedList);
+      }
+    });
+    return list.sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+  }, [sectorStats]);
+
+  const handleExportMismatchesExcel = () => {
+    const allMismatches: any[] = [];
+    const sectors = ['Setor Norte', 'Setor Central', 'Setor Águas Claras', 'Setor Sul', 'Sem Setor'];
+    
+    sectors.forEach(s => {
+      const stats = sectorStats[s];
+      if (stats && stats.mismatchedList) {
+        stats.mismatchedList.forEach(m => {
+          allMismatches.push({
+            'Nome': m.nome || '-',
+            'Vínculo': m.tipo_cadastro || '-',
+            'Setor de Residência': m.setor || '-',
+            'Bairro': m.bairro || '-',
+            'Grupo Caseiro': m.grupos_caseiros || '-',
+            'Setor do GC (Eclesiástico)': m.setor_eclesiastico_display || '-',
+            'Discipulador': m.discipulador || '-'
+          });
+        });
+      }
+    });
+
+    if (allMismatches.length === 0) return;
+
+    const worksheet = XLSX.utils.json_to_sheet(allMismatches);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Incongruências de Setor");
+    XLSX.writeFile(workbook, `incongruencias_setores_${new Date().getTime()}.xlsx`);
+  };
+
   const handleExportExcel = () => {
     if (filteredMembers.length === 0) return;
     
@@ -428,14 +550,47 @@ export const Reports: React.FC = () => {
             Filtre cruzamentos de dados e exporte planilhas analíticas rapidamente.
           </p>
         </div>
-        <button
-          onClick={handleExportExcel}
-          disabled={isLoading || filteredMembers.length === 0}
-          className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors disabled:opacity-50"
-        >
-          <Download className="h-4 w-4" /> Exportar Planilha ({filteredMembers.length})
-        </button>
+        {activeTab === 'members' && (
+          <button
+            onClick={handleExportExcel}
+            disabled={isLoading || filteredMembers.length === 0}
+            className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors disabled:opacity-50"
+          >
+            <Download className="h-4 w-4" /> Exportar Planilha ({filteredMembers.length})
+          </button>
+        )}
       </header>
+
+      {/* Modern Tabs Navigation */}
+      <div className="flex border-b border-gray-150 bg-white px-6 rounded-2xl shadow-sm border border-gray-100/50 py-1">
+        <button
+          onClick={() => setActiveTab('members')}
+          className={clsx(
+            "py-3 px-6 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer focus:outline-none",
+            activeTab === 'members'
+              ? "border-primary-600 text-primary-700 font-black"
+              : "border-transparent text-gray-400 hover:text-gray-600 hover:border-gray-200"
+          )}
+        >
+          <FileText className="h-4 w-4" />
+          Central de Membros
+        </button>
+        <button
+          onClick={() => setActiveTab('sectors')}
+          className={clsx(
+            "py-3 px-6 text-sm font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer focus:outline-none",
+            activeTab === 'sectors'
+              ? "border-primary-600 text-primary-700 font-black"
+              : "border-transparent text-gray-400 hover:text-gray-600 hover:border-gray-200"
+          )}
+        >
+          <Home className="h-4 w-4 text-teal-500" />
+          Comparativo de Setores
+        </button>
+      </div>
+
+      {activeTab === 'members' ? (
+        <>
 
       {/* Filter Surface */}
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-6">
@@ -753,6 +908,200 @@ export const Reports: React.FC = () => {
            </>
          )}
       </div>
+      </>
+      ) : (
+        <div className="space-y-6 animate-in fade-in duration-500">
+          {/* Top Info Banner */}
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-teal-900 via-slate-800 to-indigo-950 p-8 text-white shadow-xl">
+            <div className="absolute inset-0 opacity-15">
+              <div className="absolute top-0 right-0 w-96 h-96 bg-teal-400 rounded-full translate-x-1/3 -translate-y-1/3 blur-3xl" />
+              <div className="absolute bottom-0 left-0 w-80 h-80 bg-indigo-500 rounded-full -translate-x-1/3 translate-y-1/3 blur-3xl" />
+            </div>
+            <div className="relative z-10">
+              <span className="block text-[8px] font-black text-teal-300 uppercase tracking-widest leading-none mb-1">
+                PASTORAL & GEOGRAFIA
+              </span>
+              <h2 className="text-2xl md:text-3xl font-extrabold mb-2">Censo & Comparativo de Setores</h2>
+              <p className="text-slate-350 text-xs leading-relaxed max-w-2xl">
+                Compare a distribuição demográfica dos setores da igreja. Analise o desalinhamento geográfico (membros residindo em um setor mas congregando em GC de outro) e otimize o cuidado pastoral de forma direcionada.
+              </p>
+            </div>
+          </div>
+
+          {/* Sectors dashboard grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            
+            {/* Card 1: Comparativo Populacional */}
+            <div className="bg-white p-6 rounded-2xl border border-gray-150 shadow-sm flex flex-col justify-between">
+              <div>
+                <div className="border-b border-gray-100 pb-3 mb-4">
+                  <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                    <Users className="h-4 w-4 text-indigo-500" />
+                    População Residente vs Frequência de GCs
+                  </h3>
+                  <p className="text-[10px] text-gray-400 mt-0.5">Compara quantos membros residem no setor versus quantos participam de GCs localizados nele.</p>
+                </div>
+
+                <div className="space-y-5">
+                  {['Setor Norte', 'Setor Central', 'Setor Águas Claras', 'Setor Sul'].map(sName => {
+                    const stat = sectorStats[sName] || { total: 0, gcTotal: 0 };
+                    const maxVal = Math.max(...['Setor Norte', 'Setor Central', 'Setor Águas Claras', 'Setor Sul'].map(x => Math.max(sectorStats[x]?.total || 0, sectorStats[x]?.gcTotal || 0)));
+                    const pctRes = maxVal > 0 ? (stat.total / maxVal) * 100 : 0;
+                    const pctGc = maxVal > 0 ? (stat.gcTotal / maxVal) * 100 : 0;
+
+                    return (
+                      <div key={sName} className="space-y-2 p-3.5 bg-gray-50/50 rounded-2xl border border-gray-100/50">
+                        <span className="text-xs font-bold text-gray-800 block">{sName}</span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-[11px]">
+                          {/* Residem */}
+                          <div className="space-y-1">
+                            <div className="flex justify-between text-gray-500 font-semibold">
+                              <span>Residem aqui:</span>
+                              <span className="font-extrabold text-indigo-600">{stat.total}</span>
+                            </div>
+                            <div className="w-full bg-slate-200/50 h-2 rounded-full overflow-hidden">
+                              <div className="bg-indigo-500 h-full rounded-full transition-all duration-500" style={{ width: `${pctRes}%` }} />
+                            </div>
+                          </div>
+                          {/* GC */}
+                          <div className="space-y-1">
+                            <div className="flex justify-between text-gray-500 font-semibold">
+                              <span>Participam do GC local:</span>
+                              <span className="font-extrabold text-teal-600">{stat.gcTotal}</span>
+                            </div>
+                            <div className="w-full bg-slate-200/50 h-2 rounded-full overflow-hidden">
+                              <div className="bg-teal-500 h-full rounded-full transition-all duration-500" style={{ width: `${pctGc}%` }} />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Card 2: Faixas Etárias e Foco em Crianças (0-17 anos) */}
+            <div className="bg-white p-6 rounded-2xl border border-gray-150 shadow-sm flex flex-col justify-between">
+              <div>
+                <div className="border-b border-gray-100 pb-3 mb-4">
+                  <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                    <Heart className="h-4.5 w-4.5 text-teal-500" />
+                    Nova Geração por Setor (0 a 17 anos)
+                  </h3>
+                  <p className="text-[10px] text-gray-400 mt-0.5">Identifique a concentração de crianças e adolescentes residentes em cada região.</p>
+                </div>
+
+                <div className="space-y-5">
+                  {['Setor Norte', 'Setor Central', 'Setor Águas Claras', 'Setor Sul'].map(sName => {
+                    const stat = sectorStats[sName] || { children: 0, teens: 0, total: 0 };
+                    const totalKidCohort = stat.children + stat.teens;
+                    const kidPct = stat.total > 0 ? Math.round((totalKidCohort / stat.total) * 100) : 0;
+                    
+                    const maxCohort = Math.max(...['Setor Norte', 'Setor Central', 'Setor Águas Claras', 'Setor Sul'].map(x => (sectorStats[x]?.children || 0) + (sectorStats[x]?.teens || 0)));
+                    const barWeightPct = maxCohort > 0 ? (totalKidCohort / maxCohort) * 100 : 0;
+
+                    const childPctOfCohort = totalKidCohort > 0 ? Math.round((stat.children / totalKidCohort) * 100) : 0;
+                    const teenPctOfCohort = totalKidCohort > 0 ? Math.round((stat.teens / totalKidCohort) * 100) : 0;
+
+                    return (
+                      <div key={sName} className="space-y-2 p-1">
+                        <div className="flex justify-between items-center text-xs font-semibold text-gray-800">
+                          <span>{sName}</span>
+                          <span className="text-[10px] text-teal-700 font-extrabold bg-teal-50 border border-teal-100 px-2.5 py-0.5 rounded-full">
+                            {totalKidCohort} Kids/Adolescentes ({kidPct}%)
+                          </span>
+                        </div>
+                        <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden flex">
+                          <div className="bg-sky-400 h-full transition-all duration-500" style={{ width: `${barWeightPct * (childPctOfCohort/100)}%` }} title={`Crianças: ${stat.children}`} />
+                          <div className="bg-indigo-400 h-full transition-all duration-500 border-l border-white/20" style={{ width: `${barWeightPct * (teenPctOfCohort/100)}%` }} title={`Adolescentes: ${stat.teens}`} />
+                        </div>
+                        <div className="flex gap-4 text-[9px] text-gray-400 font-bold justify-end">
+                          <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-sky-400 block" /> Crianças: {stat.children}</span>
+                          <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-indigo-400 block" /> Adolescentes: {stat.teens}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="mt-4 pt-4 border-t border-gray-100 bg-teal-50/20 p-3.5 rounded-2xl border border-teal-100/50 text-[11px] text-teal-850 flex items-start gap-2.5">
+                <span className="text-sm shrink-0">💡</span>
+                <p className="leading-relaxed font-medium text-teal-800">
+                  <strong>Setor Estratégico para Kids:</strong> Águas Claras e Região concentra a maior densidade infanto-juvenil ativa da igreja. Otimize a grade de professores e salas do Ministério Infantil com base nestes números.
+                </p>
+              </div>
+            </div>
+
+          </div>
+
+          {/* Card 3: Incongruência e Desalinhamento Residência vs GC */}
+          <div className="bg-white p-6 rounded-2xl border border-gray-150 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4 mb-4">
+              <div>
+                <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                  <ShieldAlert className="h-4.5 w-4.5 text-amber-500" />
+                  Membros Fora do Setor (Desalinhamento Residência vs GC)
+                </h3>
+                <p className="text-[10px] text-gray-400 mt-0.5">Representa membros que residem em um setor geográfico, mas participam ativamente de GCs vinculados a outro setor.</p>
+              </div>
+              <button
+                onClick={handleExportMismatchesExcel}
+                className="flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-black shadow-sm transition-colors cursor-pointer shrink-0"
+              >
+                <Download className="h-3.5 w-3.5" /> Exportar Planilha ({allMismatchedList.length})
+              </button>
+            </div>
+
+            {/* Mismatches per sector grid */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              {['Setor Norte', 'Setor Central', 'Setor Águas Claras', 'Setor Sul'].map(sName => {
+                const count = sectorStats[sName]?.mismatched || 0;
+                return (
+                  <div key={sName} className="p-4 rounded-2xl border border-amber-100 bg-amber-50/20 text-center">
+                    <span className="block text-[9px] font-black text-gray-400 uppercase tracking-wider">{sName}</span>
+                    <span className="text-xl font-black text-amber-700 block mt-1">{count}</span>
+                    <span className="text-[9px] text-amber-600 font-bold block">pessoas desalinhadas</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Mismatches List Table */}
+            <div>
+              <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                🔎 Lista de Membros Desalinhados (Primeiros 100)
+              </h4>
+              <div className="overflow-x-auto rounded-2xl border border-gray-250 max-h-80 overflow-y-auto">
+                <table className="min-w-full divide-y divide-gray-200 text-xs">
+                  <thead className="bg-gray-50/80 sticky top-0 backdrop-blur-sm z-10 font-bold text-gray-600 uppercase">
+                    <tr>
+                      <th className="py-2.5 pl-4 pr-2 text-left w-12">#</th>
+                      <th className="py-2.5 px-3 text-left">Nome</th>
+                      <th className="py-2.5 px-3 text-left">Setor Residência</th>
+                      <th className="py-2.5 px-3 text-left">Setor do GC</th>
+                      <th className="py-2.5 px-3 text-left">Grupo Caseiro</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-150 bg-white">
+                    {allMismatchedList.slice(0, 100).map((m, idx) => (
+                      <tr key={m.id || idx} className="hover:bg-amber-50/[0.04]">
+                        <td className="py-2.5 pl-4 pr-2 font-bold text-gray-400">{idx + 1}</td>
+                        <td className="py-2.5 px-3 font-semibold text-gray-800">{m.nome}</td>
+                        <td className="py-2.5 px-3 text-indigo-600 font-semibold">{m.setor}</td>
+                        <td className="py-2.5 px-3 text-teal-650 font-semibold">{m.setor_eclesiastico_display}</td>
+                        <td className="py-2.5 px-3 text-gray-500 font-medium">{m.grupos_caseiros || 'Sem GC'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
     </div>
   );
 };
