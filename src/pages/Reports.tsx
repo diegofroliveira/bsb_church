@@ -144,7 +144,22 @@ export const Reports: React.FC = () => {
            supabase.from('discipulado').select('discipulo, discipulador, status')
         ]);
         
-        const allMembros = membrosRes.data || [];
+        const allMembrosRaw = membrosRes.data || [];
+        const excludedTypes = ['APOSTOLO', 'CONTADOR', 'EXTERNO', 'EXTRA LOCAL', 'FUNCIONARIO', 'VISITANTE'];
+        const allMembros = allMembrosRaw.filter((m: any) => {
+          const status = (m.status || '').trim().toLowerCase();
+          if (status !== 'ativo') return false;
+
+          const tipo = (m.tipo_de_pessoa || '')
+            .trim()
+            .toUpperCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "");
+
+          if (excludedTypes.includes(tipo)) return false;
+
+          return true;
+        });
         const allCelulas = celulasRes.data || [];
         const allDisc = discRes.data || [];
 
