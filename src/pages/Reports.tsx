@@ -308,6 +308,94 @@ export const Reports: React.FC = () => {
     });
   }, [members, filterQuery, filterType, filterGC, filterGender, filterAgeCategory, filterMinAge, filterMaxAge, filterMaritalStatus, filterState, filterSetor, filterSetorEcl, filterMestre, filterPersonType, filterStatusPessoa, filterNoChildren, allParentsNames, sortField, sortDirection]);
 
+  // Real-time mini dashboard calculations
+  const chartsData = useMemo(() => {
+    const total = filteredMembers.length;
+    
+    // 1. Sectors
+    const sectors: Record<string, number> = {
+      'Setor Norte': 0,
+      'Setor Central': 0,
+      'Setor Águas Claras': 0,
+      'Setor Sul': 0,
+      'Sem Setor': 0
+    };
+    
+    // 2. Age categories
+    const ages = {
+      'Criança (0-11)': 0,
+      'Adolescente (12-17)': 0,
+      'Jovem (18-29)': 0,
+      'Adulto (30-59)': 0,
+      'Idoso (60+)': 0,
+      'Indefinida': 0
+    };
+
+    // 3. Gender
+    let male = 0;
+    let female = 0;
+    let unknownGender = 0;
+
+    // 4. Vínculo (Cadastro)
+    let membro = 0;
+    let visitante = 0;
+
+    filteredMembers.forEach(m => {
+      // Sector
+      const s = m.setor || 'Sem Setor';
+      if (s in sectors) sectors[s]++;
+      else sectors['Sem Setor']++;
+
+      // Age category
+      const age = calculateAge(m.nascimento || m.data_nascimento || m.birth_date);
+      if (age < 0) ages['Indefinida']++;
+      else if (age < 12) ages['Criança (0-11)']++;
+      else if (age < 18) ages['Adolescente (12-17)']++;
+      else if (age < 30) ages['Jovem (18-29)']++;
+      else if (age < 60) ages['Adulto (30-59)']++;
+      else ages['Idoso (60+)']++;
+
+      // Gender
+      const g = (m.sexo || '').trim().toUpperCase();
+      if (g.startsWith('M')) male++;
+      else if (g.startsWith('F')) female++;
+      else unknownGender++;
+
+      // Vínculo
+      const t = (m.tipo_cadastro || '').trim().toUpperCase();
+      if (t === 'VISITANTE') visitante++;
+      else membro++;
+    });
+
+    return {
+      total,
+      sectors: Object.entries(sectors).map(([name, count]) => ({
+        name,
+        count,
+        pct: total > 0 ? Math.round((count / total) * 100) : 0
+      })).sort((a, b) => b.count - a.count),
+      ages: Object.entries(ages).map(([name, count]) => ({
+        name,
+        count,
+        pct: total > 0 ? Math.round((count / total) * 100) : 0
+      })),
+      gender: {
+        male,
+        malePct: total > 0 ? Math.round((male / total) * 100) : 0,
+        female,
+        femalePct: total > 0 ? Math.round((female / total) * 100) : 0,
+        unknown: unknownGender,
+        unknownPct: total > 0 ? Math.round((unknownGender / total) * 100) : 0
+      },
+      vinculo: {
+        membro,
+        membroPct: total > 0 ? Math.round((membro / total) * 100) : 0,
+        visitante,
+        visitantePct: total > 0 ? Math.round((visitante / total) * 100) : 0
+      }
+    };
+  }, [filteredMembers]);
+
   const handleExportExcel = () => {
     if (filteredMembers.length === 0) return;
     
@@ -440,6 +528,108 @@ export const Reports: React.FC = () => {
 
         </div>
       </div>
+
+      {/* Real-time Small Charts / Stats Grid */}
+      {filteredMembers.length > 0 && (
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in zoom-in-95 duration-500">
+          {/* Card 1: Setores */}
+          <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
+            <div>
+              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Distribuição por Setores</h3>
+              <div className="space-y-2.5">
+                {chartsData.sectors.map(s => (
+                  <div key={s.name} className="space-y-1">
+                    <div className="flex justify-between text-xs font-semibold text-gray-700">
+                      <span className="truncate">{s.name}</span>
+                      <span>{s.count} <span className="text-[10px] text-gray-405">({s.pct}%)</span></span>
+                    </div>
+                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                      <div className="bg-indigo-500 h-full rounded-full transition-all duration-500" style={{ width: `${s.pct}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Card 2: Faixas Etárias */}
+          <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
+            <div>
+              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Faixas Etárias</h3>
+              <div className="space-y-2.5">
+                {chartsData.ages.filter(a => a.count > 0 || a.name !== 'Indefinida').map(a => (
+                  <div key={a.name} className="space-y-1">
+                    <div className="flex justify-between text-xs font-semibold text-gray-700">
+                      <span>{a.name}</span>
+                      <span>{a.count} <span className="text-[10px] text-gray-405">({a.pct}%)</span></span>
+                    </div>
+                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                      <div className="bg-teal-500 h-full rounded-full transition-all duration-500" style={{ width: `${a.pct}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Card 3: Gênero & Vínculo */}
+          <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between space-y-6">
+            <div>
+              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Distribuição por Gênero</h3>
+              <div className="space-y-3">
+                {/* Masculino */}
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs font-semibold text-gray-700">
+                    <span className="flex items-center gap-1">👨 Masculino</span>
+                    <span>{chartsData.gender.male} <span className="text-[10px] text-gray-405">({chartsData.gender.malePct}%)</span></span>
+                  </div>
+                  <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                    <div className="bg-blue-500 h-full rounded-full transition-all duration-500" style={{ width: `${chartsData.gender.malePct}%` }} />
+                  </div>
+                </div>
+
+                {/* Feminino */}
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs font-semibold text-gray-700">
+                    <span className="flex items-center gap-1">👩 Feminino</span>
+                    <span>{chartsData.gender.female} <span className="text-[10px] text-gray-455">({chartsData.gender.femalePct}%)</span></span>
+                  </div>
+                  <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                    <div className="bg-pink-500 h-full rounded-full transition-all duration-500" style={{ width: `${chartsData.gender.femalePct}%` }} />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-gray-100 pt-4">
+              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Vínculo de Cadastro</h3>
+              <div className="space-y-3">
+                {/* Membro */}
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs font-semibold text-gray-700">
+                    <span>Membros</span>
+                    <span>{chartsData.vinculo.membro} <span className="text-[10px] text-gray-405">({chartsData.vinculo.membroPct}%)</span></span>
+                  </div>
+                  <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                    <div className="bg-emerald-500 h-full rounded-full transition-all duration-500" style={{ width: `${chartsData.vinculo.membroPct}%` }} />
+                  </div>
+                </div>
+
+                {/* Visitante */}
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs font-semibold text-gray-700">
+                    <span>Visitantes</span>
+                    <span>{chartsData.vinculo.visitante} <span className="text-[10px] text-gray-405">({chartsData.vinculo.visitantePct}%)</span></span>
+                  </div>
+                  <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                    <div className="bg-orange-500 h-full rounded-full transition-all duration-500" style={{ width: `${chartsData.vinculo.visitantePct}%` }} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="bg-gray-50/50 px-6 py-3 border-b border-gray-100 flex items-center justify-between">
