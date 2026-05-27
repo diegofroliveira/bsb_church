@@ -152,14 +152,14 @@ export const getSectorByResidence = (
     normBairro.includes('COLONIA AGRICOLA SAMAMBAIA') ||
     normBairro.includes('COL. AGR. SAMAMBAIA') ||
     normRA === 'VICENTE PIRES' ||
-    normRA === 'GUARÁ' ||
-    normRA === 'NÚCLEO BANDEIRANTE'
+    normRA === 'GUARA' ||
+    normRA === 'NUCLEO BANDEIRANTE'
   ) {
     return 'Setor Central';
   }
 
   // 2. Setor Águas Claras
-  if (normRA === 'ÁGUAS CLARAS' || normRA === 'ARNIQUEIRA') {
+  if (normRA === 'AGUAS CLARAS' || normRA === 'ARNIQUEIRA') {
     return 'Setor Águas Claras';
   }
 
@@ -170,7 +170,7 @@ export const getSectorByResidence = (
     normRA === 'NOROESTE' ||
     normRA === 'LAGO NORTE' ||
     normRA === 'SOBRADINHO' ||
-    normRA === 'JARDIM BOTÂNICO' ||
+    normRA === 'JARDIM BOTANICO' ||
     normBairro.includes('SUDOESTE') ||
     normBairro.includes('CRUZEIRO') ||
     normBairro.includes('OCTOGONAL') ||
@@ -192,7 +192,7 @@ export const getSectorByResidence = (
   if (
     normRA === 'TAGUATINGA' ||
     normRA === 'SAMAMBAIA' ||
-    normRA === 'CEILÂNDIA' ||
+    normRA === 'CEILANDIA' ||
     normRA === 'RECANTO-ENTORNO' ||
     normRA === 'RIACHO FUNDO' ||
     normRA === 'GAMA' ||

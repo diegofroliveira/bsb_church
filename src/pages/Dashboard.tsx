@@ -92,6 +92,28 @@ export const Dashboard: React.FC = () => {
       discipuladoMap.get(disc).push(d.discipulador);
     });
 
+    const getNormalizedSectorName = (dbSector: string | null | undefined): string => {
+      if (!dbSector) return 'Sem Setor';
+      const norm = dbSector.trim().toUpperCase();
+      if (norm.includes('NORTE')) return 'Setor Norte';
+      if (norm.includes('CENTRAL')) return 'Setor Central';
+      if (norm.includes('AGUAS CLARAS') || norm.includes('ÁGUAS CLARAS')) return 'Setor Águas Claras';
+      if (norm.includes('SUL')) return 'Setor Sul';
+      return 'Sem Setor';
+    };
+
+    const getMemberSector = (m: any): string => {
+      // Leader/Auxiliar Sector Override: leaders represent the sector of the cell they lead
+      const matchingCell = rawCelulas.find(c => 
+        (c.lider && c.lider.trim().toUpperCase() === m.nome?.trim().toUpperCase()) ||
+        (c.auxiliar && c.auxiliar.trim().toUpperCase() === m.nome?.trim().toUpperCase())
+      );
+      if (matchingCell) {
+        return getNormalizedSectorName(matchingCell.setor);
+      }
+      return getSectorByResidence(m.bairro, m.cidade, m.estado);
+    };
+
     const now = new Date();
     const parseSafeDate = (dateVal: any) => {
         if (!dateVal) return null;
@@ -141,7 +163,7 @@ export const Dashboard: React.FC = () => {
         const matchMarital = filterMaritalStatus === 'Todos' || m.estado_civil === filterMaritalStatus;
         const matchStatus = filterStatus === 'Todos' || m.status === filterStatus;
         const matchType = selectedTypes.length === 0 || selectedTypes.includes(m.tipo_de_pessoa?.trim() || '');
-        const residentSector = getSectorByResidence(m.bairro, m.cidade, m.estado);
+        const residentSector = getMemberSector(m);
         const matchSector = filterSector === 'Todos' || residentSector === filterSector;
         return matchGender && matchGroup && matchDisc && matchAge && matchMarital && matchStatus && matchType && matchSector;
     });
@@ -220,18 +242,8 @@ export const Dashboard: React.FC = () => {
       'Sem Setor': { nome: 'Sem Setor', grupos: 0, membros: 0 }
     };
 
-    const getNormalizedSectorName = (dbSector: string | null | undefined): string => {
-      if (!dbSector) return 'Sem Setor';
-      const norm = dbSector.trim().toUpperCase();
-      if (norm.includes('NORTE')) return 'Setor Norte';
-      if (norm.includes('CENTRAL')) return 'Setor Central';
-      if (norm.includes('AGUAS CLARAS') || norm.includes('ÁGUAS CLARAS')) return 'Setor Águas Claras';
-      if (norm.includes('SUL')) return 'Setor Sul';
-      return 'Sem Setor';
-    };
-
     filteredMembros.forEach(m => {
-      const sec = getSectorByResidence(m.bairro, m.cidade, m.estado);
+      const sec = getMemberSector(m);
       if (sectorCounts[sec]) {
         sectorCounts[sec].membros += 1;
       }

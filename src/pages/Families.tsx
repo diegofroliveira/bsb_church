@@ -281,6 +281,23 @@ export const Families: React.FC = () => {
 
   // Filtering nuclear family cards
   const filteredFamilies = useMemo(() => {
+    const getMemberSector = (m: Member | undefined): string => {
+      if (!m) return 'Sem Setor';
+      const matchingCell = cells.find(c => 
+        (c.lider && c.lider.trim().toUpperCase() === m.nome.trim().toUpperCase()) ||
+        (c.auxiliar && c.auxiliar.trim().toUpperCase() === m.nome.trim().toUpperCase())
+      );
+      if (matchingCell) {
+        const norm = (matchingCell.setor || '').trim().toUpperCase();
+        if (norm.includes('NORTE')) return 'Setor Norte';
+        if (norm.includes('CENTRAL')) return 'Setor Central';
+        if (norm.includes('AGUAS CLARAS') || norm.includes('ÁGUAS CLARAS')) return 'Setor Águas Claras';
+        if (norm.includes('SUL')) return 'Setor Sul';
+        return 'Sem Setor';
+      }
+      return getSectorByResidence(m.bairro, m.cidade, m.estado);
+    };
+
     return familyData.list.filter(fam => {
       // 1. Text search
       const matchesSearch = searchTerm === '' || 
@@ -292,7 +309,7 @@ export const Families: React.FC = () => {
 
       // 2. Sector Filter
       const headMember = fam.familyMembers.find((m: Member) => m.id.toString() === fam.headId);
-      const residentSector = getSectorByResidence(headMember?.bairro, headMember?.cidade, headMember?.estado);
+      const residentSector = getMemberSector(headMember);
       const matchesSector = filterSector === 'Todos' || residentSector === filterSector;
 
       // 3. GC Status Filter
@@ -302,7 +319,7 @@ export const Families: React.FC = () => {
 
       return matchesSearch && matchesSector && matchesStatus;
     });
-  }, [familyData, searchTerm, filterSector, filterStatus]);
+  }, [familyData, searchTerm, filterSector, filterStatus, cells]);
 
   if (isLoading) {
     return (
