@@ -486,33 +486,52 @@ export const Reports: React.FC = () => {
               <p className="text-gray-500 mt-1 max-w-sm">Os filtros aplicados não retornaram nenhum registro.</p>
            </div>
         ) : (
-           <div className="overflow-x-auto flex-1">
-              <table className="min-w-full divide-y divide-gray-200">
-                 <thead className="bg-gray-50/80 sticky top-0 backdrop-blur-sm z-10">
-                   <tr>
-                     <th className="py-4 pl-6 pr-3 text-left text-xs font-bold text-gray-600 uppercase cursor-pointer hover:bg-gray-100 transition-colors group" onClick={() => toggleSort('nome')}><div className="flex items-center gap-1">Nome {sortField === 'nome' ? (sortDirection === 'asc' ? <ChevronUp className="h-3 w-3 text-primary-500" /> : <ChevronDown className="h-3 w-3 text-primary-500" />) : <ArrowUpDown className="h-3 w-3 text-gray-300 opacity-0 group-hover:opacity-100" />}</div></th>
-                     <th className="px-3 py-4 text-left text-xs font-bold text-gray-600 uppercase cursor-pointer hover:bg-gray-100 transition-colors group" onClick={() => toggleSort('idade')}><div className="flex items-center gap-1">Perfil / Idade {sortField === 'idade' ? (sortDirection === 'asc' ? <ChevronUp className="h-3 w-3 text-primary-500" /> : <ChevronDown className="h-3 w-3 text-primary-500" />) : <ArrowUpDown className="h-3 w-3 text-gray-300 opacity-0 group-hover:opacity-100" />}</div></th>
-                     <th className="px-3 py-4 text-left text-xs font-bold text-gray-600 uppercase cursor-pointer hover:bg-gray-100 transition-colors group" onClick={() => toggleSort('grupos_caseiros')}><div className="flex items-center gap-1">GC / Setor {sortField === 'grupos_caseiros' ? (sortDirection === 'asc' ? <ChevronUp className="h-3 w-3 text-primary-500" /> : <ChevronDown className="h-3 w-3 text-primary-500" />) : <ArrowUpDown className="h-3 w-3 text-gray-300 opacity-0 group-hover:opacity-100" />}</div></th>
-                     <th className="px-3 py-4 text-left text-xs font-bold text-gray-600 uppercase cursor-pointer hover:bg-gray-100 transition-colors group" onClick={() => toggleSort('discipulador')}><div className="flex items-center gap-1">Discipulador {sortField === 'discipulador' ? (sortDirection === 'asc' ? <ChevronUp className="h-3 w-3 text-primary-500" /> : <ChevronDown className="h-3 w-3 text-primary-500" />) : <ArrowUpDown className="h-3 w-3 text-gray-300 opacity-0 group-hover:opacity-100" />}</div></th>
-                   </tr>
-                 </thead>
-                 <tbody className="divide-y divide-gray-100 bg-white">
-                   {filteredMembers.slice(0, 100).map((m, idx) => {
-                     const age = calculateAge(m.nascimento || m.data_nascimento || m.birth_date);
-                     
-                     return (
-                       <tr key={m.id || idx} className="hover:bg-gray-50/50">
-                          <td className="whitespace-nowrap py-4 pl-6 pr-3">
-                             <div className="flex items-center gap-3">
-                                <div className="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-bold text-xs shrink-0">
-                                   {(m.nome || m.name || '?')[0].toUpperCase()}
-                                </div>
-                                <div className="flex flex-col min-w-0">
-                                   <span className="text-sm font-medium text-gray-900 truncate max-w-[200px]">{m.nome}</span>
-                                   <span className="text-xs text-gray-500">{m.status || 'Ativo'}</span>
-                                </div>
-                             </div>
-                          </td>
+           <>
+            <div className="bg-gray-50/50 px-6 py-3 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-gray-500 font-medium">
+              <span className="flex items-center gap-1.5 text-gray-700">
+                🔍 Encontrados: <strong className="text-gray-900 font-bold">{filteredMembers.length}</strong> {filteredMembers.length === 1 ? 'membro' : 'membros'}
+                {filteredMembers.length > 100 && (
+                  <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-100 px-1.5 py-0.5 rounded font-black uppercase shrink-0">
+                    Exibindo os primeiros 100
+                  </span>
+                )}
+              </span>
+              <span>
+                Use os filtros avançados ou a busca para refinar o resultado.
+              </span>
+            </div>
+
+            <div className="overflow-x-auto flex-1">
+               <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50/80 sticky top-0 backdrop-blur-sm z-10">
+                    <tr>
+                      <th className="py-4 pl-6 pr-2 text-left text-xs font-bold text-gray-400 uppercase w-12">#</th>
+                      <th className="py-4 pl-2 pr-3 text-left text-xs font-bold text-gray-600 uppercase cursor-pointer hover:bg-gray-100 transition-colors group" onClick={() => toggleSort('nome')}><div className="flex items-center gap-1">Nome {sortField === 'nome' ? (sortDirection === 'asc' ? <ChevronUp className="h-3 w-3 text-primary-500" /> : <ChevronDown className="h-3 w-3 text-primary-500" />) : <ArrowUpDown className="h-3 w-3 text-gray-300 opacity-0 group-hover:opacity-100" />}</div></th>
+                      <th className="px-3 py-4 text-left text-xs font-bold text-gray-600 uppercase cursor-pointer hover:bg-gray-100 transition-colors group" onClick={() => toggleSort('idade')}><div className="flex items-center gap-1">Perfil / Idade {sortField === 'idade' ? (sortDirection === 'asc' ? <ChevronUp className="h-3 w-3 text-primary-500" /> : <ChevronDown className="h-3 w-3 text-primary-500" />) : <ArrowUpDown className="h-3 w-3 text-gray-300 opacity-0 group-hover:opacity-100" />}</div></th>
+                      <th className="px-3 py-4 text-left text-xs font-bold text-gray-600 uppercase cursor-pointer hover:bg-gray-100 transition-colors group" onClick={() => toggleSort('grupos_caseiros')}><div className="flex items-center gap-1">GC / Setor {sortField === 'grupos_caseiros' ? (sortDirection === 'asc' ? <ChevronUp className="h-3 w-3 text-primary-500" /> : <ChevronDown className="h-3 w-3 text-primary-500" />) : <ArrowUpDown className="h-3 w-3 text-gray-300 opacity-0 group-hover:opacity-100" />}</div></th>
+                      <th className="px-3 py-4 text-left text-xs font-bold text-gray-600 uppercase cursor-pointer hover:bg-gray-100 transition-colors group" onClick={() => toggleSort('discipulador')}><div className="flex items-center gap-1">Discipulador {sortField === 'discipulador' ? (sortDirection === 'asc' ? <ChevronUp className="h-3 w-3 text-primary-500" /> : <ChevronDown className="h-3 w-3 text-primary-500" />) : <ArrowUpDown className="h-3 w-3 text-gray-300 opacity-0 group-hover:opacity-100" />}</div></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 bg-white">
+                    {filteredMembers.slice(0, 100).map((m, idx) => {
+                      const age = calculateAge(m.nascimento || m.data_nascimento || m.birth_date);
+                      
+                      return (
+                        <tr key={m.id || idx} className="hover:bg-gray-50/50">
+                           <td className="whitespace-nowrap py-4 pl-6 pr-2 text-xs font-bold text-gray-400 w-12 text-left">
+                              {idx + 1}
+                           </td>
+                           <td className="whitespace-nowrap py-4 pl-2 pr-3">
+                              <div className="flex items-center gap-3">
+                                 <div className="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-bold text-xs shrink-0">
+                                    {(m.nome || m.name || '?')[0].toUpperCase()}
+                                 </div>
+                                 <div className="flex flex-col min-w-0">
+                                    <span className="text-sm font-medium text-gray-900 truncate max-w-[200px]">{m.nome}</span>
+                                    <span className="text-xs text-gray-500">{m.status || 'Ativo'}</span>
+                                 </div>
+                              </div>
+                           </td>
                           <td className="whitespace-nowrap px-3 py-4">
                              <div className="flex flex-col min-w-0">
                                 <div className="flex items-center gap-2">
@@ -533,15 +552,16 @@ export const Reports: React.FC = () => {
                              </div>
                           </td>
                           <td className="whitespace-nowrap px-3 py-4">
-                            <span className="text-sm font-medium text-emerald-600 truncate max-w-[150px] inline-block">{m.discipulador}</span>
-                          </td>
-                       </tr>
-                     );
-                   })}
-                 </tbody>
-              </table>
-           </div>
-        )}
+                             <span className="text-sm font-medium text-emerald-600 truncate max-w-[150px] inline-block">{m.discipulador}</span>
+                           </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+               </table>
+            </div>
+           </>
+         )}
       </div>
     </div>
   );
