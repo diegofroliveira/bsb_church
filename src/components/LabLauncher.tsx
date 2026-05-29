@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Sparkles, Eye, UserPlus, X, FlaskConical } from 'lucide-react';
+import { Sparkles, Eye, UserPlus, X, FlaskConical, Database } from 'lucide-react';
 
 interface LabLauncherProps {
   onClose: () => void;
@@ -26,6 +26,16 @@ const LAB_ITEMS = [
     bg: 'bg-teal-50',
     border: 'border-teal-100',
     textColor: 'text-teal-700',
+  },
+  {
+    path: '/lab/queries',
+    icon: Database,
+    label: 'Consultas & Estudos',
+    desc: 'Pesquisas ad-hoc e filtros de vínculo de membros',
+    color: 'from-indigo-400 to-violet-500',
+    bg: 'bg-indigo-50',
+    border: 'border-indigo-100',
+    textColor: 'text-indigo-700',
   },
 ];
 
