@@ -355,7 +355,7 @@ export const Birthdays: React.FC = () => {
     const isPlural = getBirthdays.length > 1;
     const isFemale = !isPlural && getBirthdays[0]?.sexo === 'Feminino';
     
-    let timeLabel = "hoje";
+    let timeLabel = "de hoje";
     if (filterMode === 'tomorrow') {
       timeLabel = "de amanhã";
     } else if (filterMode === 'month') {
