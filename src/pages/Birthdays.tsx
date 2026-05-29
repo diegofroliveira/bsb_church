@@ -24,7 +24,31 @@ const formatName = (fullName: string) => {
 
 const getFirstName = (fullName: string) => {
   if (!fullName) return '';
-  return fullName.trim().split(' ')[0];
+  const parts = fullName.trim().replace(/\s+/g, ' ').split(' ');
+  if (parts.length === 0) return '';
+  if (parts.length === 1) return parts[0];
+
+  const firstWord = parts[0].toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const secondWord = parts[1].toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+  const compoundStarters = new Set([
+    'MARIA', 'ANA', 'ANNA', 'JOAO', 'JOSE', 'CARLOS', 'PEDRO', 'LUIZ', 'LUIS', 
+    'PAULO', 'MARCOS', 'MARCO', 'FRANCISCO', 'JULIO', 'VICTOR', 'VITOR'
+  ]);
+
+  const compoundSeconds = new Set([
+    'ANTONIO', 'AUGUSTO', 'CESAR', 'EDUARDO', 'FELIPE', 'GABRIEL', 'HENRIQUE', 
+    'JOAO', 'JORGE', 'JOSE', 'LUCAS', 'MANOEL', 'MIGUEL', 'OTAVIO', 'PEDRO', 
+    'VITOR', 'VICTOR', 'VINICIUS', 'ALICE', 'BEATRIZ', 'CLARA', 'CRISTINA', 
+    'EDUARDA', 'HELENA', 'INES', 'JULIA', 'LARA', 'LIZ', 'LUIZA', 'REGINA', 
+    'RITA', 'ROSA', 'SOPHIA', 'TERESA', 'THEREZA', 'VALENTINA'
+  ]);
+
+  if (compoundStarters.has(firstWord) && compoundSeconds.has(secondWord)) {
+    return `${parts[0]} ${parts[1]}`;
+  }
+
+  return parts[0];
 };
 
 const formatGCName = (gcName?: string): string => {
