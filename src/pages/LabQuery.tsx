@@ -5,7 +5,7 @@ import {
   Search, Users, Calendar, Sparkles, Filter, 
   Download, Copy, RefreshCw, GraduationCap, AlertCircle,
   Database, UserCheck, HelpCircle, ArrowRight, ShieldCheck, MapPin,
-  Clock, Heart, Eye, HelpCircle as QuestionIcon
+  Clock, Heart, Eye, Play, Terminal, Code, HelpCircle as QuestionIcon
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -17,6 +17,7 @@ interface Member {
   sexo?: string;
   data_de_cadastro?: string | null;
   data_de_vinculo?: string | null;
+  data_atualizacao?: string | null;
   nascimento?: string | null;
   grupos_caseiros?: string | null;
   estado_civil?: string | null;
@@ -29,30 +30,54 @@ interface Member {
   email?: string | null;
 }
 
+const parseSafeDate = (dateStr?: string | null) => {
+  if (!dateStr) return null;
+  const dob = dateStr.trim();
+  if (dob.includes('/')) {
+    const parts = dob.split('/');
+    if (parts.length === 3) {
+      const d = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+      return isNaN(d.getTime()) ? null : d;
+    }
+  } else if (dob.includes('-')) {
+    const parts = dob.split('T')[0].split('-');
+    if (parts.length === 3) {
+      if (parts[0].length === 4) {
+        // YYYY-MM-DD
+        const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+        return isNaN(d.getTime()) ? null : d;
+      } else {
+        // DD-MM-YYYY
+        const d = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+        return isNaN(d.getTime()) ? null : d;
+      }
+    }
+  }
+  const parsed = new Date(dob);
+  return isNaN(parsed.getTime()) ? null : parsed;
+};
+
 const calculateAge = (dob?: string | null) => {
-  if (!dob) return -1;
-  let parts = dob.includes('/') ? dob.split('/') : dob.split('-');
-  const birth = dob.includes('/') 
-    ? new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0])) 
-    : new Date(dob);
-  if (isNaN(birth.getTime())) return -1;
+  const birth = parseSafeDate(dob);
+  if (!birth) return -1;
   const now = new Date();
   let age = now.getFullYear() - birth.getFullYear();
   if (now.getMonth() < birth.getMonth() || (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate())) age--;
   return age;
 };
 
-// Calculates how many months of connection a person has
-const calculateDurationInMonths = (cadastro?: string | null, vinculo?: string | null) => {
+// Calculates connection duration in months
+const calculateDurationInMonths = (cadastro?: string | null, vinculo?: string | null, status?: string, atualizacao?: string | null) => {
   const targetDateStr = vinculo || cadastro;
-  if (!targetDateStr) return -1;
+  const targetDate = parseSafeDate(targetDateStr);
+  if (!targetDate) return -1;
   
-  const targetDate = new Date(targetDateStr);
-  if (isNaN(targetDate.getTime())) return -1;
+  const isInactive = status && status.trim().toUpperCase() !== 'ATIVO';
+  const endDate = (isInactive && atualizacao) ? parseSafeDate(atualizacao) : new Date();
+  if (!endDate) return -1;
   
-  const now = new Date();
-  const diffYears = now.getFullYear() - targetDate.getFullYear();
-  const diffMonths = now.getMonth() - targetDate.getMonth();
+  const diffYears = endDate.getFullYear() - targetDate.getFullYear();
+  const diffMonths = endDate.getMonth() - targetDate.getMonth();
   
   return diffYears * 12 + diffMonths;
 };
@@ -76,9 +101,23 @@ export const LabQuery: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
-  // Filters State
+  // Mode Selector: 'visual' or 'playground'
+  const [queryMode, setQueryMode] = useState<'visual' | 'playground'>('visual');
+
+  // Playground Code Console State
+  const [codeQuery, setCodeQuery] = useState<string>(
+`// Consulta Customizada JS (Retorne true para incluir, false para excluir)
+const meses = calculateMonths(m.data_de_cadastro, m.data_de_vinculo, m.status, m.data_atualizacao);
+
+// Filtra apenas membros Inativos/Afastados que duraram menos de 2 anos (24 meses)
+return m.status !== 'Ativo' && meses > 0 && meses < 24;`
+  );
+  const [codeError, setCodeError] = useState<string | null>(null);
+  const [triggerRunCode, setTriggerRunCode] = useState<number>(0);
+
+  // Filters State (Visual)
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'Ativo' | 'Inativo' | 'Todos'>('Ativo');
+  const [filterStatus, setFilterStatus] = useState<'Ativo' | 'Inativo' | 'Todos'>('Todos');
   const [filterGender, setFilterGender] = useState<string>('Todos');
   const [filterGC, setFilterGC] = useState<string>('Todos');
   const [filterTipoPessoa, setFilterTipoPessoa] = useState<string>('Todos');
@@ -98,7 +137,7 @@ export const LabQuery: React.FC = () => {
         setLoading(true);
         const { data, error } = await supabase
           .from('membros')
-          .select('id, nome, apelido, status, sexo, data_de_cadastro, data_de_vinculo, nascimento, grupos_caseiros, estado_civil, tipo_de_pessoa, tipo_cadastro, bairro, cidade, celular_principal_sms, telefone_fixo, email')
+          .select('id, nome, apelido, status, sexo, data_de_cadastro, data_de_vinculo, data_atualizacao, nascimento, grupos_caseiros, estado_civil, tipo_de_pessoa, tipo_cadastro, bairro, cidade, celular_principal_sms, telefone_fixo, email')
           .limit(10000);
 
         if (error) throw error;
@@ -143,6 +182,26 @@ export const LabQuery: React.FC = () => {
 
   // Apply Filters Client-Side
   const filteredList = useMemo(() => {
+    if (queryMode === 'playground') {
+      try {
+        // Compile dynamic JS function safely
+        const filterFn = new Function('m', 'calculateMonths', codeQuery);
+        
+        return members.filter(m => {
+          try {
+            return !!filterFn(m, (cadastro: any, vinculo: any, status: any, atualizacao: any) => 
+              calculateDurationInMonths(cadastro, vinculo, status, atualizacao)
+            );
+          } catch (e) {
+            return false;
+          }
+        }).sort((a, b) => a.nome.localeCompare(b.nome));
+      } catch (err: any) {
+        return [];
+      }
+    }
+
+    // Default Visual Mode Filtering
     return members.filter(m => {
       // 1. Status Filter
       if (filterStatus !== 'Todos') {
@@ -179,17 +238,16 @@ export const LabQuery: React.FC = () => {
       if (age !== -1) {
         if (age < minAge || age > maxAge) return false;
       } else if (minAge > 0 || maxAge < 120) {
-        // If age is unrecorded, only include if user hasn't narrowed the age ranges
         return false;
       }
 
       // 7. Max duration of connection (months)
       if (maxDurationMonths !== -1) {
-        const months = calculateDurationInMonths(m.data_de_cadastro, m.data_de_vinculo);
+        const months = calculateDurationInMonths(m.data_de_cadastro, m.data_de_vinculo, m.status, m.data_atualizacao);
         if (months === -1 || months > maxDurationMonths) return false;
       }
 
-      // 8. Text Search (Nome, apelido, bairro, cidade, celular)
+      // 8. Text Search
       if (searchTerm.trim() !== '') {
         const term = searchTerm.toLowerCase();
         const matchName = m.nome.toLowerCase().includes(term);
@@ -205,7 +263,7 @@ export const LabQuery: React.FC = () => {
 
       return true;
     }).sort((a, b) => a.nome.localeCompare(b.nome));
-  }, [members, searchTerm, filterStatus, filterGender, filterGC, filterTipoPessoa, filterMaritalStatus, maxDurationMonths, minAge, maxAge]);
+  }, [members, searchTerm, filterStatus, filterGender, filterGC, filterTipoPessoa, filterMaritalStatus, maxDurationMonths, minAge, maxAge, queryMode, codeQuery, triggerRunCode]);
 
   // Statistics for Current Filtered List
   const stats = useMemo(() => {
@@ -222,24 +280,20 @@ export const LabQuery: React.FC = () => {
     let gcCount = 0;
 
     filteredList.forEach(m => {
-      // Age
       const age = calculateAge(m.nascimento);
       if (age !== -1) {
         ageSum += age;
         ageCount++;
       }
       
-      // Bond Duration
-      const duration = calculateDurationInMonths(m.data_de_cadastro, m.data_de_vinculo);
+      const duration = calculateDurationInMonths(m.data_de_cadastro, m.data_de_vinculo, m.status, m.data_atualizacao);
       if (duration !== -1) {
         durationSum += duration;
         durationCount++;
       }
 
-      // Gender
       if (m.sexo === 'Masculino') maleCount++;
 
-      // GC
       const hasGC = m.grupos_caseiros && m.grupos_caseiros.trim() !== '' && m.grupos_caseiros.toUpperCase() !== 'NENHUM';
       if (hasGC) gcCount++;
     });
@@ -254,10 +308,59 @@ export const LabQuery: React.FC = () => {
     };
   }, [filteredList]);
 
+  // Playground presets selector
+  const selectPlaygroundTemplate = (type: 'shortLink' | 'longActive' | 'solteirosNoGC' | 'semCelular') => {
+    setCodeError(null);
+    setCurrentPage(1);
+    
+    if (type === 'shortLink') {
+      setCodeQuery(
+`// Filtra membros Inativos/Afastados que entraram e saíram em menos de 2 anos (24 meses)
+const meses = calculateMonths(m.data_de_cadastro, m.data_de_vinculo, m.status, m.data_atualizacao);
+
+return m.status !== 'Ativo' && meses > 0 && meses < 24;`
+      );
+    } else if (type === 'longActive') {
+      setCodeQuery(
+`// Filtra membros Ativos fiéis com mais de 5 anos (60 meses) de casa
+const meses = calculateMonths(m.data_de_cadastro, m.data_de_vinculo, m.status, m.data_atualizacao);
+
+return m.status === 'Ativo' && meses >= 60;`
+      );
+    } else if (type === 'solteirosNoGC') {
+      setCodeQuery(
+`// Filtra solteiros ativos que participam de GCs em Vicente Pires
+const estadoCivil = (m.estado_civil || '').toUpperCase();
+const gc = (m.grupos_caseiros || '').toUpperCase();
+
+return m.status === 'Ativo' && estadoCivil.includes('SOLTEIRO') && gc.includes('VICENTE PIRES');`
+      );
+    } else if (type === 'semCelular') {
+      setCodeQuery(
+`// Filtra membros ativos sem celular principal registrado no banco
+return m.status === 'Ativo' && (!m.celular_principal_sms || m.celular_principal_sms.trim() === '');`
+      );
+    }
+  };
+
+  const handleRunPlaygroundCode = () => {
+    setCodeError(null);
+    try {
+      const fn = new Function('m', 'calculateMonths', codeQuery);
+      // Dummy check to intercept syntax/compiler crashes
+      fn({ status: 'Ativo' }, () => 0);
+      setTriggerRunCode(prev => prev + 1);
+      setCurrentPage(1);
+    } catch (e: any) {
+      setCodeError(e.message);
+    }
+  };
+
   // Presets Handlers
   const applyPresetRecentMembers = () => {
-    setFilterStatus('Ativo');
-    setMaxDurationMonths(6); // Less than 6 months of link
+    setQueryMode('visual');
+    setFilterStatus('Inativo');
+    setMaxDurationMonths(24); // stayed less than 24 months
     setFilterGC('Todos');
     setFilterTipoPessoa('Todos');
     setFilterGender('Todos');
@@ -268,8 +371,9 @@ export const LabQuery: React.FC = () => {
   };
 
   const applyPresetNoGC = () => {
+    setQueryMode('visual');
     setFilterStatus('Ativo');
-    setFilterGC('Sem GC'); // Without GC
+    setFilterGC('Sem GC'); 
     setMaxDurationMonths(-1);
     setFilterTipoPessoa('Todos');
     setFilterGender('Todos');
@@ -280,6 +384,7 @@ export const LabQuery: React.FC = () => {
   };
 
   const applyPresetExternals = () => {
+    setQueryMode('visual');
     setFilterStatus('Todos');
     setFilterTipoPessoa('EXTERNO');
     setFilterGC('Todos');
@@ -292,6 +397,7 @@ export const LabQuery: React.FC = () => {
   };
 
   const applyPresetYoungYouth = () => {
+    setQueryMode('visual');
     setFilterStatus('Ativo');
     setMinAge(12);
     setMaxAge(25);
@@ -305,7 +411,7 @@ export const LabQuery: React.FC = () => {
 
   const resetAllFilters = () => {
     setSearchTerm('');
-    setFilterStatus('Ativo');
+    setFilterStatus('Todos');
     setFilterGender('Todos');
     setFilterGC('Todos');
     setFilterTipoPessoa('Todos');
@@ -320,16 +426,16 @@ export const LabQuery: React.FC = () => {
   const handleExportCSV = () => {
     if (filteredList.length === 0) return;
     
-    // Header
     const headers = [
       'ID', 'Nome', 'Apelido', 'Status', 'Sexo', 'Tipo Pessoa', 'GC', 
       'Estado Civil', 'Bairro', 'Cidade', 'Idade', 'Tempo de Vínculo (Meses)', 
-      'Data Vínculo', 'Data Cadastro', 'Celular', 'Email'
+      'Data Entrada', 'Data Saída', 'Celular', 'Email'
     ];
     
     const rows = filteredList.map(m => {
       const age = calculateAge(m.nascimento);
-      const months = calculateDurationInMonths(m.data_de_cadastro, m.data_de_vinculo);
+      const months = calculateDurationInMonths(m.data_de_cadastro, m.data_de_vinculo, m.status, m.data_atualizacao);
+      const isInactive = m.status && m.status.trim().toUpperCase() !== 'ATIVO';
       return [
         m.id,
         `"${m.nome}"`,
@@ -343,8 +449,8 @@ export const LabQuery: React.FC = () => {
         `"${m.cidade || ''}"`,
         age !== -1 ? age : '',
         months !== -1 ? months : '',
-        m.data_de_vinculo || '',
-        m.data_de_cadastro || '',
+        m.data_de_vinculo || m.data_de_cadastro || '',
+        isInactive ? (m.data_atualizacao || 'Desconhecido') : 'Ativo',
         m.celular_principal_sms || '',
         m.email || ''
       ];
@@ -368,11 +474,11 @@ export const LabQuery: React.FC = () => {
     
     const jsonStr = JSON.stringify(filteredList.map(m => {
       const age = calculateAge(m.nascimento);
-      const months = calculateDurationInMonths(m.data_de_cadastro, m.data_de_vinculo);
+      const months = calculateDurationInMonths(m.data_de_cadastro, m.data_de_vinculo, m.status, m.data_atualizacao);
+      const isInactive = m.status && m.status.trim().toUpperCase() !== 'ATIVO';
       return {
         id: m.id,
         nome: m.nome,
-        apelido: m.apelido,
         status: m.status,
         sexo: m.sexo,
         tipo: m.tipo_de_pessoa || m.tipo_cadastro || 'Membro',
@@ -381,14 +487,14 @@ export const LabQuery: React.FC = () => {
         cidade: m.cidade,
         idade: age !== -1 ? age : null,
         tempo_vinculo_meses: months !== -1 ? months : null,
-        data_cadastro: m.data_de_cadastro,
-        data_vinculo: m.data_de_vinculo,
+        entrada: m.data_de_vinculo || m.data_de_cadastro,
+        saida: isInactive ? m.data_atualizacao : 'Ativo',
         celular: m.celular_principal_sms
       };
     }), null, 2);
 
     navigator.clipboard.writeText(jsonStr);
-    alert('Os dados do estudo foram copiados em formato JSON de alta fidelidade para sua área de transferência!');
+    alert('Os dados do estudo foram copiados em formato JSON para a área de transferência!');
   };
 
   // Paginated list
@@ -454,21 +560,21 @@ export const LabQuery: React.FC = () => {
             </span>
           </h1>
           <p className="text-slate-300 max-w-2xl text-xs md:text-sm leading-relaxed">
-            Monte estudos comportamentais e demográficos customizados. Filtre por tempo de vínculo à igreja (ex: novos convertidos de pouco tempo), idade, GCs e tipos de pessoa para subsidiar as decisões estratégicas da liderança.
+            Monte estudos comportamentais e demográficos customizados. Isola quem durou pouco tempo no vínculo pastoral (menos de 2 anos antes de se afastar/inativar) e analise datas e durações de conexões históricas no corpo de membros.
           </p>
         </div>
       </header>
 
       {/* Study Presets (One-Click Actions) */}
-      <section className="bg-slate-55 bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+      <section className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
         <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3.5 flex items-center gap-1.5">
           <GraduationCap className="w-4 h-4 text-indigo-500" /> Presets de Estudo Sugeridos (Um Clique)
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {[
             {
-              title: "🌱 Pouco Vínculo (< 6 Meses)",
-              desc: "Novos membros com até 6 meses de cadastro ou vínculo pastoral ativo.",
+              title: "🌱 Vínculo Curto Inativos (< 2 Anos)",
+              desc: "Isola ex-membros (Inativos) que entraram e saíram do corpo em menos de 2 anos.",
               action: applyPresetRecentMembers,
               color: "hover:border-emerald-300 hover:bg-emerald-50/10 hover:text-emerald-700"
             },
@@ -513,158 +619,272 @@ export const LabQuery: React.FC = () => {
         </div>
       </section>
 
-      {/* Advanced Custom Query Filters Panel */}
-      <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-6">
-        <div className="flex items-center justify-between border-b border-slate-50 pb-4">
-          <h3 className="text-xs font-black text-slate-405 uppercase tracking-widest flex items-center gap-1.5 text-slate-800">
-            <Filter className="w-4 h-4 text-indigo-500" /> Filtros e Sintonia do Estudo Customizado
-          </h3>
-          {(searchTerm || filterStatus !== 'Ativo' || filterGender !== 'Todos' || filterGC !== 'Todos' || filterTipoPessoa !== 'Todos' || filterMaritalStatus !== 'Todos' || maxDurationMonths !== -1 || minAge > 0 || maxAge < 120) && (
-            <button
-              onClick={resetAllFilters}
-              className="text-[10px] text-red-650 font-extrabold uppercase hover:underline cursor-pointer flex items-center gap-1 active:scale-95"
-            >
-              <RefreshCw className="w-3 h-3" /> Limpar Todos os Filtros
-            </button>
+      {/* Mode Selector Tabs: Visual vs JS Code Console */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => setQueryMode('visual')}
+          className={clsx(
+            "flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm border",
+            queryMode === 'visual'
+              ? "bg-indigo-650 text-white border-indigo-650"
+              : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
           )}
-        </div>
+        >
+          <Filter className="w-3.5 h-3.5" /> 🎛️ Filtros Avançados Visuais
+        </button>
+        <button
+          onClick={() => setQueryMode('playground')}
+          className={clsx(
+            "flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm border",
+            queryMode === 'playground'
+              ? "bg-indigo-650 text-white border-indigo-650"
+              : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
+          )}
+        >
+          <Terminal className="w-3.5 h-3.5" /> 💻 Console Playground JS (Query Completa)
+        </button>
+      </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {/* Text Search */}
-          <div className="space-y-1.5">
-            <label className="block text-[9px] font-black text-slate-400 uppercase tracking-wide">Busca Rápida</label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Nome, apelido, bairro..."
-                value={searchTerm}
-                onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-                className="w-full pl-9 pr-3 py-1.5 border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-300 focus:border-indigo-400 text-xs font-medium text-slate-700 bg-slate-50/50"
-              />
+      {/* Query Console / Filter Panel Container */}
+      {queryMode === 'playground' ? (
+        <section className="bg-slate-900 rounded-3xl border border-slate-800 p-6 space-y-6 shadow-xl text-white">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-4 flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <Code className="w-5 h-5 text-indigo-400" />
+              <div>
+                <h3 className="text-xs font-black text-indigo-300 uppercase tracking-widest">
+                  Console Playground de Query Turing-Completo
+                </h3>
+                <p className="text-[10px] text-gray-500 mt-0.5">
+                  Escreva e rode qualquer filtro JavaScript customizado contra o banco de {members.length} membros.
+                </p>
+              </div>
+            </div>
+
+            {/* Templates Selector */}
+            <div className="flex items-center gap-2">
+              <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wider shrink-0">Modelos Prontos:</span>
+              <select
+                onChange={e => selectPlaygroundTemplate(e.target.value as any)}
+                defaultValue="shortLink"
+                className="bg-slate-800 border border-slate-700 text-xs font-semibold text-gray-300 rounded-xl px-3 py-1.5 outline-none cursor-pointer focus:ring-1 focus:ring-indigo-500"
+              >
+                <option value="shortLink">🌱 Vínculo Curto Inativos (&lt; 2 Anos)</option>
+                <option value="longActive">⭐ Membros Fiéis (&gt; 5 Anos de Casa)</option>
+                <option value="solteirosNoGC">⛪ Solteiros no GC Vicente Pires</option>
+                <option value="semCelular">📱 Membros sem celular cadastrado</option>
+              </select>
             </div>
           </div>
 
-          {/* Status */}
-          <div className="space-y-1.5">
-            <label className="block text-[9px] font-black text-slate-400 uppercase tracking-wide font-bold">Status no Cadastro</label>
-            <select
-              value={filterStatus}
-              onChange={e => { setFilterStatus(e.target.value as any); setCurrentPage(1); }}
-              className="w-full px-3 py-1.5 border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-300 focus:border-indigo-400 text-xs font-semibold text-slate-600 bg-slate-50/50 cursor-pointer"
-            >
-              <option value="Ativo">Ativos (Padrão)</option>
-              <option value="Inativo">Inativos / Afastados</option>
-              <option value="Todos">Todos os Status</option>
-            </select>
-          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Editor Area */}
+            <div className="lg:col-span-8 space-y-3">
+              <div className="bg-slate-950 rounded-2xl border border-slate-800 p-4 font-mono text-xs overflow-hidden shadow-inner">
+                <textarea
+                  value={codeQuery}
+                  onChange={e => setCodeQuery(e.target.value)}
+                  className="w-full h-44 bg-transparent outline-none border-none text-emerald-400 leading-relaxed font-mono resize-none focus:ring-0"
+                  placeholder="// Digite seu código de filtro personalizado aqui..."
+                />
+              </div>
 
-          {/* Tipo de Pessoa */}
-          <div className="space-y-1.5">
-            <label className="block text-[9px] font-black text-slate-400 uppercase tracking-wide">Tipo de Cadastro</label>
-            <select
-              value={filterTipoPessoa}
-              onChange={e => { setFilterTipoPessoa(e.target.value); setCurrentPage(1); }}
-              className="w-full px-3 py-1.5 border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-300 focus:border-indigo-400 text-xs font-semibold text-slate-600 bg-slate-50/50 cursor-pointer"
-            >
-              <option value="Todos">Todos os Tipos</option>
-              {uniqueTipos.map(t => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </select>
-          </div>
+              {codeError && (
+                <div className="bg-red-950/60 border border-red-800/80 rounded-2xl p-4 flex gap-3 text-red-300 items-start">
+                  <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide">Erro de Compilação/Execução</p>
+                    <p className="text-[10px] mt-1 leading-relaxed">{codeError}</p>
+                  </div>
+                </div>
+              )}
 
-          {/* Grupo Caseiro */}
-          <div className="space-y-1.5">
-            <label className="block text-[9px] font-black text-slate-400 uppercase tracking-wide">Grupo Caseiro (GC)</label>
-            <select
-              value={filterGC}
-              onChange={e => { setFilterGC(e.target.value); setCurrentPage(1); }}
-              className="w-full px-3 py-1.5 border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-300 focus:border-indigo-400 text-xs font-semibold text-slate-600 bg-slate-50/50 cursor-pointer"
-            >
-              <option value="Todos">Todos os GCs</option>
-              <option value="Sem GC">🚫 Sem Grupo Caseiro</option>
-              {uniqueGCs.map(gc => (
-                <option key={gc} value={gc}>{gc}</option>
-              ))}
-            </select>
-          </div>
+              <button
+                onClick={handleRunPlaygroundCode}
+                className="inline-flex items-center gap-2 bg-indigo-500 hover:bg-indigo-650 text-white font-black px-5 py-2.5 rounded-xl transition-all cursor-pointer active:scale-95 shadow-lg shadow-indigo-500/20 text-xs uppercase tracking-wider"
+              >
+                <Play className="w-3.5 h-3.5 fill-white" /> Executar Código Customizado
+              </button>
+            </div>
 
-          {/* Tempo de Vínculo */}
-          <div className="space-y-1.5">
-            <label className="block text-[9px] font-black text-slate-400 uppercase tracking-wide flex items-center gap-1">
-              <Clock className="w-3 h-3 text-indigo-500" /> Tempo de Vínculo
-            </label>
-            <select
-              value={maxDurationMonths}
-              onChange={e => { setMaxDurationMonths(Number(e.target.value)); setCurrentPage(1); }}
-              className="w-full px-3 py-1.5 border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-300 focus:border-indigo-400 text-xs font-semibold text-slate-600 bg-slate-50/50 cursor-pointer"
-            >
-              <option value={-1}>Sem limite (Qualquer duração)</option>
-              <option value={3}>Extremamente Recente (Até 3 Meses)</option>
-              <option value={6}>Pouco Tempo de Vínculo (Até 6 Meses)</option>
-              <option value={12}>Recente (Até 1 Ano)</option>
-              <option value={24}>Médio Prazo (Até 2 Anos)</option>
-            </select>
-          </div>
-
-          {/* Sexo */}
-          <div className="space-y-1.5">
-            <label className="block text-[9px] font-black text-slate-400 uppercase tracking-wide">Sexo</label>
-            <select
-              value={filterGender}
-              onChange={e => { setFilterGender(e.target.value); setCurrentPage(1); }}
-              className="w-full px-3 py-1.5 border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-300 focus:border-indigo-400 text-xs font-semibold text-slate-600 bg-slate-50/50 cursor-pointer"
-            >
-              <option value="Todos">Todos</option>
-              <option value="Masculino">Masculino</option>
-              <option value="Feminino">Feminino</option>
-            </select>
-          </div>
-
-          {/* Estado Civil */}
-          <div className="space-y-1.5">
-            <label className="block text-[9px] font-black text-slate-400 uppercase tracking-wide">Estado Civil</label>
-            <select
-              value={filterMaritalStatus}
-              onChange={e => { setFilterMaritalStatus(e.target.value); setCurrentPage(1); }}
-              className="w-full px-3 py-1.5 border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-300 focus:border-indigo-400 text-xs font-semibold text-slate-600 bg-slate-50/50 cursor-pointer"
-            >
-              <option value="Todos">Todos</option>
-              {uniqueMaritals.map(s => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Age range */}
-          <div className="space-y-1.5">
-            <label className="block text-[9px] font-black text-slate-400 uppercase tracking-wide">Faixa Etária (Idade)</label>
-            <div className="flex items-center gap-1.5 bg-slate-50/50 border border-slate-200 rounded-xl px-2.5 py-1.5">
-              <input 
-                type="number" 
-                value={minAge} 
-                min={0}
-                max={120}
-                onChange={e => { setMinAge(Math.max(0, parseInt(e.target.value) || 0)); setCurrentPage(1); }} 
-                className="w-10 bg-transparent text-xs font-bold text-slate-700 outline-none text-center" 
-                placeholder="Mín" 
-              />
-              <span className="text-slate-350 text-[10px]">até</span>
-              <input 
-                type="number" 
-                value={maxAge} 
-                min={0}
-                max={120}
-                onChange={e => { setMaxAge(Math.min(120, parseInt(e.target.value) || 120)); setCurrentPage(1); }} 
-                className="w-10 bg-transparent text-xs font-bold text-slate-700 outline-none text-center" 
-                placeholder="Máx" 
-              />
-              <span className="text-[10px] text-slate-400 uppercase font-black tracking-tighter">anos</span>
+            {/* Quick Reference Panel */}
+            <div className="lg:col-span-4 bg-slate-950/50 rounded-2xl border border-slate-800/50 p-5 space-y-4 text-xs">
+              <h4 className="font-extrabold text-indigo-400 uppercase tracking-widest text-[10px] border-b border-slate-800 pb-2">
+                Guia de Referência do Membro (`m`)
+              </h4>
+              <p className="text-gray-400 text-[10px] leading-relaxed">
+                Você pode utilizar os seguintes atributos do objeto de membro `m` nas expressões do seu script:
+              </p>
+              <div className="space-y-2 max-h-36 overflow-y-auto pr-1 text-[10px] font-mono text-gray-300">
+                <p><span className="text-indigo-400">m.nome</span> : string (Nome completo)</p>
+                <p><span className="text-indigo-400">m.status</span> : 'Ativo' | 'Inativo'</p>
+                <p><span className="text-indigo-400">m.sexo</span> : 'Masculino' | 'Feminino'</p>
+                <p><span className="text-indigo-400">m.estado_civil</span> : string</p>
+                <p><span className="text-indigo-400">m.grupos_caseiros</span> : string</p>
+                <p><span className="text-indigo-400">m.data_de_cadastro</span> : string (entrada)</p>
+                <p><span className="text-indigo-400">m.data_de_vinculo</span> : string (batismo/adesão)</p>
+                <p><span className="text-indigo-400">m.data_atualizacao</span> : string (data da última atualização)</p>
+                <p><span className="text-indigo-400">m.bairro</span> / <span className="text-indigo-400">m.cidade</span> : string</p>
+              </div>
+              <p className="text-[9px] text-gray-500 leading-relaxed border-t border-slate-800 pt-3">
+                * A função auxiliar <code className="text-emerald-400 font-bold bg-slate-900 px-1 py-0.5 rounded">calculateMonths(cadastro, vinculo, status, atualizacao)</code> está disponível globalmente para computar o tempo de vínculo.
+              </p>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      ) : (
+        <section className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-6">
+          <div className="flex items-center justify-between border-b border-slate-50 pb-4">
+            <h3 className="text-xs font-black text-slate-405 uppercase tracking-widest flex items-center gap-1.5 text-slate-800">
+              <Filter className="w-4 h-4 text-indigo-500" /> Filtros e Sintonia do Estudo Customizado
+            </h3>
+            {(searchTerm || filterStatus !== 'Todos' || filterGender !== 'Todos' || filterGC !== 'Todos' || filterTipoPessoa !== 'Todos' || filterMaritalStatus !== 'Todos' || maxDurationMonths !== -1 || minAge > 0 || maxAge < 120) && (
+              <button
+                onClick={resetAllFilters}
+                className="text-[10px] text-red-650 font-extrabold uppercase hover:underline cursor-pointer flex items-center gap-1 active:scale-95"
+              >
+                <RefreshCw className="w-3 h-3" /> Limpar Todos os Filtros
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {/* Text Search */}
+            <div className="space-y-1.5">
+              <label className="block text-[9px] font-black text-slate-400 uppercase tracking-wide">Busca Rápida</label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Nome, apelido, bairro..."
+                  value={searchTerm}
+                  onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                  className="w-full pl-9 pr-3 py-1.5 border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-300 focus:border-indigo-400 text-xs font-medium text-slate-700 bg-slate-50/50"
+                />
+              </div>
+            </div>
+
+            {/* Status */}
+            <div className="space-y-1.5">
+              <label className="block text-[9px] font-black text-slate-400 uppercase tracking-wide font-bold">Status no Cadastro</label>
+              <select
+                value={filterStatus}
+                onChange={e => { setFilterStatus(e.target.value as any); setCurrentPage(1); }}
+                className="w-full px-3 py-1.5 border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-300 focus:border-indigo-400 text-xs font-semibold text-slate-600 bg-slate-50/50 cursor-pointer"
+              >
+                <option value="Todos">Todos os Status</option>
+                <option value="Ativo">Ativos</option>
+                <option value="Inativo">Inativos / Afastados</option>
+              </select>
+            </div>
+
+            {/* Tipo de Pessoa */}
+            <div className="space-y-1.5">
+              <label className="block text-[9px] font-black text-slate-400 uppercase tracking-wide">Tipo de Cadastro</label>
+              <select
+                value={filterTipoPessoa}
+                onChange={e => { setFilterTipoPessoa(e.target.value); setCurrentPage(1); }}
+                className="w-full px-3 py-1.5 border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-300 focus:border-indigo-400 text-xs font-semibold text-slate-600 bg-slate-50/50 cursor-pointer"
+              >
+                <option value="Todos">Todos os Tipos</option>
+                {uniqueTipos.map(t => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Grupo Caseiro */}
+            <div className="space-y-1.5">
+              <label className="block text-[9px] font-black text-slate-400 uppercase tracking-wide">Grupo Caseiro (GC)</label>
+              <select
+                value={filterGC}
+                onChange={e => { setFilterGC(e.target.value); setCurrentPage(1); }}
+                className="w-full px-3 py-1.5 border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-300 focus:border-indigo-400 text-xs font-semibold text-slate-600 bg-slate-50/50 cursor-pointer"
+              >
+                <option value="Todos">Todos os GCs</option>
+                <option value="Sem GC">🚫 Sem Grupo Caseiro</option>
+                {uniqueGCs.map(gc => (
+                  <option key={gc} value={gc}>{gc}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Tempo de Vínculo */}
+            <div className="space-y-1.5">
+              <label className="block text-[9px] font-black text-slate-400 uppercase tracking-wide flex items-center gap-1">
+                <Clock className="w-3 h-3 text-indigo-500" /> Tempo de Vínculo
+              </label>
+              <select
+                value={maxDurationMonths}
+                onChange={e => { setMaxDurationMonths(Number(e.target.value)); setCurrentPage(1); }}
+                className="w-full px-3 py-1.5 border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-300 focus:border-indigo-400 text-xs font-semibold text-slate-600 bg-slate-50/50 cursor-pointer"
+              >
+                <option value={-1}>Sem limite (Qualquer duração)</option>
+                <option value={6}>Vínculo Extremamente Curto (Até 6 Meses)</option>
+                <option value={12}>Vínculo Curto (Até 1 Ano)</option>
+                <option value={24}>Pouco Tempo (Até 2 Anos)</option>
+                <option value={60}>Médio Vínculo (Até 5 Anos)</option>
+              </select>
+            </div>
+
+            {/* Sexo */}
+            <div className="space-y-1.5">
+              <label className="block text-[9px] font-black text-slate-400 uppercase tracking-wide">Sexo</label>
+              <select
+                value={filterGender}
+                onChange={e => { setFilterGender(e.target.value); setCurrentPage(1); }}
+                className="w-full px-3 py-1.5 border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-300 focus:border-indigo-400 text-xs font-semibold text-slate-600 bg-slate-50/50 cursor-pointer"
+              >
+                <option value="Todos">Todos</option>
+                <option value="Masculino">Masculino</option>
+                <option value="Feminino">Feminino</option>
+              </select>
+            </div>
+
+            {/* Estado Civil */}
+            <div className="space-y-1.5">
+              <label className="block text-[9px] font-black text-slate-400 uppercase tracking-wide">Estado Civil</label>
+              <select
+                value={filterMaritalStatus}
+                onChange={e => { setFilterMaritalStatus(e.target.value); setCurrentPage(1); }}
+                className="w-full px-3 py-1.5 border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-300 focus:border-indigo-400 text-xs font-semibold text-slate-600 bg-slate-50/50 cursor-pointer"
+              >
+                <option value="Todos">Todos</option>
+                {uniqueMaritals.map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Age range */}
+            <div className="space-y-1.5">
+              <label className="block text-[9px] font-black text-slate-400 uppercase tracking-wide">Faixa Etária (Idade)</label>
+              <div className="flex items-center gap-1.5 bg-slate-50/50 border border-slate-200 rounded-xl px-2.5 py-1.5">
+                <input 
+                  type="number" 
+                  value={minAge} 
+                  min={0}
+                  max={120}
+                  onChange={e => { setMinAge(Math.max(0, parseInt(e.target.value) || 0)); setCurrentPage(1); }} 
+                  className="w-10 bg-transparent text-xs font-bold text-slate-700 outline-none text-center" 
+                  placeholder="Mín" 
+                />
+                <span className="text-slate-350 text-[10px]">até</span>
+                <input 
+                  type="number" 
+                  value={maxAge} 
+                  min={0}
+                  max={120}
+                  onChange={e => { setMaxAge(Math.min(120, parseInt(e.target.value) || 120)); setCurrentPage(1); }} 
+                  className="w-10 bg-transparent text-xs font-bold text-slate-700 outline-none text-center" 
+                  placeholder="Máx" 
+                />
+                <span className="text-[10px] text-slate-400 uppercase font-black tracking-tighter">anos</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Query Stats Panel */}
       <section className="grid grid-cols-2 lg:grid-cols-6 gap-4">
@@ -730,13 +950,15 @@ export const LabQuery: React.FC = () => {
                 <th className="py-3 px-4">Bairro / RA</th>
                 <th className="py-3 px-3">Idade</th>
                 <th className="py-3 px-4">Tempo de Vínculo</th>
-                <th className="py-3 px-4">Contato</th>
+                <th className="py-3 px-4">Entrada / Saída (Inativação)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50 text-xs text-slate-700">
               {paginatedList.map((m) => {
                 const age = calculateAge(m.nascimento);
-                const durationMonths = calculateDurationInMonths(m.data_de_cadastro, m.data_de_vinculo);
+                const durationMonths = calculateDurationInMonths(m.data_de_cadastro, m.data_de_vinculo, m.status, m.data_atualizacao);
+                const isInactive = m.status && m.status.trim().toUpperCase() !== 'ATIVO';
+                const hasShortLink = isInactive && durationMonths > 0 && durationMonths < 24;
                 
                 return (
                   <tr key={m.id} className="hover:bg-slate-50/30 transition-colors">
@@ -790,21 +1012,27 @@ export const LabQuery: React.FC = () => {
                       <span className="font-bold text-indigo-650 block">
                         {formatDuration(durationMonths)}
                       </span>
-                      {(m.data_de_vinculo || m.data_de_cadastro) && (
-                        <span className="text-[9px] text-slate-400 block font-medium mt-0.5">
-                          Desde: {new Date(m.data_de_vinculo || m.data_de_cadastro || '').toLocaleDateString('pt-BR')}
+                      {hasShortLink && (
+                        <span className="text-[8px] bg-red-50 text-red-650 border border-red-150 px-1 py-0.5 rounded font-black uppercase mt-1 inline-block tracking-wider animate-pulse">
+                          ⚠️ Vínculo Curto
                         </span>
                       )}
                     </td>
-                    <td className="py-3.5 px-4">
-                      <span className="font-semibold text-slate-700 block select-all">
-                        {m.celular_principal_sms || m.telefone_fixo || '—'}
+                    <td className="py-3.5 px-4 font-medium text-slate-600 leading-normal">
+                      <span className="block font-bold">
+                        📥 Entrada: {(() => {
+                          const parsed = parseSafeDate(m.data_de_vinculo || m.data_de_cadastro);
+                          return parsed ? parsed.toLocaleDateString('pt-BR') : 'Sem data';
+                        })()}
                       </span>
-                      {m.email && (
-                        <span className="text-[9px] text-slate-400 block truncate max-w-[150px] mt-0.5" title={m.email}>
-                          {m.email}
-                        </span>
-                      )}
+                      <span className={clsx("text-[10px] block font-black mt-1 uppercase tracking-wider", isInactive ? "text-red-600" : "text-emerald-600")}>
+                        {isInactive 
+                          ? `📤 Saída: ${(() => {
+                              const parsed = parseSafeDate(m.data_atualizacao);
+                              return parsed ? parsed.toLocaleDateString('pt-BR') : 'Inativo (S/ data)';
+                            })()}` 
+                          : '⚡ Ativo atualmente'}
+                      </span>
                     </td>
                   </tr>
                 );
@@ -855,7 +1083,7 @@ export const LabQuery: React.FC = () => {
         <div>
           <h4 className="text-xs font-black text-indigo-900 uppercase tracking-wider">Metodologia e Coleta de Dados</h4>
           <p className="text-[11px] text-indigo-700 leading-relaxed mt-1 font-medium">
-            Este painel foi projetado especificamente para apoiar a liderança em análises ad-hoc e estudos de retenção/demografia. O cálculo de <strong>Tempo de Vínculo</strong> prioriza a data de batismo/vínculo (`data_de_vinculo`) e retrocede para a data de cadastro (`data_de_cadastro`) se ausente, calculando com precisão matemática a duração real da conexão do membro na comunidade local. Os dados são totalmente criptografados de ponta a ponta.
+            Este painel foi projetado especificamente para apoiar a liderança em análises ad-hoc e estudos de retenção/demografia. O cálculo de <strong>Tempo de Vínculo</strong> prioriza a data de batismo/vínculo (`data_de_vinculo`) e retrocede para a data de cadastro (`data_de_cadastro`) se ausente, calculando com precisão matemática a duração real da conexão do membro na comunidade local. Para membros inativos, a data de saída é baseada na última alteração do registro (`data_atualizacao`), isolando perfeitamente a evasão precoce. Os dados são totalmente criptografados de ponta a ponta.
           </p>
           <p className="text-[9px] text-indigo-400 font-bold uppercase tracking-widest mt-2">Efésios 4:16 — BSB CHURCH LAB ENVIRONMENT</p>
         </div>
