@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import {
   Crown, Flame, MessageSquare, BookMarked, HandHeart,
   Eye, Sparkles, ArrowDown, Users, AlertTriangle,
@@ -326,6 +327,29 @@ function formIdealCells(pool: Member[], targetSize = 12): IdealCell[] {
 export const LabVision: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
+
+  const allowedModules = useMemo(() => {
+    if (!user) return [];
+    if (user.role === 'admin') {
+      return ['Lab: Visão da Plenitude', 'Lab: Gestão de Visitas', 'Lab: Consultas & Estudos'];
+    }
+    try {
+      const stored = localStorage.getItem('church_dynamic_roles');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed[user.role]) {
+          return parsed[user.role].modules || [];
+        }
+      }
+    } catch (_) {}
+    
+    if (user.role === 'pastor') {
+      return ['Lab: Visão da Plenitude', 'Lab: Gestão de Visitas', 'Lab: Consultas & Estudos'];
+    }
+    return [];
+  }, [user]);
+
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedCell, setExpandedCell] = useState<number | null>(null);
@@ -435,10 +459,10 @@ export const LabVision: React.FC = () => {
       {/* Dynamic Tabs Navigation inside Lab Pages */}
       <div className="flex flex-wrap gap-2 border-b border-slate-100 pb-1">
         {[
-          { path: '/lab/vision', label: '🏛️ Visão de Efésios 4' },
-          { path: '/lab/visits', label: '🏠 Gestão de Visitas' },
-          { path: '/lab/queries', label: '📊 Consultas & Estudos' }
-        ].map((tab) => {
+          { path: '/lab/vision', label: '🏛️ Visão de Efésios 4', id: 'Lab: Visão da Plenitude' },
+          { path: '/lab/visits', label: '🏠 Gestão de Visitas', id: 'Lab: Gestão de Visitas' },
+          { path: '/lab/queries', label: '📊 Consultas & Estudos', id: 'Lab: Consultas & Estudos' }
+        ].filter(tab => user?.role === 'admin' || allowedModules.includes(tab.id)).map((tab) => {
           const isActive = location.pathname === tab.path;
           return (
             <button

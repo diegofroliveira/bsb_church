@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, Users, Home, DollarSign, Settings, LogOut,
   Menu, BookOpen, FileText, Network, AlertTriangle, MapPin,
-  Brain, Calendar, Play, Heart, Handshake
+  Brain, Calendar, Play, Heart, Handshake, FlaskConical
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -12,8 +12,8 @@ import { useLabShortcut } from '../hooks/useLabShortcut';
 import { LabLauncher } from '../components/LabLauncher';
 
 const DEFAULT_ROLES: Record<string, string[]> = {
-  admin: ['Dashboard', 'Aniversariantes', 'Mapa', 'Membros', 'Famílias', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Financeiro', 'Consultor IA', 'Insights IA', 'Configurações', 'Simulações', 'Companheirismo'],
-  pastor: ['Dashboard', 'Aniversariantes', 'Mapa', 'Membros', 'Famílias', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Financeiro', 'Consultor IA', 'Insights IA', 'Simulações', 'Companheirismo'],
+  admin: ['Dashboard', 'Aniversariantes', 'Mapa', 'Membros', 'Famílias', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Financeiro', 'Consultor IA', 'Insights IA', 'Configurações', 'Simulações', 'Companheirismo', 'Lab: Visão da Plenitude', 'Lab: Gestão de Visitas', 'Lab: Consultas & Estudos'],
+  pastor: ['Dashboard', 'Aniversariantes', 'Mapa', 'Membros', 'Famílias', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Financeiro', 'Consultor IA', 'Insights IA', 'Simulações', 'Companheirismo', 'Lab: Visão da Plenitude', 'Lab: Gestão de Visitas', 'Lab: Consultas & Estudos'],
   secretaria: ['Dashboard', 'Aniversariantes', 'Membros', 'Famílias', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Consultor IA'],
   financeiro: ['Dashboard', 'Financeiro']
 };
@@ -21,12 +21,36 @@ const DEFAULT_ROLES: Record<string, string[]> = {
 export const MainLayout: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [allowedModules, setAllowedModules] = useState<string[]>([]);
   const [isLabOpen, setIsLabOpen] = useState(false);
 
+  const hasAccessToAnyLab = allowedModules.some(m => m.startsWith('Lab:'));
+
   // Secret lab access: type L → A → B on keyboard (not in input fields)
-  useLabShortcut(() => setIsLabOpen(true));
+  useLabShortcut(() => {
+    if (user?.role === 'admin' || hasAccessToAnyLab) {
+      setIsLabOpen(true);
+    }
+  });
+
+  // Dynamic route security protection for Lab routes
+  useEffect(() => {
+    const currentPath = location.pathname;
+    const labRouteMap: Record<string, string> = {
+      '/lab/vision': 'Lab: Visão da Plenitude',
+      '/lab/visits': 'Lab: Gestão de Visitas',
+      '/lab/queries': 'Lab: Consultas & Estudos',
+    };
+
+    const requiredModule = labRouteMap[currentPath];
+    if (requiredModule && user?.role !== 'admin' && allowedModules.length > 0) {
+      if (!allowedModules.includes(requiredModule)) {
+        navigate('/');
+      }
+    }
+  }, [location.pathname, allowedModules, navigate, user]);
 
   useEffect(() => {
     if (user?.forcePasswordReset) {
@@ -97,10 +121,15 @@ export const MainLayout: React.FC = () => {
     { id: 'Financeiro',      name: 'Financeiro',      path: '/finance',      icon: DollarSign },
     { id: 'Simulações',      name: 'Simulações',      path: '/simulations',  icon: Play },
     { id: 'Consultor IA',    name: 'IA',              path: '/ai-consultant', icon: Brain },
+    { id: 'Lab',             name: 'Laboratório',     path: '#lab',          icon: FlaskConical },
     { id: 'Configurações',   name: 'Configurações',   path: '/admin/users',  icon: Settings },
   ];
 
-  const authorizedNavItems = navItems.filter(item => allowedModules.includes(item.id));
+  const finalAllowedModules = hasAccessToAnyLab && !allowedModules.includes('Lab')
+    ? [...allowedModules, 'Lab']
+    : allowedModules;
+
+  const authorizedNavItems = navItems.filter(item => finalAllowedModules.includes(item.id));
 
   const FamilyLogo = ({ className }: { className?: string }) => (
     <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -142,28 +171,44 @@ export const MainLayout: React.FC = () => {
       </div>
       <nav className="flex flex-1 flex-col px-4 py-4 overflow-y-auto">
         <ul className="space-y-1">
-          {authorizedNavItems.map((item) => (
-            <li key={item.name}>
-              <NavLink
-                to={item.path}
-                end={item.path === '/'}
-                className={({ isActive }) => clsx(
-                  isActive ? 'bg-primary-50 text-primary-700 font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
-                  'group flex gap-x-3 rounded-md p-2 text-sm leading-6 transition-all duration-200'
+          {authorizedNavItems.map((item) => {
+            const isLabItem = item.id === 'Lab';
+            return (
+              <li key={item.name}>
+                {isLabItem ? (
+                  <button
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      setIsLabOpen(true);
+                    }}
+                    className="w-full text-left text-gray-600 hover:bg-gray-50 hover:text-gray-900 group flex gap-x-3 rounded-md p-2 text-sm leading-6 transition-all duration-200"
+                  >
+                    <item.icon className="h-5 w-5 shrink-0" aria-hidden="true" />
+                    {item.name}
+                  </button>
+                ) : (
+                  <NavLink
+                    to={item.path}
+                    end={item.path === '/'}
+                    className={({ isActive }) => clsx(
+                      isActive ? 'bg-primary-50 text-primary-700 font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
+                      'group flex gap-x-3 rounded-md p-2 text-sm leading-6 transition-all duration-200'
+                    )}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <item.icon className="h-5 w-5 shrink-0" aria-hidden="true" />
+                    {item.name}
+                  </NavLink>
                 )}
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                <item.icon className="h-5 w-5 shrink-0" aria-hidden="true" />
-                {item.name}
-              </NavLink>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
       </nav>
 
       <div className="border-t border-gray-100 p-4">
-          <div className="text-sm font-semibold text-gray-900 truncate">{user?.name}</div>
-          <div className="text-xs text-primary-600 font-medium capitalize">{user?.role}</div>
+        <div className="text-sm font-semibold text-gray-900 truncate">{user?.name}</div>
+        <div className="text-xs text-primary-600 font-medium capitalize">{user?.role}</div>
         <button onClick={handleLogout}
           className="mt-4 flex w-full items-center gap-x-3 rounded-md p-2 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors">
           <LogOut className="h-5 w-5 shrink-0" /> Sair
@@ -174,8 +219,8 @@ export const MainLayout: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50/50">
-      {/* Secret Lab Launcher — invisible in nav, activated by typing L-A-B */}
-      {isLabOpen && <LabLauncher onClose={() => setIsLabOpen(false)} />}
+      {/* Secret Lab Launcher — invisible in nav, activated by typing L-A-B or clicking Laboratório in sidebar */}
+      {isLabOpen && <LabLauncher onClose={() => setIsLabOpen(false)} allowedModules={allowedModules} />}
       {isMobileMenuOpen && (
         <div className="fixed inset-0 z-50 flex lg:hidden">
           <div className="fixed inset-0 bg-gray-900/80 transition-opacity" onClick={() => setIsMobileMenuOpen(false)} />

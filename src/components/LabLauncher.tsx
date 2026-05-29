@@ -4,10 +4,12 @@ import { Sparkles, Eye, UserPlus, X, FlaskConical, Database } from 'lucide-react
 
 interface LabLauncherProps {
   onClose: () => void;
+  allowedModules: string[];
 }
 
 const LAB_ITEMS = [
   {
+    id: 'Lab: Visão da Plenitude',
     path: '/lab/vision',
     icon: Eye,
     label: 'Visão da Plenitude',
@@ -18,6 +20,7 @@ const LAB_ITEMS = [
     textColor: 'text-amber-700',
   },
   {
+    id: 'Lab: Gestão de Visitas',
     path: '/lab/visits',
     icon: UserPlus,
     label: 'Gestão de Visitas',
@@ -28,6 +31,7 @@ const LAB_ITEMS = [
     textColor: 'text-teal-700',
   },
   {
+    id: 'Lab: Consultas & Estudos',
     path: '/lab/queries',
     icon: Database,
     label: 'Consultas & Estudos',
@@ -39,7 +43,7 @@ const LAB_ITEMS = [
   },
 ];
 
-export const LabLauncher: React.FC<LabLauncherProps> = ({ onClose }) => {
+export const LabLauncher: React.FC<LabLauncherProps> = ({ onClose, allowedModules }) => {
   const navigate = useNavigate();
 
   // Close on Escape
@@ -55,6 +59,8 @@ export const LabLauncher: React.FC<LabLauncherProps> = ({ onClose }) => {
     onClose();
     navigate(path);
   };
+
+  const visibleItems = LAB_ITEMS.filter(item => allowedModules.includes(item.id));
 
   return (
     <>
@@ -74,7 +80,7 @@ export const LabLauncher: React.FC<LabLauncherProps> = ({ onClose }) => {
             </div>
             <div>
               <p className="text-white text-xs font-bold">LAB MODE</p>
-              <p className="text-gray-500 text-[9px]">Acesso restrito · Solo para Diego</p>
+              <p className="text-gray-500 text-[9px]">Acesso restrito · Perfis autorizados</p>
             </div>
           </div>
           <button
@@ -87,7 +93,7 @@ export const LabLauncher: React.FC<LabLauncherProps> = ({ onClose }) => {
 
         {/* Items */}
         <div className="bg-white rounded-b-2xl shadow-2xl border border-gray-100 divide-y divide-gray-50 overflow-hidden">
-          {LAB_ITEMS.map(item => (
+          {visibleItems.map(item => (
             <button
               key={item.path}
               onClick={() => handleNavigate(item.path)}
@@ -103,6 +109,11 @@ export const LabLauncher: React.FC<LabLauncherProps> = ({ onClose }) => {
               <Sparkles className="h-4 w-4 text-gray-200 group-hover:text-amber-400 transition-colors shrink-0" />
             </button>
           ))}
+          {visibleItems.length === 0 && (
+            <div className="p-6 text-center text-xs text-gray-400 italic">
+              Nenhum módulo de laboratório liberado para o seu perfil.
+            </div>
+          )}
         </div>
 
         {/* Hint de como fechar */}
