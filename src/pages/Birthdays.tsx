@@ -74,6 +74,9 @@ interface Member {
   pai?: string;
   mae?: string;
   celular_principal_sms?: string;
+  cidade?: string;
+  tipo_de_pessoa?: string;
+  tipo_cadastro?: string;
 }
 
 export const Birthdays: React.FC = () => {
@@ -81,7 +84,24 @@ export const Birthdays: React.FC = () => {
   const [, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<{id: any, status: 'idle' | 'uploading' | 'success' | 'error'}>({id: null, status: 'idle'});
+  const [customNames, setCustomNames] = useState<Record<any, { msgName: string, photoName: string }>>({});
   const [storageError, setStorageError] = useState<string | null>(null);
+
+  const handleUpdateCustomName = (memberId: any, field: 'msgName' | 'photoName', value: string) => {
+    setCustomNames(prev => {
+      const current = prev[memberId] || { 
+        msgName: getFirstName(members.find(m => m.id === memberId)?.nome ?? ''), 
+        photoName: getFirstName(members.find(m => m.id === memberId)?.nome ?? '') 
+      };
+      return {
+        ...prev,
+        [memberId]: {
+          ...current,
+          [field]: value
+        }
+      };
+    });
+  };
   const collageRef = useRef<HTMLDivElement>(null);
 
   const [filterMode, setFilterMode] = useState<'today' | 'tomorrow' | 'month' | 'specific'>('today');
@@ -128,7 +148,7 @@ export const Birthdays: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('membros')
-        .select('id, nome, nascimento, grupos_caseiros, sexo, estado_civil, status, pai, mae, celular_principal_sms')
+        .select('id, nome, nascimento, grupos_caseiros, sexo, estado_civil, status, pai, mae, celular_principal_sms, cidade, tipo_de_pessoa, tipo_cadastro')
         .limit(10000);
 
       if (error) throw error;
@@ -188,6 +208,9 @@ export const Birthdays: React.FC = () => {
     return members.filter(m => {
       if (m.status !== 'Ativo') return false;
       if (!m.nascimento) return false;
+
+      const isExterno = (m.tipo_de_pessoa || '').trim().toUpperCase() === 'EXTERNO' || (m.tipo_cadastro || '').trim().toUpperCase() === 'EXTERNO';
+      if (isExterno) return false;
       
       let day: number, month: number;
       if (m.nascimento.includes('/')) {
@@ -242,13 +265,67 @@ export const Birthdays: React.FC = () => {
     }).sort((a, b) => a.nome.localeCompare(b.nome));
   }, [members, filterMode, specificDate, filterGender, filterGC, filterMinAge, filterMaxAge, filterMaritalStatus]);
 
+  const birthdayRows = useMemo(() => {
+    const total = getBirthdays.length;
+    if (total === 0) return [];
+    
+    // Determine row sizes
+    let rowSizes: number[] = [];
+    if (total <= 3) {
+      rowSizes = [total];
+    } else if (total === 4) {
+      rowSizes = [2, 2];
+    } else if (total === 5) {
+      rowSizes = [3, 2];
+    } else if (total === 6) {
+      rowSizes = [3, 3];
+    } else if (total === 7) {
+      rowSizes = [4, 3];
+    } else if (total === 8) {
+      rowSizes = [4, 4];
+    } else {
+      // General algorithm for 9+
+      let remaining = total;
+      while (remaining > 0) {
+        if (remaining === 5) {
+          rowSizes.push(3, 2);
+          break;
+        }
+        if (remaining === 6) {
+          rowSizes.push(3, 3);
+          break;
+        }
+        if (remaining === 7) {
+          rowSizes.push(4, 3);
+          break;
+        }
+        const take = Math.min(4, remaining);
+        rowSizes.push(take);
+        remaining -= take;
+      }
+    }
+
+    // Partition getBirthdays into rows
+    const rows: Member[][] = [];
+    let index = 0;
+    for (const size of rowSizes) {
+      rows.push(getBirthdays.slice(index, index + size));
+      index += size;
+    }
+    return rows;
+  }, [getBirthdays]);
+
   const generateAutomaticMessage = () => {
     if (getBirthdays.length === 0) return "Nenhum aniversariante encontrado.";
     
     const names = getBirthdays.map(m => {
       const age = calculateAge(m.nascimento);
-      const gcText = formatGCName(m.grupos_caseiros);
-      const firstName = getFirstName(m.nome).toUpperCase();
+      const isExterno = (m.tipo_de_pessoa || '').trim().toUpperCase() === 'EXTERNO' || (m.tipo_cadastro || '').trim().toUpperCase() === 'EXTERNO';
+      const citySuffix = isExterno && m.cidade ? ` (${m.cidade})` : '';
+      const gcText = formatGCName(m.grupos_caseiros) + citySuffix;
+      
+      const customMsgName = customNames[m.id]?.msgName;
+      const firstName = (customMsgName !== undefined ? customMsgName : getFirstName(m.nome)).trim().toUpperCase();
 
       if (age >= 0 && age <= 15) {
         // Até 15 anos: Nome, idade, pais e GC
@@ -312,7 +389,7 @@ export const Birthdays: React.FC = () => {
     const currentMonthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     const currentMonthDates = savedDates.filter((d: string) => d.startsWith(currentMonthPrefix));
 
-    if (currentMonthDates.length >= 5 && !currentMonthDates.includes(todayStr)) {
+    if (currentMonthDates.length >= 10 && !currentMonthDates.includes(todayStr)) {
       setShowWarningBlock(true);
       return;
     }
@@ -508,6 +585,87 @@ export const Birthdays: React.FC = () => {
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
         {/* Left Column: Text Message */}
         <div className="xl:col-span-4 space-y-6">
+          {getBirthdays.length > 0 && (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-lg">✍️</span>
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900">
+                    Ajuste Personalizado de Nomes
+                  </h3>
+                  <p className="text-[10px] text-gray-500 mt-0.5">
+                    Ajuste os nomes que vão na mensagem do WhatsApp e na foto.
+                  </p>
+                </div>
+              </div>
+              
+              <div className="space-y-3 max-h-[320px] overflow-y-auto pr-1">
+                {getBirthdays.map((m) => {
+                  const currentMsgVal = customNames[m.id]?.msgName ?? getFirstName(m.nome);
+                  const currentPhotoVal = customNames[m.id]?.photoName ?? getFirstName(m.nome);
+                  const avatarUrl = `${supabase.storage.from('avatars').getPublicUrl(`avatars/${m.id}.jpg`).data.publicUrl}?t=${avatarCacheBuster}`;
+                  
+                  return (
+                    <div key={m.id} className="p-3 bg-gray-50/50 rounded-xl border border-gray-100 space-y-2.5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="h-8 w-8 rounded-full bg-pink-100 overflow-hidden flex items-center justify-center shrink-0 border border-pink-200">
+                          <img 
+                            src={avatarUrl} 
+                            alt={m.nome}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = '';
+                              (e.target as HTMLImageElement).classList.add('hidden');
+                              (e.target as HTMLImageElement).parentElement?.querySelector('.fallback-icon')?.classList.remove('hidden');
+                            }}
+                          />
+                          <div className="fallback-icon hidden text-pink-650 font-bold text-xs uppercase">
+                            {m.nome.charAt(0)}
+                          </div>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h4 className="text-xs font-bold text-gray-800 truncate" title={m.nome}>
+                            {m.nome}
+                          </h4>
+                          <p className="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">
+                            {m.grupos_caseiros || 'Sem GC'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[8px] font-bold text-gray-400 uppercase mb-0.5 tracking-wider">
+                            Na Mensagem
+                          </label>
+                          <input
+                            type="text"
+                            value={currentMsgVal}
+                            onChange={(e) => handleUpdateCustomName(m.id, 'msgName', e.target.value)}
+                            className="w-full text-xs bg-white border border-gray-250 rounded-lg px-2 py-1.5 outline-none focus:border-pink-300 focus:ring-1 focus:ring-pink-300/30 transition-all font-medium text-gray-700"
+                            placeholder="Nome Msg"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[8px] font-bold text-gray-400 uppercase mb-0.5 tracking-wider">
+                            Na Foto
+                          </label>
+                          <input
+                            type="text"
+                            value={currentPhotoVal}
+                            onChange={(e) => handleUpdateCustomName(m.id, 'photoName', e.target.value)}
+                            className="w-full text-xs bg-white border border-gray-250 rounded-lg px-2 py-1.5 outline-none focus:border-pink-300 focus:ring-1 focus:ring-pink-300/30 transition-all font-medium text-gray-700"
+                            placeholder="Nome Foto"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
              <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
@@ -603,100 +761,110 @@ export const Birthdays: React.FC = () => {
                 <p className="text-pink-500 font-bold tracking-widest text-sm mt-2 uppercase">Parabéns!</p>
               </div>
 
-              <div className={clsx(
-                "grid gap-6",
-                getBirthdays.length === 1 ? "grid-cols-1" : 
-                getBirthdays.length === 2 ? "grid-cols-2" :
-                "grid-cols-2 md:grid-cols-3"
-              )}>
-                {getBirthdays.map((m) => {
-                  const avatarUrl = `${supabase.storage.from('avatars').getPublicUrl(`avatars/${m.id}.jpg`).data.publicUrl}?t=${avatarCacheBuster}`;
-                  const isUploading = uploadStatus.id === m.id && uploadStatus.status === 'uploading';
-                  
-                  return (
-                    <div key={m.id} className="flex flex-col items-center group relative">
-                       <label 
-                          className="cursor-pointer block w-full"
-                          onDragOver={(e) => {
-                            e.preventDefault();
-                            setDraggedOverMemberId(m.id);
-                          }}
-                          onDragLeave={(e) => {
-                            e.preventDefault();
-                            setDraggedOverMemberId(null);
-                          }}
-                          onDrop={(e) => {
-                            e.preventDefault();
-                            setDraggedOverMemberId(null);
-                            const file = e.dataTransfer.files?.[0];
-                            if (file && file.type.startsWith('image/')) {
-                              handleUploadFile(m.id, file);
-                            }
-                          }}
-                       >
-                          <input 
-                            type="file" 
-                            accept="image/*" 
-                            className="hidden" 
-                            onChange={(e) => handleUploadPhoto(m.id, e)}
-                          />
-                          <div className={clsx(
-                            "aspect-square w-full rounded-2xl bg-gray-50 border-2 border-dashed flex items-center justify-center overflow-hidden relative group-hover:border-pink-300 transition-colors",
-                            draggedOverMemberId === m.id ? "border-pink-500 bg-pink-50/30" : "border-gray-200"
-                          )}>
-                             {/* Tenta carregar a imagem, se falhar mostra placeholder */}
-                             <img 
-                                src={avatarUrl} 
-                                alt={m.nome}
-                                className="w-full h-full object-cover"
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).src = '';
-                                  (e.target as HTMLImageElement).classList.add('hidden');
-                                  (e.target as HTMLImageElement).parentElement?.querySelector('.placeholder')?.classList.remove('hidden');
-                                }}
-                             />
-                             <div className="placeholder hidden flex flex-col items-center gap-2 text-gray-300">
-                                <ImageIcon className="h-10 w-10" />
-                                <span className="text-[10px] font-bold uppercase tracking-tighter">Sem Foto</span>
-                             </div>
-
-                             {/* Hover Overlay */}
-                             <div className="absolute inset-0 bg-pink-600/0 group-hover:bg-pink-600/20 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
-                                <Upload className="h-8 w-8 text-white drop-shadow-md" />
-                             </div>
-
-                             {/* Uploading State */}
-                             {isUploading && (
-                               <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
-                                 <Loader2 className="h-8 w-8 animate-spin text-pink-600" />
-                               </div>
-                             )}
-                          </div>
-                       </label>
-                       
-                       <div className="text-center mt-3">
-                           <h4 className="font-black text-gray-900 text-sm uppercase truncate max-w-[150px]">{getFirstName(m.nome)}</h4>
-                            <p className="text-[10px] font-bold text-gray-400 uppercase">
-                              {(() => {
-                                const age = calculateAge(m.nascimento);
-                                const hasGC = m.grupos_caseiros && m.grupos_caseiros.trim() !== '' && m.grupos_caseiros.trim().toUpperCase() !== 'NENHUM';
-                                const gcText = hasGC ? formatGCName(m.grupos_caseiros) : '';
-                                
-                                if (age >= 0 && age <= 15) {
-                                  return `${age} Anos${gcText ? ` • ${gcText}` : ''}`;
-                                } else {
-                                  // >15 anos: Sem idade, sem estado civil! Apenas Grupo Caseiro se houver.
-                                  return gcText;
+              <div className="space-y-6">
+                {birthdayRows.map((row, rowIndex) => (
+                  <div key={rowIndex} className="flex flex-wrap justify-center gap-6">
+                    {row.map((m) => {
+                      const avatarUrl = `${supabase.storage.from('avatars').getPublicUrl(`avatars/${m.id}.jpg`).data.publicUrl}?t=${avatarCacheBuster}`;
+                      const isUploading = uploadStatus.id === m.id && uploadStatus.status === 'uploading';
+                      const rowLength = row.length;
+                      const itemWidthClass = 
+                        rowLength === 1 ? "w-full max-w-[240px]" : 
+                        rowLength === 2 ? "w-full max-w-[220px] sm:w-[220px]" : 
+                        rowLength === 3 ? "w-full max-w-[180px] sm:w-[180px]" : 
+                        "w-full max-w-[144px] sm:w-[144px]";
+                      
+                      return (
+                        <div key={m.id} className={clsx("flex flex-col items-center group relative", itemWidthClass)}>
+                           <label 
+                              className="cursor-pointer block w-full"
+                              onDragOver={(e) => {
+                                e.preventDefault();
+                                setDraggedOverMemberId(m.id);
+                              }}
+                              onDragLeave={(e) => {
+                                e.preventDefault();
+                                setDraggedOverMemberId(null);
+                              }}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                setDraggedOverMemberId(null);
+                                const file = e.dataTransfer.files?.[0];
+                                if (file && file.type.startsWith('image/')) {
+                                  handleUploadFile(m.id, file);
                                 }
-                              })()}
-                            </p>
+                              }}
+                           >
+                              <input 
+                                type="file" 
+                                accept="image/*" 
+                                className="hidden" 
+                                onChange={(e) => handleUploadPhoto(m.id, e)}
+                              />
+                              <div className={clsx(
+                                "aspect-square w-full rounded-2xl bg-gray-50 border-2 border-dashed flex items-center justify-center overflow-hidden relative group-hover:border-pink-300 transition-colors",
+                                draggedOverMemberId === m.id ? "border-pink-500 bg-pink-50/30" : "border-gray-200"
+                              )}>
+                                 {/* Tenta carregar a imagem, se falhar mostra placeholder */}
+                                 <img 
+                                    src={avatarUrl} 
+                                    alt={m.nome}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      (e.target as HTMLImageElement).src = '';
+                                      (e.target as HTMLImageElement).classList.add('hidden');
+                                      (e.target as HTMLImageElement).parentElement?.querySelector('.placeholder')?.classList.remove('hidden');
+                                    }}
+                                 />
+                                 <div className="placeholder hidden flex flex-col items-center gap-2 text-gray-300">
+                                    <ImageIcon className="h-10 w-10" />
+                                    <span className="text-[10px] font-bold uppercase tracking-tighter">Sem Foto</span>
+                                 </div>
+
+                                 {/* Hover Overlay */}
+                                 <div className="absolute inset-0 bg-pink-600/0 group-hover:bg-pink-600/20 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                    <Upload className="h-8 w-8 text-white drop-shadow-md" />
+                                 </div>
+
+                                 {/* Uploading State */}
+                                 {isUploading && (
+                                   <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
+                                     <Loader2 className="h-8 w-8 animate-spin text-pink-600" />
+                                   </div>
+                                 )}
+                              </div>
+                           </label>
+                           
+                           <div className="text-center mt-3 w-full">
+                                <h4 className="font-black text-gray-900 text-sm uppercase truncate max-w-[150px] mx-auto">
+                                  {customNames[m.id]?.photoName || getFirstName(m.nome)}
+                                </h4>
+                                 <p className="text-[10px] font-bold text-gray-400 uppercase truncate">
+                                   {(() => {
+                                     const age = calculateAge(m.nascimento);
+                                     const hasGC = m.grupos_caseiros && m.grupos_caseiros.trim() !== '' && m.grupos_caseiros.trim().toUpperCase() !== 'NENHUM';
+                                     const isExterno = (m.tipo_de_pessoa || '').trim().toUpperCase() === 'EXTERNO' || (m.tipo_cadastro || '').trim().toUpperCase() === 'EXTERNO';
+                                     const citySuffix = isExterno && m.cidade ? ` (${m.cidade})` : '';
+                                     const gcText = hasGC 
+                                       ? `${formatGCName(m.grupos_caseiros)}${citySuffix}` 
+                                       : (isExterno && m.cidade ? m.cidade : '');
+                                     
+                                     if (age >= 0 && age <= 15) {
+                                       return `${age} Anos${gcText ? ` • ${gcText}` : ''}`;
+                                     } else {
+                                       return gcText;
+                                     }
+                                   })()}
+                                 </p>
+                           </div>
                         </div>
-                    </div>
-                  );
-                })}
+                      );
+                    })}
+                  </div>
+                ))}
 
                 {getBirthdays.length === 0 && (
-                  <div className="col-span-full py-20 flex flex-col items-center justify-center text-gray-300 border-2 border-dashed border-gray-100 rounded-3xl">
+                  <div className="py-20 flex flex-col items-center justify-center text-gray-300 border-2 border-dashed border-gray-100 rounded-3xl w-full">
                      <ImageIcon className="h-16 w-16 mb-4" />
                      <p className="font-bold text-sm">Nenhum aniversariante selecionado</p>
                   </div>
@@ -766,7 +934,7 @@ export const Birthdays: React.FC = () => {
               </div>
               <div>
                 <h2 className="text-base font-bold text-gray-900">Limite de edições atingido</h2>
-                <p className="text-sm text-gray-500 mt-1">A mensagem foi editada manualmente em 5 ou mais dias distintos no mesmo mês.</p>
+                <p className="text-sm text-gray-500 mt-1">A mensagem foi editada manualmente em 10 ou mais dias distintos no mesmo mês.</p>
               </div>
             </div>
 
