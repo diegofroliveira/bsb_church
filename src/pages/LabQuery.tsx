@@ -127,6 +127,9 @@ LIMIT 50;`
   const [sqlHistory, setSqlHistory] = useState<{query: string; rows: number; ts: string}[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const sqlTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const [schemaOpen, setSchemaOpen] = useState(false);
+  const [schemaTables, setSchemaTables] = useState<{name:string; columns:{column_name:string;data_type:string}[]}[]>([]);
+  const [schemaLoading, setSchemaLoading] = useState(false);
 
   // Playground Code Console State
   const [codeQuery, setCodeQuery] = useState<string>(
@@ -457,11 +460,32 @@ return m.status === 'Ativo' && (!m.celular_principal_sms || m.celular_principal_
     { label: '🧮 Faixas Etárias', sql: 'SELECT\n  CASE WHEN nascimento IS NULL THEN \'Sem Dados\'\n    WHEN EXTRACT(YEAR FROM AGE(NOW(),nascimento::date))<13 THEN \'Criança (0-12)\'\n    WHEN EXTRACT(YEAR FROM AGE(NOW(),nascimento::date))<18 THEN \'Adolescente (13-17)\'\n    WHEN EXTRACT(YEAR FROM AGE(NOW(),nascimento::date))<26 THEN \'Jovem (18-25)\'\n    WHEN EXTRACT(YEAR FROM AGE(NOW(),nascimento::date))<36 THEN \'Adulto Jovem (26-35)\'\n    WHEN EXTRACT(YEAR FROM AGE(NOW(),nascimento::date))<51 THEN \'Adulto (36-50)\'\n    ELSE \'Maduro (51+)\' END AS faixa_etaria,\n  COUNT(*) AS total\nFROM membros WHERE status=\'Ativo\' GROUP BY 1 ORDER BY 2 DESC;' },
   ];
 
+  const fetchSchema = async () => {
+    if (schemaTables.length > 0) { setSchemaOpen(true); return; }
+    setSchemaLoading(true);
+    try {
+      const { data: tables } = await supabase.rpc('execute_lab_query', {
+        sql_text: "SELECT table_name FROM information_schema.tables WHERE table_schema='public' ORDER BY table_name"
+      });
+      const tableList: {name:string; columns:{column_name:string;data_type:string}[]}[] = [];
+      for (const t of (tables || [])) {
+        const { data: cols } = await supabase.rpc('execute_lab_query', {
+          sql_text: `SELECT column_name, data_type FROM information_schema.columns WHERE table_schema='public' AND table_name='${t.table_name}' ORDER BY ordinal_position LIMIT 20`
+        });
+        tableList.push({ name: t.table_name, columns: cols || [] });
+      }
+      setSchemaTables(tableList);
+      setSchemaOpen(true);
+    } catch(e) { console.error(e); }
+    finally { setSchemaLoading(false); }
+  };
+
   const handleRunSQL = async () => {
     if (!sqlQuery.trim()) return;
     setSqlLoading(true); setSqlError(null); setSqlResults(null); setSqlColumns([]);
     try {
-      const { data, error } = await supabase.rpc('execute_lab_query', { sql_text: sqlQuery });
+      const cleanSql = sqlQuery.trim().replace(/;+$/, '');
+      const { data, error } = await supabase.rpc('execute_lab_query', { sql_text: cleanSql });
       if (error) throw error;
       const rows: any[] = Array.isArray(data) ? data : (data ? [data] : []);
       setSqlResults(rows);
@@ -1099,25 +1123,115 @@ return m.status === 'Ativo' && (!m.celular_principal_sms || m.celular_principal_
                 </div>
               )}
 
-              {/* Quick reference */}
+              {/* Quick reference — dynamic tables */}
               <div className="bg-slate-900/50 rounded-2xl border border-slate-800/50 p-4 space-y-3">
-                <h4 className="font-extrabold text-emerald-400 uppercase tracking-widest text-[9px] border-b border-slate-800 pb-2">Referência Rápida</h4>
-                <div className="space-y-1.5 text-[10px] font-mono text-gray-400">
-                  <p><span className="text-emerald-400">membros</span> — tabela principal</p>
-                  <p><span className="text-slate-300">nome, status, sexo</span></p>
-                  <p><span className="text-slate-300">data_de_vinculo</span> — entrada</p>
-                  <p><span className="text-slate-300">data_atualizacao</span> — saída</p>
-                  <p><span className="text-slate-300">grupos_caseiros</span> — GC</p>
-                  <p><span className="text-slate-300">nascimento, bairro</span></p>
-                  <p><span className="text-slate-300">tipo_de_pessoa</span></p>
-                  <p><span className="text-slate-300">celular_principal_sms</span></p>
+                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                  <h4 className="font-extrabold text-emerald-400 uppercase tracking-widest text-[9px]">Tabelas do Banco</h4>
+                  <button
+                    onClick={fetchSchema}
+                    disabled={schemaLoading}
+                    title="Ver diagrama de schema"
+                    className="inline-flex items-center gap-1 text-[9px] font-black uppercase text-slate-400 hover:text-emerald-400 transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    {schemaLoading ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Table2 className="w-3 h-3" />}
+                    {schemaLoading ? 'Carregando...' : 'Ver Schema'}
+                  </button>
                 </div>
+                {schemaTables.length > 0 ? (
+                  <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                    {schemaTables.map(t => (
+                      <div key={t.name} className="group">
+                        <button
+                          onClick={() => setSqlQuery(prev => prev + '\nSELECT * FROM ' + t.name + ' LIMIT 10;')}
+                          className="w-full text-left"
+                          title={'Inserir SELECT * FROM ' + t.name}
+                        >
+                          <p className="text-[10px] font-black text-emerald-400 group-hover:text-emerald-300 transition-colors font-mono">{t.name}</p>
+                          <p className="text-[9px] text-gray-600 font-mono truncate">
+                            {t.columns.map(c => c.column_name).join(', ')}
+                          </p>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-1.5 text-[10px] font-mono text-gray-400">
+                    <p><span className="text-emerald-400 font-black">membros</span></p>
+                    <p className="text-gray-600">nome, status, sexo, nascimento</p>
+                    <p className="text-gray-600">data_de_vinculo, data_atualizacao</p>
+                    <p className="text-gray-600">grupos_caseiros, bairro, cidade</p>
+                    <p className="text-gray-600">tipo_de_pessoa, estado_civil</p>
+                    <p className="text-gray-600">celular_principal_sms, email</p>
+                    <button onClick={fetchSchema} disabled={schemaLoading} className="mt-2 w-full text-[9px] font-black text-emerald-500 hover:text-emerald-300 uppercase tracking-wide transition-colors cursor-pointer disabled:opacity-50">
+                      {schemaLoading ? 'Carregando...' : '↓ Carregar todas as tabelas'}
+                    </button>
+                  </div>
+                )}
                 <p className="text-[9px] text-gray-600 border-t border-slate-800 pt-2">
-                  Apenas <code className="text-emerald-400">SELECT</code> permitido. Use <kbd className="bg-slate-800 px-1 rounded text-[8px]">Ctrl+Enter</kbd> para executar.
+                  Clique no nome da tabela para inserir um <code className="text-emerald-400">SELECT</code>. Use <kbd className="bg-slate-800 px-1 rounded text-[8px]">Ctrl+Enter</kbd> para executar.
                 </p>
               </div>
             </div>
           </div>
+
+          {/* Schema Diagram */}
+          {schemaOpen && schemaTables.length > 0 && (
+            <div className="border border-slate-700 rounded-2xl overflow-hidden">
+              <div className="px-4 py-3 bg-slate-800 border-b border-slate-700 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Table2 className="w-4 h-4 text-emerald-400" />
+                  <span className="text-[10px] font-black text-emerald-300 uppercase tracking-widest">
+                    Schema do Banco — {schemaTables.length} tabela(s)
+                  </span>
+                </div>
+                <button onClick={() => setSchemaOpen(false)} className="text-gray-500 hover:text-white text-[10px] font-black uppercase tracking-wide cursor-pointer transition-colors">
+                  Fechar ✕
+                </button>
+              </div>
+              <div className="p-4 overflow-x-auto">
+                <div className="flex gap-4 min-w-max">
+                  {schemaTables.map(t => (
+                    <div key={t.name} className="bg-slate-900 border border-slate-700 rounded-xl overflow-hidden min-w-[180px] shadow-lg">
+                      {/* Table header */}
+                      <div className="bg-emerald-900/40 border-b border-emerald-800/40 px-3 py-2 flex items-center gap-1.5">
+                        <Database className="w-3 h-3 text-emerald-400 shrink-0" />
+                        <span className="text-[10px] font-black text-emerald-300 font-mono">{t.name}</span>
+                      </div>
+                      {/* Columns */}
+                      <div className="divide-y divide-slate-800/60">
+                        {t.columns.map(col => {
+                          const isPk = col.column_name === 'id';
+                          const isRef = col.column_name.endsWith('_id') && col.column_name !== 'id';
+                          return (
+                            <div key={col.column_name} className="flex items-center justify-between px-3 py-1.5 gap-3">
+                              <span className={['text-[9px] font-mono', isPk ? 'text-yellow-400 font-black' : isRef ? 'text-blue-400' : 'text-gray-300'].join(' ')}>
+                                {isPk ? '🔑 ' : isRef ? '🔗 ' : ''}{col.column_name}
+                              </span>
+                              <span className="text-[8px] text-gray-600 font-mono shrink-0">
+                                {col.data_type.replace('character varying','varchar').replace('timestamp without time zone','timestamp').replace('timestamp with time zone','timestampz')}
+                              </span>
+                            </div>
+                          );
+                        })}
+                        {t.columns.length === 0 && (
+                          <div className="px-3 py-2 text-[9px] text-gray-600 italic">sem colunas</div>
+                        )}
+                      </div>
+                      {/* Quick select button */}
+                      <div className="border-t border-slate-800 px-3 py-2">
+                        <button
+                          onClick={() => { setSqlQuery('SELECT *\nFROM ' + t.name + '\nLIMIT 20;'); setSchemaOpen(false); }}
+                          className="w-full text-[8px] font-black uppercase text-emerald-500 hover:text-emerald-300 transition-colors cursor-pointer tracking-wider"
+                        >
+                          SELECT * FROM {t.name}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Results Table */}
           {sqlResults !== null && (
