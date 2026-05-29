@@ -25,6 +25,7 @@ import { Families } from './pages/Families';
 import { Companionship } from './pages/Companionship';
 import { LabVision } from './pages/LabVision';
 import { LabVisits } from './pages/LabVisits';
+import { LabQuery } from './pages/LabQuery';
 
 function App() {
   return (
@@ -62,6 +63,7 @@ function App() {
               {/* ── SECRET LAB ROUTES — not linked anywhere in the UI — */}
               <Route path="/lab/vision" element={<LabVision />} />
               <Route path="/lab/visits" element={<LabVisits />} />
+              <Route path="/lab/queries" element={<LabQuery />} />
             </Route>
           </Route>
 

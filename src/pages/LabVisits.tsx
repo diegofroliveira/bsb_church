@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useFamilyEngine } from '../hooks/useFamilyEngine';
 import type { Member, FamilyRelation } from '../hooks/useFamilyEngine';
 import { getAdministrativeRegion } from '../lib/geoUtils';
@@ -24,6 +25,8 @@ interface VisitRecord {
 type VisitationState = Record<string, VisitRecord>;
 
 export const LabVisits: React.FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [members, setMembers] = useState<Member[]>([]);
   const [relations, setRelations] = useState<FamilyRelation[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
@@ -309,6 +312,32 @@ export const LabVisits: React.FC = () => {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700 max-w-7xl mx-auto pb-20">
+
+      {/* Dynamic Tabs Navigation inside Lab Pages */}
+      <div className="flex flex-wrap gap-2 border-b border-slate-100 pb-1">
+        {[
+          { path: '/lab/vision', label: '🏛️ Visão de Efésios 4' },
+          { path: '/lab/visits', label: '🏠 Gestão de Visitas' },
+          { path: '/lab/queries', label: '📊 Consultas & Estudos' }
+        ].map((tab) => {
+          const isActive = location.pathname === tab.path;
+          return (
+            <button
+              key={tab.path}
+              onClick={() => navigate(tab.path)}
+              className={clsx(
+                "px-4 py-2 text-xs font-black uppercase tracking-wider rounded-t-xl transition-all border-b-2 cursor-pointer",
+                isActive 
+                  ? "bg-slate-900 text-white border-indigo-500" 
+                  : "bg-slate-50 text-slate-500 border-transparent hover:bg-slate-100/80 hover:text-slate-700"
+              )}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Top Gradient Hero Block */}
       <header className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-teal-950 p-8 text-white shadow-xl">
         <div className="absolute inset-0 opacity-15">

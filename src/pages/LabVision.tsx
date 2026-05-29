@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Crown, Flame, MessageSquare, BookMarked, HandHeart,
   Eye, Sparkles, ArrowDown, Users, AlertTriangle,
@@ -323,6 +324,8 @@ function formIdealCells(pool: Member[], targetSize = 12): IdealCell[] {
 // COMPONENTE PRINCIPAL
 // ─────────────────────────────────────────────────────────
 export const LabVision: React.FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedCell, setExpandedCell] = useState<number | null>(null);
@@ -428,6 +431,31 @@ export const LabVision: React.FC = () => {
 
   return (
     <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
+
+      {/* Dynamic Tabs Navigation inside Lab Pages */}
+      <div className="flex flex-wrap gap-2 border-b border-slate-100 pb-1">
+        {[
+          { path: '/lab/vision', label: '🏛️ Visão de Efésios 4' },
+          { path: '/lab/visits', label: '🏠 Gestão de Visitas' },
+          { path: '/lab/queries', label: '📊 Consultas & Estudos' }
+        ].map((tab) => {
+          const isActive = location.pathname === tab.path;
+          return (
+            <button
+              key={tab.path}
+              onClick={() => navigate(tab.path)}
+              className={clsx(
+                "px-4 py-2 text-xs font-black uppercase tracking-wider rounded-t-xl transition-all border-b-2 cursor-pointer",
+                isActive 
+                  ? "bg-slate-900 text-white border-indigo-500" 
+                  : "bg-slate-50 text-slate-500 border-transparent hover:bg-slate-100/80 hover:text-slate-700"
+              )}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
 
       {/* HERO */}
       <div className="relative overflow-hidden rounded-3xl bg-[#080810] p-10 text-white">
