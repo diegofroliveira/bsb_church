@@ -22,6 +22,11 @@ const formatName = (fullName: string) => {
   return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1]}` : parts[0];
 };
 
+const getFirstName = (fullName: string) => {
+  if (!fullName) return '';
+  return fullName.trim().split(' ')[0];
+};
+
 const formatGCName = (gcName?: string): string => {
   if (!gcName) return 'Sem GC';
   let name = gcName.trim();
@@ -219,6 +224,7 @@ export const Birthdays: React.FC = () => {
     const names = getBirthdays.map(m => {
       const age = calculateAge(m.nascimento);
       const gcText = formatGCName(m.grupos_caseiros);
+      const firstName = getFirstName(m.nome).toUpperCase();
 
       if (age >= 0 && age <= 15) {
         // Até 15 anos: Nome, idade, pais e GC
@@ -229,19 +235,19 @@ export const Birthdays: React.FC = () => {
         const mother = m.mae?.trim();
         
         if (father && mother) {
-          parentsText = ` - ${genderWord} de ${father} e ${mother}`;
+          parentsText = ` - ${genderWord} de ${getFirstName(father).toUpperCase()} e ${getFirstName(mother).toUpperCase()}`;
         } else if (father) {
-          parentsText = ` - ${genderWord} de ${father}`;
+          parentsText = ` - ${genderWord} de ${getFirstName(father).toUpperCase()}`;
         } else if (mother) {
-          parentsText = ` - ${genderWord} de ${mother}`;
+          parentsText = ` - ${genderWord} de ${getFirstName(mother).toUpperCase()}`;
         }
 
-        return `*${m.nome.toUpperCase()}* (${age} anos)${parentsText} - ${gcText} 🌷`;
+        return `*${firstName}* (${age} anos)${parentsText} - ${gcText} 🌷`;
       } else {
         // Depois dos 15 anos: Nome, @mention (se tem telefone) e GC
         const hasPhone = m.celular_principal_sms && m.celular_principal_sms.trim() !== '';
-        const mention = hasPhone ? ` (@${formatName(m.nome).toUpperCase()})` : '';
-        return `*${m.nome.toUpperCase()}*${mention} - ${gcText} 🌷`;
+        const mention = hasPhone ? ` (@${firstName})` : '';
+        return `*${firstName}*${mention} - ${gcText} 🌷`;
       }
     }).join('\n');
     
@@ -634,7 +640,7 @@ export const Birthdays: React.FC = () => {
                        </label>
                        
                        <div className="text-center mt-3">
-                           <h4 className="font-black text-gray-900 text-sm uppercase truncate max-w-[150px]">{formatName(m.nome)}</h4>
+                           <h4 className="font-black text-gray-900 text-sm uppercase truncate max-w-[150px]">{getFirstName(m.nome)}</h4>
                             <p className="text-[10px] font-bold text-gray-400 uppercase">
                               {(() => {
                                 const age = calculateAge(m.nascimento);
