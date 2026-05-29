@@ -283,7 +283,12 @@ export const Birthdays: React.FC = () => {
     const savedDates = savedDatesStr ? JSON.parse(savedDatesStr) : [];
     const todayStr = new Date().toISOString().split('T')[0];
 
-    if (savedDates.length >= 3 && !savedDates.includes(todayStr)) {
+    // Filter to only include dates from the current month
+    const now = new Date();
+    const currentMonthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const currentMonthDates = savedDates.filter((d: string) => d.startsWith(currentMonthPrefix));
+
+    if (currentMonthDates.length >= 5 && !currentMonthDates.includes(todayStr)) {
       setShowWarningBlock(true);
       return;
     }
@@ -307,9 +312,15 @@ export const Birthdays: React.FC = () => {
       const todayStr = new Date().toISOString().split('T')[0];
       const savedDatesStr = localStorage.getItem('edited_birthday_dates');
       const savedDates = savedDatesStr ? JSON.parse(savedDatesStr) : [];
-      if (!savedDates.includes(todayStr)) {
-        savedDates.push(todayStr);
-        localStorage.setItem('edited_birthday_dates', JSON.stringify(savedDates));
+
+      // Clean up dates older than current month when saving, to keep localStorage tidy
+      const now = new Date();
+      const currentMonthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      const currentMonthDates = savedDates.filter((d: string) => d.startsWith(currentMonthPrefix));
+
+      if (!currentMonthDates.includes(todayStr)) {
+        currentMonthDates.push(todayStr);
+        localStorage.setItem('edited_birthday_dates', JSON.stringify(currentMonthDates));
       }
     }
     setIsEditMode(false);
@@ -731,7 +742,7 @@ export const Birthdays: React.FC = () => {
               </div>
               <div>
                 <h2 className="text-base font-bold text-gray-900">Limite de edições atingido</h2>
-                <p className="text-sm text-gray-500 mt-1">A mensagem foi editada manualmente em 3 ou mais dias distintos.</p>
+                <p className="text-sm text-gray-500 mt-1">A mensagem foi editada manualmente em 5 ou mais dias distintos no mesmo mês.</p>
               </div>
             </div>
 
