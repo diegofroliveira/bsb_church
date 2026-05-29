@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
-  Search, Users, Calendar, Sparkles, Filter, 
+  Search, Sparkles, Filter,
   Download, Copy, RefreshCw, GraduationCap, AlertCircle,
-  Database, UserCheck, HelpCircle, ArrowRight, ShieldCheck, MapPin,
-  Clock, Heart, Eye, Play, Terminal, Code, HelpCircle as QuestionIcon
+  Database, ArrowRight, ShieldCheck,
+  Clock, Play, Terminal, Code, ExternalLink, History, Trash2, ChevronDown, ChevronUp, Table2
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -101,8 +101,32 @@ export const LabQuery: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
-  // Mode Selector: 'visual' or 'playground'
-  const [queryMode, setQueryMode] = useState<'visual' | 'playground'>('visual');
+  // Mode Selector: 'visual', 'playground', or 'sql'
+  const [queryMode, setQueryMode] = useState<'visual' | 'playground' | 'sql'>('visual');
+
+  // SQL Console State
+  const [sqlQuery, setSqlQuery] = useState(
+`-- Escreva sua query SQL aqui (apenas SELECT)
+SELECT
+  nome,
+  status,
+  data_de_vinculo,
+  data_atualizacao,
+  grupos_caseiros,
+  bairro
+FROM membros
+WHERE status != 'Ativo'
+  AND data_de_vinculo IS NOT NULL
+ORDER BY data_atualizacao DESC
+LIMIT 50;`
+  );
+  const [sqlResults, setSqlResults] = useState<any[] | null>(null);
+  const [sqlColumns, setSqlColumns] = useState<string[]>([]);
+  const [sqlError, setSqlError] = useState<string | null>(null);
+  const [sqlLoading, setSqlLoading] = useState(false);
+  const [sqlHistory, setSqlHistory] = useState<{query: string; rows: number; ts: string}[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+  const sqlTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Playground Code Console State
   const [codeQuery, setCodeQuery] = useState<string>(
@@ -422,6 +446,52 @@ return m.status === 'Ativo' && (!m.celular_principal_sms || m.celular_principal_
     setCurrentPage(1);
   };
 
+
+  // ── SQL Console ──────────────────────────────────────────────
+  const SQL_TEMPLATES = [
+    { label: '🌱 Vínculo Curto', sql: 'SELECT\n  nome, status,\n  data_de_vinculo AS entrada,\n  data_atualizacao AS saida,\n  bairro, grupos_caseiros AS gc\nFROM membros\nWHERE status != \'Ativo\'\n  AND data_de_vinculo IS NOT NULL\n  AND data_atualizacao IS NOT NULL\n  AND (data_atualizacao::date - data_de_vinculo::date) < 730\nORDER BY (data_atualizacao::date - data_de_vinculo::date) ASC\nLIMIT 100;' },
+    { label: '⭐ Fiéis > 5 Anos', sql: 'SELECT nome, data_de_vinculo AS entrada,\n  EXTRACT(YEAR FROM AGE(NOW(), data_de_vinculo::date))::int AS anos_de_casa,\n  grupos_caseiros AS gc, bairro\nFROM membros\nWHERE status = \'Ativo\'\n  AND data_de_vinculo IS NOT NULL\n  AND data_de_vinculo::date < NOW() - INTERVAL \'5 years\'\nORDER BY data_de_vinculo ASC LIMIT 100;' },
+    { label: '📊 Total por GC', sql: 'SELECT COALESCE(NULLIF(TRIM(grupos_caseiros),\'\'),\'Sem GC\') AS grupo_caseiro,\n  COUNT(*) AS total,\n  COUNT(*) FILTER (WHERE sexo=\'Masculino\') AS homens,\n  COUNT(*) FILTER (WHERE sexo=\'Feminino\') AS mulheres\nFROM membros WHERE status=\'Ativo\' GROUP BY 1 ORDER BY total DESC;' },
+    { label: '📅 Entradas por Mês', sql: 'SELECT TO_CHAR(data_de_cadastro::date,\'YYYY-MM\') AS mes, COUNT(*) AS novos\nFROM membros WHERE data_de_cadastro IS NOT NULL\n  AND EXTRACT(YEAR FROM data_de_cadastro::date)=2024\nGROUP BY 1 ORDER BY 1;' },
+    { label: '📱 Sem Celular', sql: 'SELECT nome, email, bairro, grupos_caseiros AS gc FROM membros\nWHERE status=\'Ativo\' AND (celular_principal_sms IS NULL OR TRIM(celular_principal_sms)=\'\')\nORDER BY nome;' },
+    { label: '🧮 Faixas Etárias', sql: 'SELECT\n  CASE WHEN nascimento IS NULL THEN \'Sem Dados\'\n    WHEN EXTRACT(YEAR FROM AGE(NOW(),nascimento::date))<13 THEN \'Criança (0-12)\'\n    WHEN EXTRACT(YEAR FROM AGE(NOW(),nascimento::date))<18 THEN \'Adolescente (13-17)\'\n    WHEN EXTRACT(YEAR FROM AGE(NOW(),nascimento::date))<26 THEN \'Jovem (18-25)\'\n    WHEN EXTRACT(YEAR FROM AGE(NOW(),nascimento::date))<36 THEN \'Adulto Jovem (26-35)\'\n    WHEN EXTRACT(YEAR FROM AGE(NOW(),nascimento::date))<51 THEN \'Adulto (36-50)\'\n    ELSE \'Maduro (51+)\' END AS faixa_etaria,\n  COUNT(*) AS total\nFROM membros WHERE status=\'Ativo\' GROUP BY 1 ORDER BY 2 DESC;' },
+  ];
+
+  const handleRunSQL = async () => {
+    if (!sqlQuery.trim()) return;
+    setSqlLoading(true); setSqlError(null); setSqlResults(null); setSqlColumns([]);
+    try {
+      const { data, error } = await supabase.rpc('execute_lab_query', { sql_text: sqlQuery });
+      if (error) throw error;
+      const rows: any[] = Array.isArray(data) ? data : (data ? [data] : []);
+      setSqlResults(rows);
+      setSqlColumns(rows.length > 0 ? Object.keys(rows[0]) : []);
+      setSqlHistory(prev => [{ query: sqlQuery, rows: rows.length, ts: new Date().toLocaleTimeString('pt-BR') }, ...prev.slice(0, 9)]);
+    } catch (err: any) { setSqlError(err.message || 'Erro ao executar query.'); }
+    finally { setSqlLoading(false); }
+  };
+
+  const handleExportSQLCSV = () => {
+    if (!sqlResults || sqlResults.length === 0) return;
+    const headers = sqlColumns.join(',');
+    const rows = sqlResults.map(row => sqlColumns.map(col => {
+      const v = row[col]; if (v == null) return '';
+      const s = String(v);
+      return (s.includes(',') || s.includes('"')) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    }).join(','));
+    const a = document.createElement('a');
+    a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent('\uFEFF' + [headers, ...rows].join('\n'));
+    a.download = 'lab_sql_' + new Date().toISOString().split('T')[0] + '.csv';
+    a.click();
+  };
+
+  const handleCopySQLJSON = () => {
+    if (!sqlResults) return;
+    navigator.clipboard.writeText(JSON.stringify(sqlResults, null, 2));
+    alert('Resultado copiado como JSON!');
+  };
+
+
   // Export to CSV helper
   const handleExportCSV = () => {
     if (filteredList.length === 0) return;
@@ -643,6 +713,25 @@ return m.status === 'Ativo' && (!m.celular_principal_sms || m.celular_principal_
         >
           <Terminal className="w-3.5 h-3.5" /> 💻 Console Playground JS (Query Completa)
         </button>
+        <button
+          onClick={() => setQueryMode('sql')}
+          className={clsx(
+            "flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm border",
+            queryMode === 'sql'
+              ? "bg-emerald-600 text-white border-emerald-600"
+              : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
+          )}
+        >
+          <Database className="w-3.5 h-3.5" /> 🗃️ SQL Console (PostgreSQL Real)
+        </button>
+        <a
+          href="https://supabase.com/dashboard/project/vadufkgbluisdamgkbln/sql/new"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm border bg-white text-slate-500 border-slate-200 hover:bg-slate-50 hover:text-emerald-600"
+        >
+          <ExternalLink className="w-3.5 h-3.5" /> Supabase Studio
+        </a>
       </div>
 
       {/* Query Console / Filter Panel Container */}
@@ -883,6 +972,197 @@ return m.status === 'Ativo' && (!m.celular_principal_sms || m.celular_principal_
               </div>
             </div>
           </div>
+        </section>
+      )}
+
+      {/* SQL Console Panel */}
+      {queryMode === 'sql' && (
+        <section className="bg-slate-950 rounded-3xl border border-slate-800 p-6 space-y-5 shadow-2xl text-white">
+          {/* Header */}
+          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-800 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg">
+                <Database className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="text-xs font-black text-emerald-300 uppercase tracking-widest">SQL Console — PostgreSQL Direto</h3>
+                <p className="text-[10px] text-gray-500 mt-0.5">Queries SELECT contra a tabela <code className="text-emerald-400 font-mono">membros</code> em tempo real. Apenas leitura.</p>
+              </div>
+            </div>
+            <a
+              href="https://supabase.com/dashboard/project/vadufkgbluisdamgkbln/sql/new"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 text-[10px] font-black uppercase tracking-wider px-3 py-2 rounded-xl transition-all border border-slate-700"
+            >
+              <ExternalLink className="w-3 h-3" /> Abrir Supabase Studio
+            </a>
+          </div>
+
+          {/* Templates */}
+          <div>
+            <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2">Templates Prontos:</p>
+            <div className="flex flex-wrap gap-2">
+              {SQL_TEMPLATES.map((t, i) => (
+                <button
+                  key={i}
+                  onClick={() => setSqlQuery(t.sql)}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-300 text-[10px] font-bold rounded-lg border border-slate-700 transition-all cursor-pointer"
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Editor */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+            <div className="lg:col-span-8 space-y-3">
+              <div className="relative bg-slate-900 rounded-2xl border border-slate-700 overflow-hidden shadow-inner">
+                <div className="flex items-center gap-2 px-4 py-2 border-b border-slate-800 bg-slate-950/50">
+                  <div className="w-2.5 h-2.5 rounded-full bg-red-500/60" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/60" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/60" />
+                  <span className="text-[9px] text-gray-600 font-mono ml-1 uppercase tracking-widest">sql editor</span>
+                </div>
+                <textarea
+                  ref={sqlTextareaRef}
+                  value={sqlQuery}
+                  onChange={e => setSqlQuery(e.target.value)}
+                  onKeyDown={e => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); handleRunSQL(); } }}
+                  className="w-full h-52 bg-transparent outline-none border-none text-emerald-300 leading-relaxed font-mono text-xs resize-none focus:ring-0 p-4"
+                  placeholder="-- Digite sua query SQL aqui (apenas SELECT)..."
+                  spellCheck={false}
+                />
+              </div>
+
+              {sqlError && (
+                <div className="bg-red-950/60 border border-red-800/80 rounded-2xl p-4 flex gap-3 text-red-300 items-start">
+                  <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide">Erro PostgreSQL</p>
+                    <p className="text-[10px] mt-1 leading-relaxed font-mono">{sqlError}</p>
+                    {sqlError.includes('execute_lab_query') && (
+                      <p className="text-[9px] mt-2 text-red-400 leading-relaxed">
+                        ⚠️ A função <code>execute_lab_query</code> ainda não foi criada no banco. Execute o script em{' '}
+                        <a href="https://supabase.com/dashboard/project/vadufkgbluisdamgkbln/sql/new" target="_blank" rel="noopener noreferrer" className="underline text-red-300">Supabase Studio</a>.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleRunSQL}
+                  disabled={sqlLoading}
+                  className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-black px-5 py-2.5 rounded-xl transition-all cursor-pointer active:scale-95 shadow-lg shadow-emerald-900/40 text-xs uppercase tracking-wider"
+                >
+                  {sqlLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5 fill-white" />}
+                  {sqlLoading ? 'Executando...' : 'Executar SQL (Ctrl+Enter)'}
+                </button>
+                {sqlResults !== null && (
+                  <>
+                    <button onClick={handleExportSQLCSV} className="inline-flex items-center gap-1.5 text-[10px] font-black text-white bg-indigo-600 hover:bg-indigo-500 px-3.5 py-2 rounded-xl transition-all cursor-pointer active:scale-95 uppercase tracking-wide">
+                      <Download className="w-3.5 h-3.5" /> CSV
+                    </button>
+                    <button onClick={handleCopySQLJSON} className="inline-flex items-center gap-1.5 text-[10px] font-black text-slate-300 hover:bg-slate-800 border border-slate-700 px-3.5 py-2 rounded-xl transition-all cursor-pointer active:scale-95 uppercase tracking-wide">
+                      <Copy className="w-3.5 h-3.5" /> JSON
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Sidebar: history + tips */}
+            <div className="lg:col-span-4 space-y-4 text-xs">
+              {/* History */}
+              {sqlHistory.length > 0 && (
+                <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
+                  <button
+                    onClick={() => setShowHistory(h => !h)}
+                    className="w-full flex items-center justify-between px-4 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest hover:bg-slate-800 transition-colors cursor-pointer"
+                  >
+                    <span className="flex items-center gap-1.5"><History className="w-3.5 h-3.5" /> Histórico ({sqlHistory.length})</span>
+                    {showHistory ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                  </button>
+                  {showHistory && (
+                    <div className="divide-y divide-slate-800 max-h-48 overflow-y-auto">
+                      {sqlHistory.map((h, i) => (
+                        <button key={i} onClick={() => setSqlQuery(h.query)} className="w-full text-left px-4 py-2.5 hover:bg-slate-800 transition-colors cursor-pointer group">
+                          <p className="text-[9px] font-mono text-emerald-400 truncate">{h.query.split('\n').join(' ').substring(0, 60)}...</p>
+                          <p className="text-[8px] text-gray-600 mt-0.5">{h.ts} · {h.rows} linha(s)</p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Quick reference */}
+              <div className="bg-slate-900/50 rounded-2xl border border-slate-800/50 p-4 space-y-3">
+                <h4 className="font-extrabold text-emerald-400 uppercase tracking-widest text-[9px] border-b border-slate-800 pb-2">Referência Rápida</h4>
+                <div className="space-y-1.5 text-[10px] font-mono text-gray-400">
+                  <p><span className="text-emerald-400">membros</span> — tabela principal</p>
+                  <p><span className="text-slate-300">nome, status, sexo</span></p>
+                  <p><span className="text-slate-300">data_de_vinculo</span> — entrada</p>
+                  <p><span className="text-slate-300">data_atualizacao</span> — saída</p>
+                  <p><span className="text-slate-300">grupos_caseiros</span> — GC</p>
+                  <p><span className="text-slate-300">nascimento, bairro</span></p>
+                  <p><span className="text-slate-300">tipo_de_pessoa</span></p>
+                  <p><span className="text-slate-300">celular_principal_sms</span></p>
+                </div>
+                <p className="text-[9px] text-gray-600 border-t border-slate-800 pt-2">
+                  Apenas <code className="text-emerald-400">SELECT</code> permitido. Use <kbd className="bg-slate-800 px-1 rounded text-[8px]">Ctrl+Enter</kbd> para executar.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Results Table */}
+          {sqlResults !== null && (
+            <div className="border border-slate-800 rounded-2xl overflow-hidden">
+              <div className="px-4 py-3 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Table2 className="w-4 h-4 text-emerald-400" />
+                  <span className="text-[10px] font-black text-emerald-300 uppercase tracking-widest">
+                    {sqlResults.length} linha(s) · {sqlColumns.length} coluna(s)
+                  </span>
+                </div>
+              </div>
+              {sqlResults.length === 0 ? (
+                <div className="py-10 text-center text-gray-500 text-xs">Query executada com sucesso — nenhum resultado retornado.</div>
+              ) : (
+                <div className="overflow-x-auto max-h-96">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead className="sticky top-0">
+                      <tr className="bg-slate-800 text-[9px] font-black text-emerald-400 uppercase tracking-wider">
+                        {sqlColumns.map(col => (
+                          <th key={col} className="py-2 px-4 whitespace-nowrap border-b border-slate-700">{col}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60">
+                      {sqlResults.slice(0, 200).map((row, ri) => (
+                        <tr key={ri} className="hover:bg-slate-900/60 transition-colors">
+                          {sqlColumns.map(col => (
+                            <td key={col} className="py-2 px-4 text-gray-300 font-mono whitespace-nowrap max-w-[200px] truncate" title={String(row[col] ?? '')}>
+                              {row[col] === null ? <span className="text-gray-600 italic">null</span> : String(row[col])}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {sqlResults.length > 200 && (
+                    <div className="px-4 py-3 text-[9px] text-gray-500 bg-slate-900 border-t border-slate-800">
+                      Exibindo apenas as primeiras 200 linhas. Exporte o CSV para ver todos os {sqlResults.length} resultados.
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </section>
       )}
 
