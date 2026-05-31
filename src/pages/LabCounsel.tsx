@@ -128,198 +128,262 @@ export const LabCounsel: React.FC = () => {
   // Dynamic selection of the "12 Disciples"
   const theTwelve = useMemo<Disciple[]>(() => {
     if (activeMembers.length === 0) return [];
-    
-    // Sort and prioritize real leaders/officers
-    const getRoleScore = (m: Member) => {
-      const role = (m.tipo_de_pessoa || '').toUpperCase();
-      if (role === 'APÓSTOLO') return 5;
-      if (role === 'PRESBÍTERO') return 4;
-      if (role === 'DIÁCONO') return 3;
-      if (role === 'LÍDER') return 2;
-      return 1;
+
+    const usedIds = new Set<any>();
+
+    // Dynamic pattern-based helper with priority levels and robust fallback chains
+    const getCandidate = (filters: ((m: Member) => boolean)[]) => {
+      for (const filterFn of filters) {
+        const candidates = activeMembers.filter(m => !usedIds.has(m.id) && filterFn(m));
+        if (candidates.length > 0) {
+          // Sort deterministically to maintain stable order
+          candidates.sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+          const selected = candidates[0];
+          usedIds.add(selected.id);
+          return selected;
+        }
+      }
+      
+      // Ultimate fallback: take any remaining active member
+      const fallbackCandidates = activeMembers.filter(m => !usedIds.has(m.id));
+      if (fallbackCandidates.length > 0) {
+        fallbackCandidates.sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+        const selected = fallbackCandidates[0];
+        usedIds.add(selected.id);
+        return selected;
+      }
+      return null;
     };
 
-    // Filter active officers/leaders
-    let officers = activeMembers.filter(m => 
-      ['APÓSTOLO', 'PRESBÍTERO', 'DIÁCONO', 'LÍDER'].includes((m.tipo_de_pessoa || '').toUpperCase())
-    );
+    // 1. Pedro (Simão) - Pilar do Governo Central
+    const pedroMember = getCandidate([
+      m => ['APÓSTOLO', 'PASTOR'].includes((m.tipo_de_pessoa || '').toUpperCase()),
+      m => (m.tipo_de_pessoa || '').toUpperCase() === 'PRESBÍTERO'
+    ]);
 
-    // Pad with regular active members if we have fewer than 12 officers
-    if (officers.length < 12) {
-      const regularActive = activeMembers.filter(m => 
-        !['APÓSTOLO', 'PRESBÍTERO', 'DIÁCONO', 'LÍDER'].includes((m.tipo_de_pessoa || '').toUpperCase())
-      );
-      // Deterministic secondary sort so order is stable
-      regularActive.sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
-      officers = [...officers, ...regularActive];
-    }
+    // 2. João - Pilar do Lar & Aliança Familiar
+    const joaoMember = getCandidate([
+      m => (m.estado_civil === 'Casado' || !!m.esposo_a) && !!m.esposo_a,
+      m => m.estado_civil === 'Casado'
+    ]);
 
-    // Sort by role priority: APÓSTOLO > PRESBÍTERO > DIÁCONO > LÍDER
-    officers.sort((a, b) => {
-      const scoreA = getRoleScore(a);
-      const scoreB = getRoleScore(b);
-      if (scoreA !== scoreB) return scoreB - scoreA;
-      // Secondary sort alphabetically to remain deterministic
-      return (a.nome || '').localeCompare(b.nome || '');
-    });
+    // 3. Tiago - Pilar da Doutrina & Ancião de Ensino
+    const tiagoMember = getCandidate([
+      m => (m.tipo_de_pessoa || '').toUpperCase() === 'PRESBÍTERO' && (getAge(m.nascimento) || 0) > 40,
+      m => ['PRESBÍTERO', 'LÍDER'].includes((m.tipo_de_pessoa || '').toUpperCase())
+    ]);
 
-    // Take the top 12
-    const selectedMembers = officers.slice(0, 12);
+    // 4. André - Pilar da Acolhida & Conexão de Bairros
+    const andreMember = getCandidate([
+      m => !!m.grupos_caseiros && !!m.bairro && ['CEILÂNDIA', 'SAMAMBAIA', 'CENTRAL', 'SUL'].some(b => (m.bairro || '').toUpperCase().includes(b)),
+      m => !!m.grupos_caseiros
+    ]);
 
-    const availableProfiles = [
-      { key: 'pedro', name: 'Pedro (Simão)', role: 'Ação Ousada & Liderança da Frente' },
-      { key: 'joao', name: 'João', role: 'Guardião do Amor & Cuidado Profundo' },
-      { key: 'tiago', name: 'Tiago', role: 'Coluna de Justiça & Zelo Doutrinário' },
-      { key: 'andre', name: 'André', role: 'Conector Silencioso de Pessoas' },
-      { key: 'filipe', name: 'Filipe', role: 'Planejador Pragmático & Racional' },
-      { key: 'bartolomeu', name: 'Bartolomeu (Natanael)', role: 'O Homem de Caráter Íntegro' },
-      { key: 'mateus', name: 'Mateus (Levi)', role: 'Organizador de Sistemas & Finanças' },
-      { key: 'tome', name: 'Tomé', role: 'O Questionador Reflexivo' },
-      { key: 'tiago_alfeu', name: 'Tiago (Filho de Alfeu)', role: 'O Pacificador Silencioso' },
-      { key: 'simao_zelote', name: 'Simão (O Zelote)', role: 'Ativista Para Todos & Missionário' },
-      { key: 'judas_tadeu', name: 'Judas Tadeu', role: 'O Questionador Espiritual' },
-      { key: 'matias', name: 'Matias', role: 'O Cooperador Fiel Substituto' }
+    // 5. Filipe - Pilar da Estrutura & Logística Prática
+    const filipeMember = getCandidate([
+      m => m.e_dizimista === 'Sim' && (m.tipo_de_pessoa || '').toUpperCase() === 'DIÁCONO',
+      m => m.e_dizimista === 'Sim'
+    ]);
+
+    // 6. Bartolomeu (Natanael) - Pilar da Constância & Pioneiro Histórico
+    const bartolomeuMember = getCandidate([
+      m => {
+        if (!m.data_de_cadastro) return false;
+        const year = new Date(m.data_de_cadastro).getFullYear();
+        return year <= 2024;
+      },
+      m => !!m.data_de_cadastro
+    ]);
+
+    // 7. Mateus (Levi) - Pilar da Mordomia & Provedor Fiel
+    const mateusMember = getCandidate([
+      m => m.e_dizimista === 'Sim' && !['APÓSTOLO', 'PASTOR', 'PRESBÍTERO'].includes((m.tipo_de_pessoa || '').toUpperCase()),
+      m => m.e_dizimista === 'Sim'
+    ]);
+
+    // 8. Tomé - Pilar da Reflexão & Sinceridade Intelectual
+    const tomeMember = getCandidate([
+      m => m.estado_civil === 'Solteiro' && (getAge(m.nascimento) || 0) > 30,
+      m => m.estado_civil === 'Solteiro'
+    ]);
+
+    // 9. Tiago (Filho de Alfeu) - Pilar do Serviço Prático Eclesiástico
+    const tiagoAlfeuMember = getCandidate([
+      m => (m.tipo_de_pessoa || '').toUpperCase() === 'DIÁCONO',
+      m => ['DIÁCONO', 'LÍDER'].includes((m.tipo_de_pessoa || '').toUpperCase())
+    ]);
+
+    // 10. Simão (O Zelote) - Pilar da Juventude Ativa & Força Missionária
+    const simaoZeloteMember = getCandidate([
+      m => m.estado_civil === 'Solteiro' && (getAge(m.nascimento) || 0) > 0 && (getAge(m.nascimento) || 0) < 30,
+      m => (getAge(m.nascimento) || 0) > 0 && (getAge(m.nascimento) || 0) < 32
+    ]);
+
+    // 11. Judas Tadeu - Pilar da Intercessão & Mover Íntimo
+    const judasTadeuMember = getCandidate([
+      m => m.sexo === 'Feminino' && ['PASTOR', 'LÍDER', 'DIÁCONO'].includes((m.tipo_de_pessoa || '').toUpperCase()),
+      m => m.sexo === 'Feminino'
+    ]);
+
+    // 12. Matias - Pilar da Renovação & Novo Fruto
+    const matiasMember = getCandidate([
+      m => {
+        if (!m.data_de_cadastro) return false;
+        const year = new Date(m.data_de_cadastro).getFullYear();
+        return year >= 2025;
+      },
+      m => !!m.data_de_cadastro
+    ]);
+
+    const disciplesConfig = [
+      { 
+        member: pedroMember, 
+        key: 'pedro', 
+        name: 'Pedro (Simão)', 
+        role: 'Ação Ousada & Liderança da Frente',
+        getDesc: (m: Member) => `Selecionado como Pedro por representar a autoridade eclesiástica ativa de maior relevância (${m.tipo_de_pessoa || 'Líder'}) para conduzir a igreja da BSB Church com voz firme.`,
+        getCounsel: (firstName: string, genderSuffix: string, isMarried: boolean, spouseText: string, gcText: string, bairroText: string) => 
+          `"Diego, incentive ${firstName} a canalizar seu ímpeto natural para liderar e pastorear as minhas ovelhas ${gcText} com paciência. ${firstName} tem uma chama de liderança ousada, mas ensine-${genderSuffix} que a verdadeira rocha é firmada na humildade. ${isMarried ? `Que caminhe firme ${spouseText}, protegendo o seu lar.` : 'Que sua entrega seja pura perante mim.'} Diga-lhe: não olhe para o vento ou para as ondas ${bairroText}, mas mantenha os olhos em Mim."`
+      },
+      { 
+        member: joaoMember, 
+        key: 'joao', 
+        name: 'João', 
+        role: 'Guardião do Amor & Cuidado Profundo',
+        getDesc: (m: Member) => `Selecionado como João por representar as alianças familiares consagradas no banco de dados (${m.estado_civil || 'Casado'} ${m.esposo_a ? `com ${m.esposo_a}` : ''}), simbolizando o amor e a união da noiva de Cristo.`,
+        getCounsel: (firstName: string, genderSuffix: string, isMarried: boolean, spouseText: string, gcText: string, bairroText: string) => 
+          `"Diego, apoie-se em ${firstName} para manter o coração da igreja focado no amor genuíno. ${firstName} tem a sensibilidade dos discípulos mais íntimos. Que ${genderSuffix} cuide com ternura de cada alma ${gcText}, sendo um canal de cura e acolhimento ${bairroText}. ${isMarried ? `Que seu casamento ${spouseText} seja um testemunho vivo de amor sacrificial.` : 'Que sua vida seja preenchida pelo meu amor no secreto.'} Lembre-o de que quem não ama, não conhece a Deus."`
+      },
+      { 
+        member: tiagoMember, 
+        key: 'tiago', 
+        name: 'Tiago', 
+        role: 'Coluna de Justiça & Zelo Doutrinário',
+        getDesc: (m: Member) => {
+          const age = getAge(m.nascimento);
+          return `Selecionado como Tiago por ser um líder maduro da congregação (${age ? `${age} anos` : 'experiente'}), servindo de pilar para consolidar a retidão espiritual e o ensino estável.`;
+        },
+        getCounsel: (firstName: string, genderSuffix: string, isMarried: boolean, spouseText: string, gcText: string, bairroText: string) => 
+          `"Diego, utilize a firmeza e seriedade de ${firstName} para consolidar as colunas da nossa fé ${gcText}. ${firstName} possui um zelo profundo pela retidão e pela sã doutrina. Exorte-${genderSuffix} a sustentar a igreja em intercessão ardente ${bairroText}. ${isMarried ? `Seu lar, edificado com ${spouseText}, é a base de sua autoridade espiritual.` : ''} Lembre-${genderSuffix} de que a fé sem obras é morta e a justiça sem amor é vazia."`
+      },
+      { 
+        member: andreMember, 
+        key: 'andre', 
+        name: 'André', 
+        role: 'Conector Silencioso de Pessoas',
+        getDesc: (m: Member) => `Selecionado como André por morar e servir no polo estratégico de ${m.bairro || 'Brasília'} e ser ativo no GC ${m.grupos_caseiros || 'principal'}, servindo de braço acolhedor no um-a-um.`,
+        getCounsel: (firstName: string, genderSuffix: string, isMarried: boolean, spouseText: string, gcText: string, bairroText: string) => 
+          `"Diego, dê total espaço para o ministério discreto de ${firstName}. Enquanto alguns pregam para multidões, ${firstName} traz as pessoas individualmente pelos braços no secreto ${bairroText}. ${genderSuffix.toUpperCase()} é a chave de acolhida ${gcText}, notando os esquecidos que ninguém mais vê. ${isMarried ? `Que ${spouseText} seja um porto seguro para novos convertidos.` : ''} Lembre-${genderSuffix} que no meu Reino, os últimos serão os primeiros."`
+      },
+      { 
+        member: filipeMember, 
+        key: 'filipe', 
+        name: 'Filipe', 
+        role: 'Planejador Pragmático & Racional',
+        getDesc: (m: Member) => `Selecionado como Filipe por aliar a diaconice/liderança ativa e dízimo fiel à análise de recursos, ajudando a igreja a calcular custos espirituais e práticos com ordem.`,
+        getCounsel: (firstName: string, genderSuffix: string, isMarried: boolean, spouseText: string, gcText: string, bairroText: string) => 
+          `"Diego, não despreze as análises e o realismo de ${firstName}. ${genderSuffix.toUpperCase()} ajuda a igreja a estruturar com inteligência os custos e passos ${bairroText}. Mas desafie-o constantemente a ver além dos relatórios ${gcText}. Lembre-o de que cinco pães e dois peixes em minhas mãos alimentam milhares. ${isMarried ? `Junto com ${spouseText}, multipliquei seus recursos para transbordar.` : ''} Ensine-${genderSuffix} a andar por fé, e não por vista."`
+      },
+      { 
+        member: bartolomeuMember, 
+        key: 'bartolomeu', 
+        name: 'Bartolomeu (Natanael)', 
+        role: 'O Homem de Caráter Íntegro',
+        getDesc: (m: Member) => {
+          const vinculo = m.data_de_cadastro ? new Date(m.data_de_cadastro).toLocaleDateString('pt-BR') : 'desde a fundação';
+          return `Selecionado como Bartolomeu por ser um pilar de constância irrepreensível, integrado de forma pioneira na base (registro em ${vinculo}) e protetor de uma fé sincera.`;
+        },
+        getCounsel: (firstName: string, genderSuffix: string, isMarried: boolean, spouseText: string, gcText: string, bairroText: string) => 
+          `"Diego, honre a sinceridade pura e sem fingimento de ${firstName}. ${firstName} é ${genderSuffix === 'o' ? 'um homem' : 'uma mulher'} de caráter irrepreensível, que medita na minha Palavra sob a figueira ${bairroText} longe dos holofotes. Use a integridade de${genderSuffix} para guiar e aconselhar ${gcText}. ${isMarried ? `A aliança familiar reflete essa integridade.` : ''} Pessoas assim blindam a minha noiva contra a hipocrisia."`
+      },
+      { 
+        member: mateusMember, 
+        key: 'mateus', 
+        name: 'Mateus (Levi)', 
+        role: 'Organizador de Sistemas & Finanças',
+        getDesc: (m: Member) => `Selecionado como Mateus por ser um dizimista fiel na base do banco de dados, servindo de pilar de generosidade moral e mordomia prática fora dos cargos pastorais de governo.`,
+        getCounsel: (firstName: string, genderSuffix: string, isMarried: boolean, spouseText: string, gcText: string, bairroText: string) => 
+          `"Diego, canalize a mente organizada e o talento para processos de ${firstName} para abençoar a estrutura ${gcText}. O que antes o mundo podia ver como apenas números, eu redimi para ser um registro fiel da minha Graça ${bairroText}. Diga-lhe que sua fidelidade nos dízimos e na mordomia inspira a toda a congregação a confiar no meu sustento."`
+      },
+      { 
+        member: tomeMember, 
+        key: 'tome', 
+        name: 'Tomé', 
+        role: 'O Questionador Reflexivo',
+        getDesc: (m: Member) => {
+          const age = getAge(m.nascimento);
+          return `Selecionado como Tomé por ser um membro solteiro maduro (${age ? `${age} anos` : 'reflexivo'}), cuja fé é pautada pela honestidade intelectual e busca de bases espirituais sólidas.`;
+        },
+        getCounsel: (firstName: string, genderSuffix: string, isMarried: boolean, spouseText: string, gcText: string, bairroText: string) => 
+          `"Diego, acolha as reflexões profundas de ${firstName} sem julgá-las. Suas dúvidas honestas e busca por bases sólidas ${bairroText} trazem respostas firmes que ajudam ${gcText}. Quando ${firstName} experimenta a minha presença, seu compromisso é radical e inabalável. Fortaleça-${genderSuffix} a tocar em minhas marcas e proclamar: Senhor meu e Deus meu!"`
+      },
+      { 
+        member: tiagoAlfeuMember, 
+        key: 'tiago_alfeu', 
+        name: 'Tiago (Filho de Alfeu)', 
+        role: 'O Pacificador Silencioso',
+        getDesc: (m: Member) => `Selecionado como Tiago Alfeu por sua ordenação como Diácono ativo no banco de dados, servindo silenciosamente nas atividades cotidianas e no suporte prático aos fracos.`,
+        getCounsel: (firstName: string, genderSuffix: string, isMarried: boolean, spouseText: string, gcText: string, bairroText: string) => 
+          `"Diego, valorize a fidelidade silenciosa de ${firstName}. Embora ${genderSuffix} raramente apareça nos holofotes, o serviço diário de${genderSuffix} ${bairroText} é o cimento espiritual que mantém as paredes do ${gcText} unidas. ${isMarried ? `Sua casa, edificada com ${spouseText}, é um altar de paz.` : ''} Lembre-${genderSuffix} de que o Pai que vê o que é feito em segredo, recompensará de forma abundante."`
+      },
+      { 
+        member: simaoZeloteMember, 
+        key: 'simao_zelote', 
+        name: 'Simão (O Zelote)', 
+        role: 'Ativista Para Todos & Missionário',
+        getDesc: (m: Member) => {
+          const age = getAge(m.nascimento);
+          return `Selecionado como Simão Zelote por representar a juventude ativa e solteira da BSB (${age ? `${age} anos` : 'jovem'}), canalizando vigor político e social para o mover da evangelização.`;
+        },
+        getCounsel: (firstName: string, genderSuffix: string, isMarried: boolean, spouseText: string, gcText: string, bairroText: string) => 
+          `"Diego, canalize a energia vibrante e apaixonada de ${firstName} para a grande colheita em Brasília. ${firstName} tem o encargo de levar o Reino para fora das quatro paredes, mobilizando o ${gcText} para acolher os necessitados ${bairroText}. ${isMarried ? `Que com ${spouseText}, corram a corrida missionária sem hesitar.` : 'Que sua solteirice seja canal de foco radical na minha obra.'} Desperte nele o amor pelos marginalizados."`
+      },
+      { 
+        member: judasTadeuMember, 
+        key: 'judas_tadeu', 
+        name: 'Judas Tadeu', 
+        role: 'O Questionador Espiritual',
+        getDesc: (m: Member) => `Selecionada como Judas Tadeu por representar a liderança e diaconato do sexo feminino no corpo de BSB, vocacionada para a revelação espiritual e comunhão íntima no lar.`,
+        getCounsel: (firstName: string, genderSuffix: string, isMarried: boolean, spouseText: string, gcText: string, bairroText: string) => 
+          `"Diego, incentive ${firstName} a guiar as pessoas na comunhão íntima e devoção sincera. ${firstName} ajuda o ${gcText} a não cair no ativismo vazio, guardando o fogo da oração no altar do coração ${bairroText}. ${isMarried ? `Sua devoção em família, ao lado de ${spouseText}, responde ao mover do meu Espírito.` : ''} Que ${genderSuffix} incentive cada membro a buscar a intimidade divina."`
+      },
+      { 
+        member: matiasMember, 
+        key: 'matias', 
+        name: 'Matias', 
+        role: 'O Cooperador Fiel Substituto',
+        getDesc: (m: Member) => {
+          const vinculo = m.data_de_cadastro ? new Date(m.data_de_cadastro).toLocaleDateString('pt-BR') : 'recentemente';
+          return `Selecionado como Matias por representar a renovação constante da BSB (novo fruto cadastrado em ${vinculo}), pronto para assumir lacunas de serviço com maturidade e humildade.`;
+        },
+        getCounsel: (firstName: string, genderSuffix: string, isMarried: boolean, spouseText: string, gcText: string, bairroText: string) => 
+          `"Diego, honre a caminhada de ${firstName}, que esteve conosco servindo fielmente no anonimato ${bairroText}. Quando surgir uma lacuna ou desafio no ${gcText}, confie nele. ${firstName} está pronto porque seu coração sempre esteve na minha obra, não em cargos. ${isMarried ? `Que ${spouseText} continue sendo canal de serviço humilde e frutuoso.` : ''} A unção dele vem da constância nas pequenas coisas."`
+      }
     ];
 
     const assignedDisciples: Disciple[] = [];
-    const remainingProfiles = [...availableProfiles];
 
-    for (const m of selectedMembers) {
+    disciplesConfig.forEach(conf => {
+      if (!conf.member) return;
+      const m = conf.member;
       const age = getAge(m.nascimento);
-      const role = (m.tipo_de_pessoa || '').toUpperCase();
       const isMarried = m.estado_civil === 'Casado' || !!m.esposo_a;
       const isTither = m.e_dizimista === 'Sim';
-      const hasGC = !!m.grupos_caseiros;
 
-      // Calculate scores for each remaining profile to match dynamically
-      let bestProfileIdx = 0;
-      let highestScore = -999;
-
-      remainingProfiles.forEach((prof, idx) => {
-        let score = 0;
-        
-        if (prof.key === 'pedro') {
-          if (role === 'APÓSTOLO') score += 15;
-          if (role === 'PRESBÍTERO') score += 8;
-          if (role === 'LÍDER' && hasGC) score += 5;
-        }
-        if (prof.key === 'joao') {
-          if (m.sexo === 'Feminino') score += 6;
-          if (age && age < 35) score += 5;
-        }
-        if (prof.key === 'tiago') {
-          if (role === 'PRESBÍTERO') score += 10;
-          if (age && age > 45) score += 5;
-        }
-        if (prof.key === 'andre') {
-          if (role === 'LÍDER' || role === 'DIÁCONO') score += 5;
-          if (!hasGC) score += 4;
-        }
-        if (prof.key === 'filipe') {
-          if (isTither) score += 4;
-          if (role === 'DIÁCONO') score += 3;
-        }
-        if (prof.key === 'bartolomeu') {
-          if (age && age > 50) score += 8;
-          if (isMarried) score += 3;
-        }
-        if (prof.key === 'mateus') {
-          if (isTither) score += 12;
-          if (role === 'DIÁCONO') score += 4;
-        }
-        if (prof.key === 'tome') {
-          if (m.estado_civil === 'Solteiro') score += 5;
-          if (age && age < 30) score += 3;
-        }
-        if (prof.key === 'tiago_alfeu') {
-          if (role === 'DIÁCONO') score += 8;
-          if (!isTither) score += 2;
-        }
-        if (prof.key === 'simao_zelote') {
-          if (m.estado_civil === 'Solteiro') score += 8;
-          if (role === 'LÍDER') score += 3;
-        }
-        if (prof.key === 'judas_tadeu') {
-          if (role === 'LÍDER') score += 4;
-        }
-        if (prof.key === 'matias') {
-          if (role === 'MEMBRO') score += 10;
-          if (role === 'DIÁCONO') score += 4;
-        }
-
-        // Add a deterministic name hash factor to avoid ties and maintain stability
-        let hash = 0;
-        const name = m.nome || '';
-        for (let i = 0; i < name.length; i++) {
-          hash = name.charCodeAt(i) + ((hash << 5) - hash);
-        }
-        score += (Math.abs(hash + prof.key.charCodeAt(0)) % 100) / 100;
-
-        if (score > highestScore) {
-          highestScore = score;
-          bestProfileIdx = idx;
-        }
-      });
-
-      // Splice the best profile out
-      const chosenProfile = remainingProfiles.splice(bestProfileIdx, 1)[0];
-
-      // Construct dynamic descriptions & counsels based on database facts
       const firstName = m.nome.split(' ')[0];
       const genderSuffix = m.sexo === 'Feminino' ? 'a' : 'o';
       const spouseText = isMarried ? (m.esposo_a ? `junto com ${m.esposo_a}` : 'junto com seu cônjuge') : '';
       const gcText = m.grupos_caseiros ? `no GC ${m.grupos_caseiros}` : 'na congregação';
       const bairroText = m.bairro ? `em ${m.bairro}` : '';
 
-      let description = '';
-      let counsel = '';
-
-      if (chosenProfile.key === 'pedro') {
-        description = `Identificado como Pedro na BSB Church. Uma liderança enérgica e impetuosa, de ação rápida, pronta para assumir a frente dos desafios e defender o corpo.`;
-        counsel = `"Diego, incentive ${firstName} a canalizar seu ímpeto natural para liderar e pastorear as minhas ovelhas ${gcText} com paciência. ${firstName} tem uma chama de liderança ousada, mas ensine-${genderSuffix} que a verdadeira rocha é firmada na humildade. ${isMarried ? `Que caminhe firme ${spouseText}, protegendo o seu lar.` : 'Que sua entrega seja pura perante mim.'} Diga-lhe: não olhe para o vento ou para as ondas ${bairroText}, mas mantenha os olhos em Mim."`;
-      } else if (chosenProfile.key === 'joao') {
-        description = `Identificado como João. Guardião do cuidado relacional e da intimidade de comunhão, focado na lealdade e no amor profundo aos irmãos.`;
-        counsel = `"Diego, apoie-se em ${firstName} para manter o coração da igreja focado no amor genuíno. ${firstName} tem a sensibilidade dos discípulos mais íntimos. Que ${genderSuffix} cuide com ternura de cada alma ${gcText}, sendo um canal de cura e acolhimento ${bairroText}. ${isMarried ? `Que seu casamento ${spouseText} seja um testemunho vivo de amor sacrificial.` : 'Que sua vida seja preenchida pelo meu amor no secreto.'} Lembre-o de que quem não ama, não conhece a Deus."`;
-      } else if (chosenProfile.key === 'tiago') {
-        description = `Identificado como Tiago. Um pilar forte de oração, ordem espiritual e zelo pela sã doutrina. Exige retidão doutrinária e moral.`;
-        counsel = `"Diego, utilize a firmeza e seriedade de ${firstName} para consolidar as colunas da nossa fé ${gcText}. ${firstName} possui um zelo profundo pela retidão e pela sã doutrina. Exorte-${genderSuffix} a sustentar a igreja em intercessão ardente ${bairroText}. ${isMarried ? `Seu lar, edificado com ${m.esposo_a || 'sua família'}, é a base de sua autoridade espiritual.` : ''} Lembre-${genderSuffix} de que a fé sem obras é morta e a justiça sem amor é vazia."`;
-      } else if (chosenProfile.key === 'andre') {
-        description = `Identificado como André. Aquele que atua nos bastidores trazendo as pessoas individualmente para Jesus, com grande espírito acolhedor.`;
-        counsel = `"Diego, dê total espaço para o ministério discreto de ${firstName}. Enquanto alguns pregam para multidões, ${firstName} traz as pessoas individualmente pelos braços no secreto ${bairroText}. ${genderSuffix.toUpperCase()} é a chave de acolhida ${gcText}, notando os esquecidos que ninguém mais vê. ${isMarried ? `Que ${spouseText} seja um porto seguro para novos convertidos.` : ''} Lembre-${genderSuffix} que no meu Reino, os últimos serão os primeiros."`;
-      } else if (chosenProfile.key === 'filipe') {
-        description = `Identificado como Filipe. O administrador prático que calcula custos, analisa logística e busca a viabilidade racional dos passos da igreja.`;
-        counsel = `"Diego, não despreze as análises e o realismo de ${firstName}. ${genderSuffix.toUpperCase()} ajuda a igreja a estruturar com inteligência os custos e passos ${bairroText}. Mas desafie-o constantemente a ver além dos relatórios ${gcText}. Lembre-o de que cinco pães e dois peixes em minhas mãos alimentam milhares. ${isMarried ? `Junto com ${spouseText}, multipliquei seus recursos para transbordar.` : ''} Ensine-${genderSuffix} a andar por fé, e não por vista."`;
-      } else if (chosenProfile.key === 'bartolomeu') {
-        description = `Identificado como Bartolomeu (Natanael). Um servo de integridade exemplar, cuja conduta reta inspira confiança e serve de consolo para o rebanho.`;
-        counsel = `"Diego, honre a sinceridade pura e sem fingimento de ${firstName}. ${firstName} é ${genderSuffix === 'o' ? 'um homem' : 'uma mulher'} de caráter irrepreensível, que medita na minha Palavra sob a figueira ${bairroText} longe dos holofotes. Use a integridade de${genderSuffix} para guiar e aconselhar ${gcText}. ${isMarried ? `A aliança com ${m.esposo_a || 'sua família'} reflete essa integridade.` : ''} Pessoas assim blindam a minha noiva contra a hipocrisia."`;
-      } else if (chosenProfile.key === 'mateus') {
-        description = `Identificado como Mateus. Organizador de sistemas e finanças, focado em prestação de contas, dízimos fiéis e integridade material.`;
-        counsel = `"Diego, canalize a mente organizada e o talento para processos de ${firstName} para abençoar a estrutura ${gcText}. O que antes o mundo podia ver como apenas números, eu redimi para ser um registro fiel da minha Graça ${bairroText}. ${isMarried ? `Que ${spouseText} governe com ordem e generosidade.` : ''} Diga-lhe que sua fidelidade nos dízimos e na mordomia inspira a toda a congregação a confiar no meu sustento."`;
-      } else if (chosenProfile.key === 'tome') {
-        description = `Identificado como Tomé. O questionador sincero e analítico que busca verdades profundas e não se contenta com respostas superficiais.`;
-        counsel = `"Diego, acolha as reflexões profundas de ${firstName} sem julgá-las. Suas dúvidas honestas e busca por bases sólidas ${bairroText} trazem respostas firmes que ajudam ${gcText}. Quando ${firstName} experimenta a minha presença, seu compromisso é radical e inabalável. ${isMarried ? `Que ao lado de ${m.esposo_a || 'seu cônjuge'}, encontre descanso na fé compartilhada.` : ''} Fortaleça-${genderSuffix} a tocar em minhas marcas e proclamar: Senhor meu e Deus meu!"`;
-      } else if (chosenProfile.key === 'tiago_alfeu') {
-        description = `Identificado como Tiago (filho de Alfeu). Representante do trabalho fiel e silencioso nos bastidores cotidianos, construindo a igreja no secreto.`;
-        counsel = `"Diego, valorize a fidelidade silenciosa de ${firstName}. Embora ${genderSuffix} raramente apareça nos holofotes, o serviço diário de${genderSuffix} ${bairroText} é o cimento espiritual que mantém as paredes do ${gcText} unidas. ${isMarried ? `Sua casa, edificada com ${spouseText}, é um altar de paz.` : ''} Lembre-${genderSuffix} de que o Pai que vê o que é feito em segredo, recompensará de forma abundante."`;
-      } else if (chosenProfile.key === 'simao_zelote') {
-        description = `Identificado como Simão o Zelote. Cheio de zelo missionário e energia, excelente para mover o povo em causas de evangelismo ativo e socorro social.`;
-        counsel = `"Diego, canalize a energia vibrante e apaixonada de ${firstName} para a grande colheita em Brasília. ${firstName} tem o encargo de levar o Reino para fora das quatro paredes, mobilizando o ${gcText} para acolher os necessitados ${bairroText}. ${isMarried ? `Que com ${spouseText}, corram a corrida missionária sem hesitar.` : 'Que sua solteirice seja canal de foco radical na minha obra.'} Desperte nele o amor pelos marginalizados."`;
-      } else if (chosenProfile.key === 'judas_tadeu') {
-        description = `Identificado como Judas Tadeu. Foco na comunhão do Espírito, adoração profunda e na revelação da glória de Deus no secreto.`;
-        counsel = `"Diego, incentive ${firstName} a guiar as pessoas na comunhão íntima e devoção sincera. ${firstName} ajuda o ${gcText} a não cair no ativismo vazio, guardando o fogo da oração no altar do coração ${bairroText}. ${isMarried ? `Sua devoção em família, ao lado de ${m.esposo_a || 'seu cônjuge'}, responde ao mover do meu Espírito.` : ''} Que ${genderSuffix} incentive cada membro a buscar a intimidade divina."`;
-      } else {
-        description = `Identificado como Matias. Aquele que serve fielmente por muito tempo com maturidade, pronto para assumir novas e grandes responsabilidades.`;
-        counsel = `"Diego, honre a caminhada de ${firstName}, que esteve conosco servindo fielmente no anonimato ${bairroText}. Quando surgir uma lacuna ou desafio no ${gcText}, confie nele. ${firstName} está pronto porque seu coração sempre esteve na minha obra, não em cargos. ${isMarried ? `Que ${spouseText} continue sendo canal de serviço humilde e frutuoso.` : ''} A unção dele vem da constância nas pequenas coisas."`;
-      }
-
       assignedDisciples.push({
         member: m,
-        apostolicName: chosenProfile.name,
-        role: chosenProfile.role,
-        desc: description,
-        counsel
+        apostolicName: conf.name,
+        role: conf.role,
+        desc: conf.getDesc(m),
+        counsel: conf.getCounsel(firstName, genderSuffix, isMarried, spouseText, gcText, bairroText)
       });
-    }
+    });
 
     return assignedDisciples;
   }, [activeMembers]);
