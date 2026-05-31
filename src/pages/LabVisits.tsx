@@ -342,8 +342,7 @@ export const LabVisits: React.FC = () => {
         {[
           { path: '/lab/vision', label: '🏛️ Visão de Efésios 4', id: 'Lab: Visão da Plenitude' },
           { path: '/lab/visits', label: '🏠 Gestão de Visitas', id: 'Lab: Gestão de Visitas' },
-          { path: '/lab/queries', label: '📊 Consultas & Estudos', id: 'Lab: Consultas & Estudos' },
-          { path: '/lab/counsel', label: '🕊️ Conselho Apostólico', id: 'Lab: Conselho Apostólico' }
+          { path: '/lab/queries', label: '📊 Consultas & Estudos', id: 'Lab: Consultas & Estudos' }
         ].filter(tab => user?.role === 'admin' || allowedModules.includes(tab.id)).map((tab) => {
           const isActive = location.pathname === tab.path;
           return (

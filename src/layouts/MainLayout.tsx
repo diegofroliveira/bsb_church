@@ -12,8 +12,8 @@ import { useLabShortcut } from '../hooks/useLabShortcut';
 import { LabLauncher } from '../components/LabLauncher';
 
 const DEFAULT_ROLES: Record<string, string[]> = {
-  admin: ['Dashboard', 'Aniversariantes', 'Mapa', 'Membros', 'Famílias', 'GCs/Localidades', 'Setores', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Financeiro', 'Consultor IA', 'Insights IA', 'Configurações', 'Simulações', 'Companheirismo', 'Lab: Visão da Plenitude', 'Lab: Gestão de Visitas', 'Lab: Consultas & Estudos', 'Lab: Conselho Apostólico'],
-  pastor: ['Dashboard', 'Aniversariantes', 'Mapa', 'Membros', 'Famílias', 'GCs/Localidades', 'Setores', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Financeiro', 'Consultor IA', 'Insights IA', 'Simulações', 'Companheirismo', 'Lab: Visão da Plenitude', 'Lab: Gestão de Visitas', 'Lab: Consultas & Estudos', 'Lab: Conselho Apostólico'],
+  admin: ['Dashboard', 'Aniversariantes', 'Mapa', 'Membros', 'Famílias', 'GCs/Localidades', 'Setores', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Financeiro', 'Consultor IA', 'Insights IA', 'Configurações', 'Simulações', 'Companheirismo', 'Lab: Visão da Plenitude', 'Lab: Gestão de Visitas', 'Lab: Consultas & Estudos'],
+  pastor: ['Dashboard', 'Aniversariantes', 'Mapa', 'Membros', 'Famílias', 'GCs/Localidades', 'Setores', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Financeiro', 'Consultor IA', 'Insights IA', 'Simulações', 'Companheirismo', 'Lab: Visão da Plenitude', 'Lab: Gestão de Visitas', 'Lab: Consultas & Estudos'],
   secretaria: ['Dashboard', 'Aniversariantes', 'Membros', 'Famílias', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Consultor IA'],
   financeiro: ['Dashboard', 'Financeiro']
 };
@@ -42,7 +42,6 @@ export const MainLayout: React.FC = () => {
       '/lab/vision': 'Lab: Visão da Plenitude',
       '/lab/visits': 'Lab: Gestão de Visitas',
       '/lab/queries': 'Lab: Consultas & Estudos',
-      '/lab/counsel': 'Lab: Conselho Apostólico',
     };
 
     const requiredModule = labRouteMap[currentPath];
