@@ -20,15 +20,38 @@ interface Member {
   bairro?: string;
   data_de_vinculo?: string | null;
   data_de_cadastro?: string | null;
+  estado_civil?: string;
+  esposo_a?: string;
+  e_dizimista?: string;
+  nascimento?: string | null;
+  setor_eclesiastico?: string | null;
+  setor_residencial?: string | null;
 }
 
 interface Disciple {
   member: Member;
   apostolicName: string;
   role: string;
-  description: string;
+  desc: string;
   counsel: string;
 }
+
+// Age calculator helper relative to system base date 2026-05-30
+const getAge = (birthdayStr: string | null | undefined): number | null => {
+  if (!birthdayStr) return null;
+  try {
+    const birthDate = new Date(birthdayStr);
+    const currentDate = new Date('2026-05-30');
+    let age = currentDate.getFullYear() - birthDate.getFullYear();
+    const m = currentDate.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && currentDate.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age;
+  } catch (_) {
+    return null;
+  }
+};
 
 interface GiftCategory {
   name: string;
@@ -83,7 +106,7 @@ export const LabCounsel: React.FC = () => {
   useEffect(() => {
     supabase
       .from('membros')
-      .select('id, nome, tipo_de_pessoa, grupos_caseiros, status, sexo, bairro, data_de_vinculo, data_de_cadastro, estado_civil, esposo_a, e_dizimista')
+      .select('id, nome, tipo_de_pessoa, grupos_caseiros, status, sexo, bairro, data_de_vinculo, data_de_cadastro, estado_civil, esposo_a, e_dizimista, nascimento, setor_eclesiastico, setor_residencial')
       .limit(10000)
       .then(({ data, error }) => { 
         if (error) setFetchError(error.message);
@@ -117,9 +140,19 @@ export const LabCounsel: React.FC = () => {
     };
 
     // Filter active officers/leaders
-    const officers = activeMembers.filter(m => 
+    let officers = activeMembers.filter(m => 
       ['APÓSTOLO', 'PRESBÍTERO', 'DIÁCONO', 'LÍDER'].includes((m.tipo_de_pessoa || '').toUpperCase())
     );
+
+    // Pad with regular active members if we have fewer than 12 officers
+    if (officers.length < 12) {
+      const regularActive = activeMembers.filter(m => 
+        !['APÓSTOLO', 'PRESBÍTERO', 'DIÁCONO', 'LÍDER'].includes((m.tipo_de_pessoa || '').toUpperCase())
+      );
+      // Deterministic secondary sort so order is stable
+      regularActive.sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+      officers = [...officers, ...regularActive];
+    }
 
     // Sort by role priority: APÓSTOLO > PRESBÍTERO > DIÁCONO > LÍDER
     officers.sort((a, b) => {
@@ -133,28 +166,162 @@ export const LabCounsel: React.FC = () => {
     // Take the top 12
     const selectedMembers = officers.slice(0, 12);
 
-    const rolesAndCounsel = [
-      { apostolicName: 'Pedro (Simão)', role: 'Ação Ousada & Liderança da Frente', desc: 'Impulsivo, mas rocha fundamental. Aquele que fala primeiro e age com paixão.', counsel: '"Diego, incentive-o a canalizar seu ímpeto para pastorear as minhas ovelhas com paciência. A audácia dele abrirá novas portas, mas é a constância que as manterá abertas. Ensine-o a olhar para mim e não para o vento forte."' },
-      { apostolicName: 'João', role: 'Guardião do Amor & Cuidado Profundo', desc: 'O discípulo amado. Foco em relacionamentos íntimos e lealdade inabalável.', counsel: '"Diego, apoie-se nele para manter o coração da igreja focado na essência: amar uns aos outros. Suas palavras curarão feridas e lembrarão a congregação de que quem não ama, não conhece a Deus."' },
-      { apostolicName: 'Tiago', role: 'Coluna de Justiça & Zelo Doutrinário', desc: 'Pilar forte, obstinado e zeloso pela retidão e oração intercessória.', counsel: '"Diego, utilize sua firmeza para consolidar os fundamentos da fé. Ele lembra a todos de que a fé sem obras é morta. Cuide de seus joelhos de oração, pois eles sustentam o peso da igreja."' },
-      { apostolicName: 'André', role: 'Conector Silencioso de Pessoas', desc: 'Aquele que traz outros a Jesus (suo irmão Pedro, o jovem dos pães). Foco no um-a-um.', counsel: '"Diego, dê espaço para o ministério discreto dele. Enquanto Pedro prega para multidões, André traz as pessoas pelos braços no secreto. Ele é a chave para a verdadeira acolhida no um-a-um."' },
-      { apostolicName: 'Filipe', role: 'Planejador Pragmático & Racional', desc: 'Focado em números e logística ("Duzentos denários não bastariam"). Precisa ver para crer.', counsel: '"Diego, não despreze suas dúvidas de logística. Ele ajuda a igreja a calcular os custos. Mas desafie-o constantemente a ver o sobrenatural. Lembre-o de que cinco pães e dois peixes em minhas mãos alimentam milhares."' },
-      { apostolicName: 'Bartolomeu (Natanael)', role: 'O Homem de Caráter Íntegro', desc: 'Sem falsidade ou hipocrisia. Amante da meditação na palavra (debaixo da figueira).', counsel: '"Diego, honre a sinceridade pura deste discípulo. Ele é um pilar de integridade moral que protege a congregação contra a superficialidade. Promova-o para aconselhar e guiar novos convertidos."' },
-      { apostolicName: 'Mateus (Levi)', role: 'Organizador de Sistemas & Finanças', desc: 'Ex-cobrador de impostos. Habilidade com números, processos e documentação escrita.', counsel: '"Diego, use a mente organizada dele para estruturar a administração e as finanças da igreja com máxima transparência. O que o mundo via como ganância, eu redimi para ser um registro fiel da Graça."' },
-      { apostolicName: 'Tomé', role: 'O Questionador Reflexivo', desc: 'Melancólico, analítico, busca verdades sólidas. Quer tocar nas feridas para crer.', counsel: '"Diego, acolha as dúvidas dele sem julgamento. Suas perguntas honestas trazem respostas profundas que fortalecem toda a igreja. Quando ele finalmente crê, seu compromisso é radical até a morte."' },
-      { apostolicName: 'Tiago (Filho de Alfeu)', role: 'O Pacificador Silencioso', desc: 'Trabalhador dos bastidores, discreto mas fiel na rotina diária.', counsel: '"Diego, valorize a fidelidade silenciosa dele. Embora ele raramente apareça nos holofotes, o serviço diário dele é o cimento que mantém os tijolos da igreja unidos. A recompensa dele no céu é imensa."' },
-      { apostolicName: 'Simão (O Zelote)', role: 'Ativista Para Todos & Missionário', desc: 'Cheio de energia revolucionária, impulsiona causas sociais e evangelismo ativo.', counsel: '"Diego, canalize o fogo político e social dele para a revolução do Reino de Deus. Ele é excelente para mobilizar a igreja para fora das quatro paredes, alcançando os necessitados e marginalizados."' },
-      { apostolicName: 'Judas Tadeu', role: 'O Questionador Espiritual', desc: 'Busca compreender as manifestações do Espírito no íntimo e no secreto.', counsel: '"Diego, incentive-o a guiar as pessoas na intimidade espiritual. Ele ajuda a igreja a não se tornar um show externo, mantendo as chamas da revelação íntima e da devoção acesas no altar do coração."' },
-      { apostolicName: 'Matias', role: 'O Cooperador Fiel Substituto', desc: 'Aquele que esteve conosco o tempo todo no anonimato, preparado para assumir responsabilidades.', counsel: '"Diego, ele representa aqueles que servem fielmente sem cargos. Quando uma lacuna de liderança aparecer, olhe para ele. Ele está pronto porque seu coração sempre esteve na obra, não no título."' },
+    const availableProfiles = [
+      { key: 'pedro', name: 'Pedro (Simão)', role: 'Ação Ousada & Liderança da Frente' },
+      { key: 'joao', name: 'João', role: 'Guardião do Amor & Cuidado Profundo' },
+      { key: 'tiago', name: 'Tiago', role: 'Coluna de Justiça & Zelo Doutrinário' },
+      { key: 'andre', name: 'André', role: 'Conector Silencioso de Pessoas' },
+      { key: 'filipe', name: 'Filipe', role: 'Planejador Pragmático & Racional' },
+      { key: 'bartolomeu', name: 'Bartolomeu (Natanael)', role: 'O Homem de Caráter Íntegro' },
+      { key: 'mateus', name: 'Mateus (Levi)', role: 'Organizador de Sistemas & Finanças' },
+      { key: 'tome', name: 'Tomé', role: 'O Questionador Reflexivo' },
+      { key: 'tiago_alfeu', name: 'Tiago (Filho de Alfeu)', role: 'O Pacificador Silencioso' },
+      { key: 'simao_zelote', name: 'Simão (O Zelote)', role: 'Ativista Para Todos & Missionário' },
+      { key: 'judas_tadeu', name: 'Judas Tadeu', role: 'O Questionador Espiritual' },
+      { key: 'matias', name: 'Matias', role: 'O Cooperador Fiel Substituto' }
     ];
 
-    return selectedMembers.map((m, idx) => ({
-      member: m,
-      apostolicName: rolesAndCounsel[idx]?.apostolicName || `Discípulo ${idx + 1}`,
-      role: rolesAndCounsel[idx]?.role || 'Cooperador do Reino',
-      desc: rolesAndCounsel[idx]?.desc || 'Membro dedicado chamado ao serviço.',
-      counsel: rolesAndCounsel[idx]?.counsel || '"Diego, cuide desta vida, pois ela é preciosa no meu Reino. Capacite-a para servir com amor."'
-    }));
+    const assignedDisciples: Disciple[] = [];
+    const remainingProfiles = [...availableProfiles];
+
+    for (const m of selectedMembers) {
+      const age = getAge(m.nascimento);
+      const role = (m.tipo_de_pessoa || '').toUpperCase();
+      const isMarried = m.estado_civil === 'Casado' || !!m.esposo_a;
+      const isTither = m.e_dizimista === 'Sim';
+      const hasGC = !!m.grupos_caseiros;
+
+      // Calculate scores for each remaining profile to match dynamically
+      let bestProfileIdx = 0;
+      let highestScore = -999;
+
+      remainingProfiles.forEach((prof, idx) => {
+        let score = 0;
+        
+        if (prof.key === 'pedro') {
+          if (role === 'APÓSTOLO') score += 15;
+          if (role === 'PRESBÍTERO') score += 8;
+          if (role === 'LÍDER' && hasGC) score += 5;
+        }
+        if (prof.key === 'joao') {
+          if (m.sexo === 'Feminino') score += 6;
+          if (age && age < 35) score += 5;
+        }
+        if (prof.key === 'tiago') {
+          if (role === 'PRESBÍTERO') score += 10;
+          if (age && age > 45) score += 5;
+        }
+        if (prof.key === 'andre') {
+          if (role === 'LÍDER' || role === 'DIÁCONO') score += 5;
+          if (!hasGC) score += 4;
+        }
+        if (prof.key === 'filipe') {
+          if (isTither) score += 4;
+          if (role === 'DIÁCONO') score += 3;
+        }
+        if (prof.key === 'bartolomeu') {
+          if (age && age > 50) score += 8;
+          if (isMarried) score += 3;
+        }
+        if (prof.key === 'mateus') {
+          if (isTither) score += 12;
+          if (role === 'DIÁCONO') score += 4;
+        }
+        if (prof.key === 'tome') {
+          if (m.estado_civil === 'Solteiro') score += 5;
+          if (age && age < 30) score += 3;
+        }
+        if (prof.key === 'tiago_alfeu') {
+          if (role === 'DIÁCONO') score += 8;
+          if (!isTither) score += 2;
+        }
+        if (prof.key === 'simao_zelote') {
+          if (m.estado_civil === 'Solteiro') score += 8;
+          if (role === 'LÍDER') score += 3;
+        }
+        if (prof.key === 'judas_tadeu') {
+          if (role === 'LÍDER') score += 4;
+        }
+        if (prof.key === 'matias') {
+          if (role === 'MEMBRO') score += 10;
+          if (role === 'DIÁCONO') score += 4;
+        }
+
+        // Add a deterministic name hash factor to avoid ties and maintain stability
+        let hash = 0;
+        const name = m.nome || '';
+        for (let i = 0; i < name.length; i++) {
+          hash = name.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        score += (Math.abs(hash + prof.key.charCodeAt(0)) % 100) / 100;
+
+        if (score > highestScore) {
+          highestScore = score;
+          bestProfileIdx = idx;
+        }
+      });
+
+      // Splice the best profile out
+      const chosenProfile = remainingProfiles.splice(bestProfileIdx, 1)[0];
+
+      // Construct dynamic descriptions & counsels based on database facts
+      const firstName = m.nome.split(' ')[0];
+      const genderSuffix = m.sexo === 'Feminino' ? 'a' : 'o';
+      const spouseText = isMarried ? (m.esposo_a ? `junto com ${m.esposo_a}` : 'junto com seu cônjuge') : '';
+      const gcText = m.grupos_caseiros ? `no GC ${m.grupos_caseiros}` : 'na congregação';
+      const bairroText = m.bairro ? `em ${m.bairro}` : '';
+
+      let description = '';
+      let counsel = '';
+
+      if (chosenProfile.key === 'pedro') {
+        description = `Identificado como Pedro na BSB Church. Uma liderança enérgica e impetuosa, de ação rápida, pronta para assumir a frente dos desafios e defender o corpo.`;
+        counsel = `"Diego, incentive ${firstName} a canalizar seu ímpeto natural para liderar e pastorear as minhas ovelhas ${gcText} com paciência. ${firstName} tem uma chama de liderança ousada, mas ensine-${genderSuffix} que a verdadeira rocha é firmada na humildade. ${isMarried ? `Que caminhe firme ${spouseText}, protegendo o seu lar.` : 'Que sua entrega seja pura perante mim.'} Diga-lhe: não olhe para o vento ou para as ondas ${bairroText}, mas mantenha os olhos em Mim."`;
+      } else if (chosenProfile.key === 'joao') {
+        description = `Identificado como João. Guardião do cuidado relacional e da intimidade de comunhão, focado na lealdade e no amor profundo aos irmãos.`;
+        counsel = `"Diego, apoie-se em ${firstName} para manter o coração da igreja focado no amor genuíno. ${firstName} tem a sensibilidade dos discípulos mais íntimos. Que ${genderSuffix} cuide com ternura de cada alma ${gcText}, sendo um canal de cura e acolhimento ${bairroText}. ${isMarried ? `Que seu casamento ${spouseText} seja um testemunho vivo de amor sacrificial.` : 'Que sua vida seja preenchida pelo meu amor no secreto.'} Lembre-o de que quem não ama, não conhece a Deus."`;
+      } else if (chosenProfile.key === 'tiago') {
+        description = `Identificado como Tiago. Um pilar forte de oração, ordem espiritual e zelo pela sã doutrina. Exige retidão doutrinária e moral.`;
+        counsel = `"Diego, utilize a firmeza e seriedade de ${firstName} para consolidar as colunas da nossa fé ${gcText}. ${firstName} possui um zelo profundo pela retidão e pela sã doutrina. Exorte-${genderSuffix} a sustentar a igreja em intercessão ardente ${bairroText}. ${isMarried ? `Seu lar, edificado com ${m.esposo_a || 'sua família'}, é a base de sua autoridade espiritual.` : ''} Lembre-${genderSuffix} de que a fé sem obras é morta e a justiça sem amor é vazia."`;
+      } else if (chosenProfile.key === 'andre') {
+        description = `Identificado como André. Aquele que atua nos bastidores trazendo as pessoas individualmente para Jesus, com grande espírito acolhedor.`;
+        counsel = `"Diego, dê total espaço para o ministério discreto de ${firstName}. Enquanto alguns pregam para multidões, ${firstName} traz as pessoas individualmente pelos braços no secreto ${bairroText}. ${genderSuffix.toUpperCase()} é a chave de acolhida ${gcText}, notando os esquecidos que ninguém mais vê. ${isMarried ? `Que ${spouseText} seja um porto seguro para novos convertidos.` : ''} Lembre-${genderSuffix} que no meu Reino, os últimos serão os primeiros."`;
+      } else if (chosenProfile.key === 'filipe') {
+        description = `Identificado como Filipe. O administrador prático que calcula custos, analisa logística e busca a viabilidade racional dos passos da igreja.`;
+        counsel = `"Diego, não despreze as análises e o realismo de ${firstName}. ${genderSuffix.toUpperCase()} ajuda a igreja a estruturar com inteligência os custos e passos ${bairroText}. Mas desafie-o constantemente a ver além dos relatórios ${gcText}. Lembre-o de que cinco pães e dois peixes em minhas mãos alimentam milhares. ${isMarried ? `Junto com ${spouseText}, multipliquei seus recursos para transbordar.` : ''} Ensine-${genderSuffix} a andar por fé, e não por vista."`;
+      } else if (chosenProfile.key === 'bartolomeu') {
+        description = `Identificado como Bartolomeu (Natanael). Um servo de integridade exemplar, cuja conduta reta inspira confiança e serve de consolo para o rebanho.`;
+        counsel = `"Diego, honre a sinceridade pura e sem fingimento de ${firstName}. ${firstName} é ${genderSuffix === 'o' ? 'um homem' : 'uma mulher'} de caráter irrepreensível, que medita na minha Palavra sob a figueira ${bairroText} longe dos holofotes. Use a integridade de${genderSuffix} para guiar e aconselhar ${gcText}. ${isMarried ? `A aliança com ${m.esposo_a || 'sua família'} reflete essa integridade.` : ''} Pessoas assim blindam a minha noiva contra a hipocrisia."`;
+      } else if (chosenProfile.key === 'mateus') {
+        description = `Identificado como Mateus. Organizador de sistemas e finanças, focado em prestação de contas, dízimos fiéis e integridade material.`;
+        counsel = `"Diego, canalize a mente organizada e o talento para processos de ${firstName} para abençoar a estrutura ${gcText}. O que antes o mundo podia ver como apenas números, eu redimi para ser um registro fiel da minha Graça ${bairroText}. ${isMarried ? `Que ${spouseText} governe com ordem e generosidade.` : ''} Diga-lhe que sua fidelidade nos dízimos e na mordomia inspira a toda a congregação a confiar no meu sustento."`;
+      } else if (chosenProfile.key === 'tome') {
+        description = `Identificado como Tomé. O questionador sincero e analítico que busca verdades profundas e não se contenta com respostas superficiais.`;
+        counsel = `"Diego, acolha as reflexões profundas de ${firstName} sem julgá-las. Suas dúvidas honestas e busca por bases sólidas ${bairroText} trazem respostas firmes que ajudam ${gcText}. Quando ${firstName} experimenta a minha presença, seu compromisso é radical e inabalável. ${isMarried ? `Que ao lado de ${m.esposo_a || 'seu cônjuge'}, encontre descanso na fé compartilhada.` : ''} Fortaleça-${genderSuffix} a tocar em minhas marcas e proclamar: Senhor meu e Deus meu!"`;
+      } else if (chosenProfile.key === 'tiago_alfeu') {
+        description = `Identificado como Tiago (filho de Alfeu). Representante do trabalho fiel e silencioso nos bastidores cotidianos, construindo a igreja no secreto.`;
+        counsel = `"Diego, valorize a fidelidade silenciosa de ${firstName}. Embora ${genderSuffix} raramente apareça nos holofotes, o serviço diário de${genderSuffix} ${bairroText} é o cimento espiritual que mantém as paredes do ${gcText} unidas. ${isMarried ? `Sua casa, edificada com ${spouseText}, é um altar de paz.` : ''} Lembre-${genderSuffix} de que o Pai que vê o que é feito em segredo, recompensará de forma abundante."`;
+      } else if (chosenProfile.key === 'simao_zelote') {
+        description = `Identificado como Simão o Zelote. Cheio de zelo missionário e energia, excelente para mover o povo em causas de evangelismo ativo e socorro social.`;
+        counsel = `"Diego, canalize a energia vibrante e apaixonada de ${firstName} para a grande colheita em Brasília. ${firstName} tem o encargo de levar o Reino para fora das quatro paredes, mobilizando o ${gcText} para acolher os necessitados ${bairroText}. ${isMarried ? `Que com ${spouseText}, corram a corrida missionária sem hesitar.` : 'Que sua solteirice seja canal de foco radical na minha obra.'} Desperte nele o amor pelos marginalizados."`;
+      } else if (chosenProfile.key === 'judas_tadeu') {
+        description = `Identificado como Judas Tadeu. Foco na comunhão do Espírito, adoração profunda e na revelação da glória de Deus no secreto.`;
+        counsel = `"Diego, incentive ${firstName} a guiar as pessoas na comunhão íntima e devoção sincera. ${firstName} ajuda o ${gcText} a não cair no ativismo vazio, guardando o fogo da oração no altar do coração ${bairroText}. ${isMarried ? `Sua devoção em família, ao lado de ${m.esposo_a || 'seu cônjuge'}, responde ao mover do meu Espírito.` : ''} Que ${genderSuffix} incentive cada membro a buscar a intimidade divina."`;
+      } else {
+        description = `Identificado como Matias. Aquele que serve fielmente por muito tempo com maturidade, pronto para assumir novas e grandes responsabilidades.`;
+        counsel = `"Diego, honre a caminhada de ${firstName}, que esteve conosco servindo fielmente no anonimato ${bairroText}. Quando surgir uma lacuna ou desafio no ${gcText}, confie nele. ${firstName} está pronto porque seu coração sempre esteve na minha obra, não em cargos. ${isMarried ? `Que ${spouseText} continue sendo canal de serviço humilde e frutuoso.` : ''} A unção dele vem da constância nas pequenas coisas."`;
+      }
+
+      assignedDisciples.push({
+        member: m,
+        apostolicName: chosenProfile.name,
+        role: chosenProfile.role,
+        desc: description,
+        counsel
+      });
+    }
+
+    return assignedDisciples;
   }, [activeMembers]);
 
   // Pair up the "70 Missionaries" (35 pairs) dynamically
@@ -358,6 +525,75 @@ O amor não busca os seus próprios interesses, não se irrita, não suspeita ma
     }
   }, [activeMembers, totalGCs, letterFocus]);
 
+  // Dynamic stats calculated from real Supabase data for the Jerusalem Council Dashboard
+  const stats = useMemo(() => {
+    // 1. Harvest in Ceilândia/Samambaia (Paul)
+    const ceilandiaSamambaiaMembers = activeMembers.filter(m => {
+      const b = (m.bairro || '').toLowerCase();
+      return b.includes('ceilândia') || b.includes('ceilandia') || b.includes('samambaia');
+    });
+    const ceilandiaMembersCount = ceilandiaSamambaiaMembers.length;
+    
+    // GCs in Ceilândia/Samambaia (calculated by distinct GCs of members living there)
+    const ceilandiaGCsCount = new Set(
+      ceilandiaSamambaiaMembers.map(m => m.grupos_caseiros).filter(Boolean)
+    ).size;
+
+    // 2. Kids under 8 in Central Sector (Jesus)
+    const centralChildren = activeMembers.filter(m => {
+      const isCentral = (m.setor_eclesiastico || '').toLowerCase().includes('central') || 
+                        (m.setor_residencial || '').toLowerCase().includes('central');
+      if (!isCentral) return false;
+      if (!m.nascimento) return false;
+      const age = getAge(m.nascimento);
+      return age !== null && age < 8;
+    });
+    const centralChildrenCount = centralChildren.length;
+
+    const totalChildrenCount = activeMembers.filter(m => {
+      if (!m.nascimento) return false;
+      const age = getAge(m.nascimento);
+      return age !== null && age < 8;
+    }).length;
+
+    // 3. Mismatched Members Relocation (Paul)
+    const mismatchedMembers = activeMembers.filter(m => {
+      const ecl = (m.setor_eclesiastico || '').trim().toUpperCase();
+      const res = (m.setor_residencial || '').trim().toUpperCase();
+      return ecl && res && ecl !== res;
+    });
+    const mismatchesCount = mismatchedMembers.length;
+
+    // 4. Leaders Ratio & Potential Leaders (Jesus)
+    const totalActiveCount = activeMembers.length;
+    const leaders = activeMembers.filter(m => 
+      ['APÓSTOLO', 'PRESBÍTERO', 'DIÁCONO', 'LÍDER'].includes((m.tipo_de_pessoa || '').toUpperCase())
+    );
+    const leadersCount = leaders.length;
+    const membersPerLeader = leadersCount > 0 ? (totalActiveCount / leadersCount).toFixed(1) : '0';
+
+    // Potential leaders: dizimista = 'Sim', status = 'ATIVO', NOT currently a leader/officer
+    const potentialLeadersList = activeMembers.filter(m => {
+      const isOfficer = ['APÓSTOLO', 'PRESBÍTERO', 'DIÁCONO', 'LÍDER'].includes((m.tipo_de_pessoa || '').toUpperCase());
+      return !isOfficer && m.e_dizimista === 'Sim';
+    })
+    .sort((a, b) => (a.nome || '').localeCompare(b.nome || ''))
+    .slice(0, 3);
+
+    return {
+      ceilandiaMembersCount,
+      ceilandiaGCsCount,
+      centralChildrenCount,
+      totalChildrenCount,
+      mismatchesCount,
+      mismatchedMembers: mismatchedMembers.slice(0, 5),
+      totalActiveCount,
+      leadersCount,
+      membersPerLeader,
+      potentialLeadersList
+    };
+  }, [activeMembers]);
+
   if (loading) {
     return (
       <div className="flex h-96 items-center justify-center">
@@ -508,6 +744,31 @@ O amor não busca os seus próprios interesses, não se irrita, não suspeita ma
                         </span>
                         <h3 className="text-2xl font-black text-slate-950 mt-1">{theTwelve[selectedDisciple].apostolicName}</h3>
                         <p className="text-xs text-slate-400">Representado na BSB por: <strong className="text-slate-700">{theTwelve[selectedDisciple].member.nome}</strong></p>
+                        <div className="flex flex-wrap gap-2 mt-1.5">
+                          {theTwelve[selectedDisciple].member.nascimento && (
+                            <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md border border-slate-200">
+                              🎂 {getAge(theTwelve[selectedDisciple].member.nascimento)} anos
+                            </span>
+                          )}
+                          {theTwelve[selectedDisciple].member.estado_civil && (
+                            <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md border border-slate-200">
+                              💍 {theTwelve[selectedDisciple].member.estado_civil}
+                            </span>
+                          )}
+                          <span className={clsx(
+                            "text-[10px] font-bold px-2 py-0.5 rounded-md border",
+                            theTwelve[selectedDisciple].member.e_dizimista === 'Sim' 
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-250" 
+                              : "bg-slate-100 text-slate-500 border-slate-200"
+                          )}>
+                            🪙 {theTwelve[selectedDisciple].member.e_dizimista === 'Sim' ? 'Fiel Provedor' : 'Cooperador'}
+                          </span>
+                          {theTwelve[selectedDisciple].member.bairro && (
+                            <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md border border-slate-200">
+                              📍 {theTwelve[selectedDisciple].member.bairro}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <div className="text-right">
                         <span className="text-[10px] font-bold text-slate-400 block">Atribuição Apostólica</span>
@@ -913,6 +1174,153 @@ O amor não busca os seus próprios interesses, não se irrita, não suspeita ma
 
         </div>
       )}
+
+      {/* Concílio de Jerusalém - Painel Estratégico Apostólico */}
+      <section className="bg-slate-900 border border-slate-800 rounded-3xl p-6 text-white relative overflow-hidden mt-12 shadow-xl shadow-amber-500/5">
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-0 right-0 w-80 h-80 bg-amber-500 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-80 h-80 bg-violet-600 rounded-full blur-3xl pointer-events-none" />
+        </div>
+
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-5 mb-6">
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-1.5 bg-amber-500/10 text-amber-300 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border border-amber-500/20">
+              <Scroll className="w-3.5 h-3.5" /> DIRETRIZES ESTRUTURAIS DO BANCO DO CONCÍLIO
+            </div>
+            <h2 className="text-xl font-extrabold tracking-tight">O Concílio de Jerusalém — Análise Eclesiástica</h2>
+            <p className="text-xs text-slate-400">Uma convergência teológica e estratégica baseada nas Escrituras e nos dados atuais de {stats.totalActiveCount} membros.</p>
+          </div>
+          
+          <div className="flex gap-4 shrink-0 text-slate-400 text-xs">
+            <div className="flex flex-col items-end">
+              <span className="font-extrabold text-[10px] text-slate-500 uppercase">Membros Ativos</span>
+              <span className="font-black text-white text-base">{stats.totalActiveCount}</span>
+            </div>
+            <div className="flex flex-col items-end border-l border-slate-800 pl-4">
+              <span className="font-extrabold text-[10px] text-slate-500 uppercase">Líderes Ativos</span>
+              <span className="font-black text-white text-base">{stats.leadersCount}</span>
+            </div>
+            <div className="flex flex-col items-end border-l border-slate-800 pl-4">
+              <span className="font-extrabold text-[10px] text-slate-500 uppercase">Proporção de Cuidado</span>
+              <span className="font-black text-amber-400 text-base">1:{stats.membersPerLeader}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* Card 1: Colheita em Ceilândia/Samambaia */}
+          <div className="bg-slate-950/60 border border-slate-850 p-5 rounded-2xl flex flex-col justify-between hover:border-slate-850/80 transition-all hover:scale-[1.01] duration-300">
+            <div className="space-y-3">
+              <div className="flex justify-between items-start">
+                <span className="text-[9px] font-black uppercase tracking-wider bg-violet-500/10 text-violet-300 border border-violet-500/20 px-2 py-0.5 rounded">
+                  Exortação de Paulo
+                </span>
+                <span className="text-xs text-slate-500 font-bold">Atos 16:9</span>
+              </div>
+              <h3 className="text-sm font-black text-slate-100 flex items-center gap-1.5">
+                🌍 Colheita em Ceilândia & Samambaia
+              </h3>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                Identificamos <strong className="text-white">{stats.ceilandiaMembersCount} membros ativos</strong> residindo em Ceilândia ou Samambaia, porém apenas <strong className="text-white">{stats.ceilandiaGCsCount} GCs</strong> operando nessas localidades.
+              </p>
+            </div>
+            
+            <div className="mt-4 pt-3 border-t border-slate-900 space-y-2">
+              <p className="text-[10.5px] text-violet-300 italic leading-snug">
+                "Diego, o clamor da Macedônia ecoa dessas regiões! A densidade de vidas ali demanda a plantação urgente de novos grupos nos lares locais. Não deixe as ovelhas viajarem longas distâncias para ter comunhão."
+              </p>
+            </div>
+          </div>
+
+          {/* Card 2: GC Kids no Setor Central */}
+          <div className="bg-slate-950/60 border border-slate-850 p-5 rounded-2xl flex flex-col justify-between hover:border-slate-850/80 transition-all hover:scale-[1.01] duration-300">
+            <div className="space-y-3">
+              <div className="flex justify-between items-start">
+                <span className="text-[9px] font-black uppercase tracking-wider bg-amber-500/10 text-amber-300 border border-amber-500/20 px-2 py-0.5 rounded">
+                  Diretriz de Jesus
+                </span>
+                <span className="text-xs text-slate-500 font-bold">Mateus 19:14</span>
+              </div>
+              <h3 className="text-sm font-black text-slate-100 flex items-center gap-1.5">
+                👶 GC Kids Setor Central
+              </h3>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                Das <strong className="text-white">{stats.totalChildrenCount} crianças sob 8 anos</strong> na igreja, exatamente <strong className="text-white">{stats.centralChildrenCount} menores</strong> estão concentrados no Setor Central.
+              </p>
+            </div>
+            
+            <div className="mt-4 pt-3 border-t border-slate-900 space-y-2">
+              <p className="text-[10.5px] text-amber-300 italic leading-snug">
+                "Diego, os pequeninos no Setor Central clamam pelo pão da Vida adequado à sua idade! É urgente organizar um departamento sólido de GC Kids local para acolher e consolidar essas famílias."
+              </p>
+            </div>
+          </div>
+
+          {/* Card 3: Ajuste de Caminhada Territorial */}
+          <div className="bg-slate-950/60 border border-slate-850 p-5 rounded-2xl flex flex-col justify-between hover:border-slate-850/80 transition-all hover:scale-[1.01] duration-300">
+            <div className="space-y-3">
+              <div className="flex justify-between items-start">
+                <span className="text-[9px] font-black uppercase tracking-wider bg-violet-500/10 text-violet-300 border border-violet-500/20 px-2 py-0.5 rounded">
+                  Exortação de Paulo
+                </span>
+                <span className="text-xs text-slate-500 font-bold">1 Cor 14:40</span>
+              </div>
+              <h3 className="text-sm font-black text-slate-100 flex items-center gap-1.5">
+                📍 Alinhamento Territorial
+              </h3>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                Existem <strong className="text-white">{stats.mismatchesCount} membros</strong> frequentando GCs em setores eclesiásticos diferentes da sua região de residência (e.g. residindo no Sul mas em GCs no Centro).
+              </p>
+            </div>
+            
+            <div className="mt-4 pt-3 border-t border-slate-900 space-y-2">
+              <p className="text-[10.5px] text-violet-300 italic leading-snug">
+                "A ordem e a decência pedem cuidado territorial! Exorte esses irmãos a se vincularem aos GCs locais do seu bairro. A comunhão prospera quando a igreja serve no mesmo lugar."
+              </p>
+            </div>
+          </div>
+
+          {/* Card 4: Proporção de Obreiros & Novos Líderes */}
+          <div className="bg-slate-950/60 border border-slate-850 p-5 rounded-2xl flex flex-col justify-between hover:border-slate-850/80 transition-all hover:scale-[1.01] duration-300">
+            <div className="space-y-3">
+              <div className="flex justify-between items-start">
+                <span className="text-[9px] font-black uppercase tracking-wider bg-amber-500/10 text-amber-300 border border-amber-500/20 px-2 py-0.5 rounded">
+                  Diretriz de Jesus
+                </span>
+                <span className="text-xs text-slate-500 font-bold">Mateus 9:37</span>
+              </div>
+              <h3 className="text-sm font-black text-slate-100 flex items-center gap-1.5">
+                🔥 Formar Novos Líderes
+              </h3>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                Com 1 líder para {stats.membersPerLeader} membros, vejo fidelidade e generosidade no secreto nestes dizimistas prontos para cooperar na liderança:
+              </p>
+            </div>
+            
+            <div className="mt-3 pt-2.5 border-t border-slate-900 space-y-2">
+              {stats.potentialLeadersList.length > 0 ? (
+                <div className="space-y-1.5">
+                  <div className="flex flex-col gap-1">
+                    {stats.potentialLeadersList.map((m) => (
+                      <div key={m.id} className="text-[10px] font-bold text-slate-200 bg-slate-900/80 px-2.5 py-1 rounded border border-slate-850 flex justify-between items-center">
+                        <span className="truncate pr-1">{m.nome.split(' ')[0]} {m.nome.split(' ')[1] || ''}</span>
+                        <span className="text-amber-400 text-[8px] uppercase tracking-wider font-extrabold shrink-0">{m.bairro || 'Membro'}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[9px] text-amber-350 italic mt-0.5 leading-snug">
+                    "Diego, convoque estes a darem um passo de fé na liderança. Quem é fiel nas pequenas coisas será honrado!"
+                  </p>
+                </div>
+              ) : (
+                <p className="text-[10.5px] text-amber-300 italic leading-snug">
+                  "A colheita é farta, mas os ceifeiros são poucos. Clamai ao Senhor da colheita para que envie trabalhadores."
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
 
     </div>
   );
