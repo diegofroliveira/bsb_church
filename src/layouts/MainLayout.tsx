@@ -123,7 +123,6 @@ export const MainLayout: React.FC = () => {
     { id: 'Financeiro',      name: 'Financeiro',      path: '/finance',      icon: DollarSign },
     { id: 'Simulações',      name: 'Simulações',      path: '/simulations',  icon: Play },
     { id: 'Consultor IA',    name: 'IA',              path: '/ai-consultant', icon: Brain },
-    { id: 'Lab',             name: 'Laboratório',     path: '#lab',          icon: FlaskConical },
     { id: 'Configurações',   name: 'Configurações',   path: '/admin/users',  icon: Settings },
   ];
 
