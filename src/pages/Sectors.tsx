@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { 
   Compass, Users, Home, MapPin, Search, Filter, 
   Layers, CheckCircle2, ChevronRight, AlertCircle, 
-  Map, BarChart2, ShieldCheck, UserCheck, Flame 
+  Map, BarChart2, ShieldCheck, UserCheck, Flame, Baby
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -17,6 +17,7 @@ interface Member {
   status?: string;
   sexo?: string;
   bairro?: string;
+  nascimento?: string | null;
   estado_civil?: string;
   e_dizimista?: string;
   setor_eclesiastico?: string | null;
@@ -42,9 +43,27 @@ interface SectorSummary {
   membersCount: number;
   leadersCount: number;
   tithersCount: number;
+  childrenCount: number;
   percentage: number;
   topNeighborhoods: string[];
 }
+
+// Age calculator helper relative to system base date 2026-05-30
+const getAge = (birthdayStr: string | null | undefined): number | null => {
+  if (!birthdayStr) return null;
+  try {
+    const birthDate = new Date(birthdayStr);
+    const currentDate = new Date('2026-05-30');
+    let age = currentDate.getFullYear() - birthDate.getFullYear();
+    const m = currentDate.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && currentDate.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age;
+  } catch (_) {
+    return null;
+  }
+};
 
 export const Sectors: React.FC = () => {
   const navigate = useNavigate();
@@ -80,10 +99,11 @@ export const Sectors: React.FC = () => {
   // Filter and View State
   const [viewMode, setViewMode] = useState<'eclesiastico' | 'residencial'>('eclesiastico');
   const [selectedSectorName, setSelectedSectorName] = useState<string>('Setor Norte');
-  const [detailsTab, setDetailsTab] = useState<'gcs' | 'members'>('gcs');
+  const [detailsTab, setDetailsTab] = useState<'gcs' | 'members' | 'mismatches'>('gcs');
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('Todos');
   const [titherFilter, setTitherFilter] = useState('Todos');
+  const [notifiedMembers, setNotifiedMembers] = useState<Record<any, boolean>>({});
 
   useEffect(() => {
     const fetchData = async () => {
@@ -91,7 +111,7 @@ export const Sectors: React.FC = () => {
         const [membersRes, cellsRes] = await Promise.all([
           supabase
             .from('membros')
-            .select('id, nome, tipo_de_pessoa, grupos_caseiros, status, sexo, bairro, estado_civil, e_dizimista, setor_eclesiastico, setor_residencial')
+            .select('id, nome, tipo_de_pessoa, grupos_caseiros, status, sexo, bairro, nascimento, estado_civil, e_dizimista, setor_eclesiastico, setor_residencial')
             .limit(10000),
           supabase
             .from('celulas')
@@ -177,6 +197,13 @@ export const Sectors: React.FC = () => {
 
       const tithersCount = sectorMembers.filter(m => m.e_dizimista === 'Sim').length;
 
+      // Children under 8 count
+      const childrenCount = sectorMembers.filter(m => {
+        if (!m.nascimento) return false;
+        const age = getAge(m.nascimento);
+        return age !== null && age < 8;
+      }).length;
+
       // Calculate top neighborhoods
       const neighborhoodsCounts: Record<string, number> = {};
       sectorMembers.forEach(m => {
@@ -204,6 +231,7 @@ export const Sectors: React.FC = () => {
         membersCount: sectorMembers.length,
         leadersCount,
         tithersCount,
+        childrenCount,
         percentage,
         topNeighborhoods
       };
@@ -239,6 +267,24 @@ export const Sectors: React.FC = () => {
       return memberSector === selectedSectorName;
     });
   }, [activeMembers, cells, selectedSectorName, viewMode]);
+
+  // Find all members in the selected sector that have a sector mismatch (Territorial Inconsistency)
+  const mismatchedMembers = useMemo(() => {
+    return selectedSectorMembers.filter(m => {
+      if (!m.grupos_caseiros) return false;
+      
+      const eclSec = getNormalizedSectorName(
+        m.setor_eclesiastico || cells.find(c => c.grupo_caseiro === m.grupos_caseiros)?.setor
+      );
+      
+      const resSec = getNormalizedSectorName(
+        m.setor_residencial || cells.find(c => c.grupo_caseiro === m.grupos_caseiros)?.setor
+      );
+
+      // Mismatch if ecclesiastical sector is different from residential sector
+      return eclSec !== 'Sem Setor' && resSec !== 'Sem Setor' && eclSec !== resSec;
+    });
+  }, [selectedSectorMembers, cells]);
 
   // Count active members per cell in selected sector
   const membersPerCellCount = useMemo(() => {
@@ -435,14 +481,20 @@ export const Sectors: React.FC = () => {
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-dashed border-slate-200/20">
-                  <div>
+                <div className="grid grid-cols-3 gap-1 pt-2 border-t border-dashed border-slate-200/20">
+                  <div className="text-left">
                     <span className="text-[9px] font-bold text-slate-400 block uppercase">Membros</span>
-                    <span className="text-lg font-black">{sector.membersCount}</span>
+                    <span className="text-base font-black">{sector.membersCount}</span>
                   </div>
-                  <div>
+                  <div className="text-center">
                     <span className="text-[9px] font-bold text-slate-400 block uppercase">GCs</span>
-                    <span className="text-lg font-black">{sector.gcsCount}</span>
+                    <span className="text-base font-black">{sector.gcsCount}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[9px] font-bold text-amber-500 block uppercase flex items-center justify-end gap-0.5">
+                      <Baby className="w-2.5 h-2.5" /> Cria.
+                    </span>
+                    <span className="text-base font-black text-amber-500">{sector.childrenCount}</span>
                   </div>
                 </div>
 
@@ -502,24 +554,36 @@ export const Sectors: React.FC = () => {
 
           <div className="flex items-center gap-2 self-start md:self-center">
             {/* Tabs Trigger */}
-            <div className="bg-slate-50 border border-slate-100 p-1 rounded-xl flex">
+            <div className="bg-slate-50 border border-slate-100 p-1 rounded-xl flex flex-wrap gap-1">
               <button 
                 onClick={() => setDetailsTab('gcs')}
                 className={clsx(
-                  "px-4 py-2 rounded-lg font-bold text-xs uppercase transition-all cursor-pointer",
+                  "px-3 py-1.5 rounded-lg font-bold text-xs uppercase transition-all cursor-pointer",
                   detailsTab === 'gcs' ? "bg-white text-slate-900 shadow-sm font-black" : "text-slate-500 hover:text-slate-800"
                 )}
               >
-                Grupos Caseiros ({selectedSectorMeta.gcsCount})
+                Células ({selectedSectorMeta.gcsCount})
               </button>
               <button 
                 onClick={() => setDetailsTab('members')}
                 className={clsx(
-                  "px-4 py-2 rounded-lg font-bold text-xs uppercase transition-all cursor-pointer",
+                  "px-3 py-1.5 rounded-lg font-bold text-xs uppercase transition-all cursor-pointer",
                   detailsTab === 'members' ? "bg-white text-slate-900 shadow-sm font-black" : "text-slate-500 hover:text-slate-800"
                 )}
               >
-                Membros Ativos ({selectedSectorMeta.membersCount})
+                Membros ({selectedSectorMeta.membersCount})
+              </button>
+              <button 
+                onClick={() => setDetailsTab('mismatches')}
+                className={clsx(
+                  "px-3 py-1.5 rounded-lg font-bold text-xs uppercase transition-all cursor-pointer flex items-center gap-1.5",
+                  detailsTab === 'mismatches' ? "bg-white text-slate-900 shadow-sm font-black animate-pulse" : "text-slate-500 hover:text-slate-800"
+                )}
+              >
+                Inconsistências ({mismatchedMembers.length})
+                {mismatchedMembers.length > 0 && (
+                  <span className="w-2 h-2 rounded-full bg-red-500 animate-ping shrink-0" />
+                )}
               </button>
             </div>
           </div>
@@ -531,7 +595,7 @@ export const Sectors: React.FC = () => {
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input 
               type="text" 
-              placeholder={detailsTab === 'gcs' ? "Buscar GC, líder ou auxiliar..." : "Buscar membro, bairro ou GC..."}
+              placeholder={detailsTab === 'gcs' ? "Buscar GC, líder ou auxiliar..." : detailsTab === 'mismatches' ? "Buscar por nome ou bairro..." : "Buscar membro, bairro ou GC..."}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full bg-slate-50 hover:bg-slate-100/50 focus:bg-white border border-slate-100 focus:border-blue-500 rounded-xl pl-10 pr-4 py-2.5 text-xs font-medium focus:ring-1 focus:ring-blue-100 transition-all outline-none"
@@ -572,8 +636,8 @@ export const Sectors: React.FC = () => {
           )}
         </div>
 
-        {/* Tab 1: Grupos Caseiros Grid */}
-        {detailsTab === 'gcs' ? (
+        {/* Tab content rendering */}
+        {detailsTab === 'gcs' && (
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               {filteredCells.map((cell) => {
@@ -611,8 +675,9 @@ export const Sectors: React.FC = () => {
               )}
             </div>
           </div>
-        ) : (
-          /* Tab 2: Membros Table List */
+        )}
+
+        {detailsTab === 'members' && (
           <div className="overflow-x-auto border border-slate-100 rounded-2xl">
             <table className="min-w-full divide-y divide-slate-100 text-left">
               <thead className="bg-slate-50/60 text-[10px] font-black uppercase text-slate-400 tracking-wider">
@@ -685,8 +750,115 @@ export const Sectors: React.FC = () => {
             </table>
           </div>
         )}
-      </div>
 
+        {detailsTab === 'mismatches' && (
+          <div className="space-y-6">
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-amber-900 flex items-start gap-3 text-xs leading-relaxed">
+              <AlertCircle className="w-5 h-5 text-amber-650 shrink-0 mt-0.5" />
+              <div>
+                <strong className="font-extrabold block text-sm mb-1 text-amber-950">Alerta de Inconsistência de Setor</strong>
+                Identificamos membros cujo setor de residência física difere do setor eclesiástico de seu Grupo Caseiro (GC). 
+                É importante que os membros frequentem células próximas de onde residem para permitir visitas pastorais eficazes e fortalecer a comunhão física de bairro.
+              </div>
+            </div>
+
+            <div className="overflow-x-auto border border-slate-100 rounded-2xl">
+              <table className="min-w-full divide-y divide-slate-100 text-left font-sans">
+                <thead className="bg-slate-50/60 text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                  <tr>
+                    <th className="px-6 py-4">Membro</th>
+                    <th className="px-6 py-4">Setor Eclesiástico (GC)</th>
+                    <th className="px-6 py-4">Setor Residencial (Moradia)</th>
+                    <th className="px-6 py-4">Diagnóstico / Recomendação</th>
+                    <th className="px-6 py-4 text-right">Ação</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-xs text-slate-650 bg-white">
+                  {mismatchedMembers.filter(m => {
+                    return !searchTerm || m.nome.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                      (m.bairro || '').toLowerCase().includes(searchTerm.toLowerCase());
+                  }).map((m) => {
+                    const eclSec = getNormalizedSectorName(
+                      m.setor_eclesiastico || cells.find(c => c.grupo_caseiro === m.grupos_caseiros)?.setor
+                    );
+                    const resSec = getNormalizedSectorName(
+                      m.setor_residencial || cells.find(c => c.grupo_caseiro === m.grupos_caseiros)?.setor
+                    );
+
+                    const isNotified = !!notifiedMembers[m.id];
+
+                    // Check for Entorno case
+                    const isEntorno = (m.bairro || '').toLowerCase().includes('entorno') || 
+                      (m.bairro || '').toLowerCase().includes('valparaiso') || 
+                      (m.bairro || '').toLowerCase().includes('ocidental') || 
+                      (m.bairro || '').toLowerCase().includes('ceu azul') ||
+                      resSec === 'Sem Setor';
+
+                    let diagnosis = `Reside no ${resSec} (${m.bairro || 'Sem Bairro'}), mas congrega no ${eclSec} (${m.grupos_caseiros}).`;
+                    let recommendation = `Sugerir transferência para uma célula do ${resSec} para facilitar visitas e comunhão local.`;
+
+                    if (isEntorno && eclSec === 'Setor Central') {
+                      diagnosis = `Residente no Entorno Sul (${m.bairro || 'Entorno'}), mas congrega no Setor Central (${m.grupos_caseiros}).`;
+                      recommendation = `Sugerir migração para o Setor Sul (onde se concentram as células do entorno sul).`;
+                    }
+
+                    return (
+                      <tr key={m.id} className="hover:bg-slate-50/40 transition-colors">
+                        <td className="px-6 py-4 font-bold text-slate-900">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-700">
+                              {m.nome.split(' ').map(n => n[0]).slice(0, 2).join('')}
+                            </div>
+                            <div>
+                              <p className="font-extrabold text-slate-900">{m.nome}</p>
+                              <p className="text-[10px] text-slate-400">Cargo: {m.tipo_de_pessoa}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-[10px] font-black uppercase text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded">
+                            {eclSec}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-[10px] font-black uppercase text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded">
+                            {resSec}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 max-w-[320px]">
+                          <p className="font-bold text-slate-800">{diagnosis}</p>
+                          <p className="text-[10px] text-red-500 font-bold mt-0.5 leading-snug">{recommendation}</p>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <button
+                            onClick={() => setNotifiedMembers(prev => ({ ...prev, [m.id]: !isNotified }))}
+                            className={clsx(
+                              "px-3 py-1.5 rounded-xl font-black text-[9px] uppercase tracking-wider transition-all border cursor-pointer",
+                              isNotified 
+                                ? "bg-emerald-50 border-emerald-200 text-emerald-700 font-black" 
+                                : "bg-slate-900 border-slate-900 text-white hover:bg-slate-800"
+                            )}
+                          >
+                            {isNotified ? 'Notificado! ✅' : 'Avisar Líder'}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+
+                  {mismatchedMembers.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="text-center py-12 text-slate-400 italic bg-slate-50/50">
+                        Nenhuma inconsistência territorial identificada no {selectedSectorName}! Excelente alinhamento.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
