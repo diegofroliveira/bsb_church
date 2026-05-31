@@ -26,6 +26,7 @@ import { Companionship } from './pages/Companionship';
 import { LabVision } from './pages/LabVision';
 import { LabVisits } from './pages/LabVisits';
 import { LabQuery } from './pages/LabQuery';
+import { LabCounsel } from './pages/LabCounsel';
 
 function App() {
   return (
@@ -64,6 +65,7 @@ function App() {
               <Route path="/lab/vision" element={<LabVision />} />
               <Route path="/lab/visits" element={<LabVisits />} />
               <Route path="/lab/queries" element={<LabQuery />} />
+              <Route path="/lab/counsel" element={<LabCounsel />} />
             </Route>
           </Route>
 

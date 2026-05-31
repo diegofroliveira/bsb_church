@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Sparkles, Eye, UserPlus, X, FlaskConical, Database } from 'lucide-react';
+import { Sparkles, Eye, UserPlus, X, FlaskConical, Database, Compass } from 'lucide-react';
 
 interface LabLauncherProps {
   onClose: () => void;
@@ -40,6 +40,17 @@ const LAB_ITEMS = [
     bg: 'bg-indigo-50',
     border: 'border-indigo-100',
     textColor: 'text-indigo-700',
+  },
+  {
+    id: 'Lab: Conselho Apostólico',
+    path: '/lab/counsel',
+    icon: Compass,
+    label: 'Conselho Apostólico',
+    desc: 'Como Jesus e Paulo organizariam a BSB Church?',
+    color: 'from-rose-450 to-pink-600 border border-pink-500/10',
+    bg: 'bg-pink-50',
+    border: 'border-pink-100',
+    textColor: 'text-pink-700',
   },
 ];
 
