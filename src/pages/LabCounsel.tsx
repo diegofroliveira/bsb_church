@@ -73,6 +73,7 @@ export const LabCounsel: React.FC = () => {
   // Interactive UI State
   const [counselMode, setCounselMode] = useState<'jesus' | 'paul'>('jesus');
   const [selectedDisciple, setSelectedDisciple] = useState<number | null>(null);
+  const [selectedGift, setSelectedGift] = useState<number>(0);
   const [letterFocus, setLetterFocus] = useState<'unity' | 'mission' | 'love'>('unity');
   const [isLetterSigned, setIsLetterSigned] = useState(false);
   const [isSending70, setIsSending70] = useState(false);
@@ -82,7 +83,7 @@ export const LabCounsel: React.FC = () => {
   useEffect(() => {
     supabase
       .from('membros')
-      .select('id, nome, tipo_de_pessoa, grupos_caseiros, status, sexo, bairro, data_de_vinculo, data_de_cadastro')
+      .select('id, nome, tipo_de_pessoa, grupos_caseiros, status, sexo, bairro, data_de_vinculo, data_de_cadastro, estado_civil, esposo_a, e_dizimista')
       .limit(10000)
       .then(({ data, error }) => { 
         if (error) setFetchError(error.message);
@@ -105,37 +106,32 @@ export const LabCounsel: React.FC = () => {
   const theTwelve = useMemo<Disciple[]>(() => {
     if (activeMembers.length === 0) return [];
     
-    // Prioritize leaders & pastors
-    const pool = [...activeMembers].sort((a, b) => {
-      const typeA = (a.tipo_de_pessoa || '').toUpperCase();
-      const typeB = (b.tipo_de_pessoa || '').toUpperCase();
-      
-      const scoreA = typeA.includes('PASTOR') ? 3 : typeA.includes('LÍDER') ? 2 : 1;
-      const scoreB = typeB.includes('PASTOR') ? 3 : typeB.includes('LÍDER') ? 2 : 1;
-      
-      return scoreB - scoreA;
+    // Sort and prioritize real leaders/officers
+    const getRoleScore = (m: Member) => {
+      const role = (m.tipo_de_pessoa || '').toUpperCase();
+      if (role === 'APÓSTOLO') return 5;
+      if (role === 'PRESBÍTERO') return 4;
+      if (role === 'DIÁCONO') return 3;
+      if (role === 'LÍDER') return 2;
+      return 1;
+    };
+
+    // Filter active officers/leaders
+    const officers = activeMembers.filter(m => 
+      ['APÓSTOLO', 'PRESBÍTERO', 'DIÁCONO', 'LÍDER'].includes((m.tipo_de_pessoa || '').toUpperCase())
+    );
+
+    // Sort by role priority: APÓSTOLO > PRESBÍTERO > DIÁCONO > LÍDER
+    officers.sort((a, b) => {
+      const scoreA = getRoleScore(a);
+      const scoreB = getRoleScore(b);
+      if (scoreA !== scoreB) return scoreB - scoreA;
+      // Secondary sort alphabetically to remain deterministic
+      return (a.nome || '').localeCompare(b.nome || '');
     });
 
-    const selectedMembers: Member[] = [];
-    const usedGcs = new Set<string>();
-    
-    // Select 12 with diverse GCs and balanced genders if possible
-    for (const m of pool) {
-      if (selectedMembers.length >= 12) break;
-      const gc = m.grupos_caseiros || '';
-      
-      if (!gc || !usedGcs.has(gc) || selectedMembers.length < 6) {
-        selectedMembers.push(m);
-        if (gc) usedGcs.add(gc);
-      }
-    }
-    
-    // Fill up to 12 if pool was small
-    while (selectedMembers.length < 12 && pool.length > selectedMembers.length) {
-      const next = pool.find(p => !selectedMembers.includes(p));
-      if (next) selectedMembers.push(next);
-      else break;
-    }
+    // Take the top 12
+    const selectedMembers = officers.slice(0, 12);
 
     const rolesAndCounsel = [
       { apostolicName: 'Pedro (Simão)', role: 'Ação Ousada & Liderança da Frente', desc: 'Impulsivo, mas rocha fundamental. Aquele que fala primeiro e age com paixão.', counsel: '"Diego, incentive-o a canalizar seu ímpeto para pastorear as minhas ovelhas com paciência. A audácia dele abrirá novas portas, mas é a constância que as manterá abertas. Ensine-o a olhar para mim e não para o vento forte."' },
@@ -147,7 +143,7 @@ export const LabCounsel: React.FC = () => {
       { apostolicName: 'Mateus (Levi)', role: 'Organizador de Sistemas & Finanças', desc: 'Ex-cobrador de impostos. Habilidade com números, processos e documentação escrita.', counsel: '"Diego, use a mente organizada dele para estruturar a administração e as finanças da igreja com máxima transparência. O que o mundo via como ganância, eu redimi para ser um registro fiel da Graça."' },
       { apostolicName: 'Tomé', role: 'O Questionador Reflexivo', desc: 'Melancólico, analítico, busca verdades sólidas. Quer tocar nas feridas para crer.', counsel: '"Diego, acolha as dúvidas dele sem julgamento. Suas perguntas honestas trazem respostas profundas que fortalecem toda a igreja. Quando ele finalmente crê, seu compromisso é radical até a morte."' },
       { apostolicName: 'Tiago (Filho de Alfeu)', role: 'O Pacificador Silencioso', desc: 'Trabalhador dos bastidores, discreto mas fiel na rotina diária.', counsel: '"Diego, valorize a fidelidade silenciosa dele. Embora ele raramente apareça nos holofotes, o serviço diário dele é o cimento que mantém os tijolos da igreja unidos. A recompensa dele no céu é imensa."' },
-      { apostolicName: 'Simão (O Zelote)', role: 'Ativista Apaixonado & Missionário', desc: 'Cheio de energia revolucionária, impulsiona causas sociais e evangelismo ativo.', counsel: '"Diego, canalize o fogo político e social dele para a revolução do Reino de Deus. Ele é excelente para mobilizar a igreja para fora das quatro paredes, alcançando os necessitados e marginalizados."' },
+      { apostolicName: 'Simão (O Zelote)', role: 'Ativista Para Todos & Missionário', desc: 'Cheio de energia revolucionária, impulsiona causas sociais e evangelismo ativo.', counsel: '"Diego, canalize o fogo político e social dele para a revolução do Reino de Deus. Ele é excelente para mobilizar a igreja para fora das quatro paredes, alcançando os necessitados e marginalizados."' },
       { apostolicName: 'Judas Tadeu', role: 'O Questionador Espiritual', desc: 'Busca compreender as manifestações do Espírito no íntimo e no secreto.', counsel: '"Diego, incentive-o a guiar as pessoas na intimidade espiritual. Ele ajuda a igreja a não se tornar um show externo, mantendo as chamas da revelação íntima e da devoção acesas no altar do coração."' },
       { apostolicName: 'Matias', role: 'O Cooperador Fiel Substituto', desc: 'Aquele que esteve conosco o tempo todo no anonimato, preparado para assumir responsabilidades.', counsel: '"Diego, ele representa aqueles que servem fielmente sem cargos. Quando uma lacuna de liderança aparecer, olhe para ele. Ele está pronto porque seu coração sempre esteve na obra, não no título."' },
     ];
@@ -206,19 +202,91 @@ export const LabCounsel: React.FC = () => {
       { name: 'Misericórdia', description: 'Empatia profunda, cuidar de doentes, fracos e necessitados.', icon: Star, color: 'from-pink-400 to-rose-500', glow: 'shadow-pink-500/20 text-pink-500', biblicalRef: 'Rom 12:8' },
     ];
 
-    const distribution = categories.map(cat => ({ ...cat, count: 0, members: [] as Member[] }));
+    const distribution = categories.map(cat => ({ 
+      ...cat, 
+      count: 0, 
+      members: [] as { member: Member; justification: string }[] 
+    }));
 
-    activeMembers.forEach((m, idx) => {
+    activeMembers.forEach((m) => {
+      const role = (m.tipo_de_pessoa || '').toUpperCase();
+      const name = m.nome || '';
+      
       // Deterministic hash based on name characters
       let hash = 0;
-      for (let i = 0; i < m.nome.length; i++) {
-        hash = m.nome.charCodeAt(i) + ((hash << 5) - hash);
+      for (let i = 0; i < name.length; i++) {
+        hash = name.charCodeAt(i) + ((hash << 5) - hash);
       }
-      const catIdx = Math.abs(hash) % categories.length;
-      distribution[catIdx].count++;
-      if (distribution[catIdx].members.length < 15) {
-        distribution[catIdx].members.push(m);
+      const absHash = Math.abs(hash);
+
+      let giftIndex = 0;
+      let justification = '';
+
+      if (role === 'APÓSTOLO') {
+        giftIndex = 5; // Liderança / Governo
+        justification = `Liderança apostólica na BSB Church. Chamado a guiar o corpo de anciãos e a congregação com sabedoria, visão pioneira e autoridade espiritual.`;
+      } else if (role === 'PRESBÍTERO') {
+        giftIndex = (absHash % 2 === 0) ? 2 : 5; // Ensino or Liderança
+        if (giftIndex === 2) {
+          justification = `Identificado como Presbítero com forte encargo de Ensino. Chamado a pastorear a congregação através da sã doutrina e instrução fiel da Bíblia.`;
+        } else {
+          justification = `Identificado como Presbítero com o encargo de Governo. Vocacionado a presidir, organizar e conduzir a comunidade local com diligência.`;
+        }
+      } else if (role === 'DIÁCONO') {
+        giftIndex = 1; // Serviço / Ministério
+        justification = `Ordenado como Diácono na congregação. Vocação de suporte prático, socorro aos necessitados e serviço sacrificial na casa de Deus.`;
+      } else if (role === 'LÍDER') {
+        const leaderGifts = [5, 2, 3]; // Liderança, Ensino, Encorajamento
+        giftIndex = leaderGifts[absHash % leaderGifts.length];
+        if (giftIndex === 5) {
+          justification = `Líder de GC ativo. Chamado a governar e guiar as ovelhas do seu lar de comunhão com proteção, amor e ordem eclesiástica.`;
+        } else if (giftIndex === 2) {
+          justification = `Líder focado em consolidação doutrinária. Capacidade de explicar e discipular os membros na verdade do Evangelho de Cristo.`;
+        } else {
+          justification = `Líder com coração pastoral e acolhedor, vocacionado para motivar a fé, aconselhar nos momentos de dor e erguer os cansados.`;
+        }
+      } else {
+        // Regular members (MEMBRO, AGREGADO, etc.) - NEVER Liderança/Governo to preserve realism
+        const isTither = m.e_dizimista === 'Sim';
+        const hasGC = !!m.grupos_caseiros;
+        
+        // Allowed: Profecia (0), Serviço (1), Ensino (2), Encorajamento (3), Contribuição (4), Misericórdia (6)
+        if (isTither && (absHash % 3 === 0)) {
+          giftIndex = 4; // Contribuição
+          justification = `Fidelidade e desprendimento material demonstrados na BSB. Vocacionado para prosperar e cooperar com generosidade alegre na expansão do Reino.`;
+        } else if (!hasGC && m.estado_civil && m.estado_civil.includes('Solteiro')) {
+          // "Solteiro pouco englobado" -> Misericórdia (6), Serviço (1) or Encorajamento (3)
+          const restricted = [6, 1, 3];
+          giftIndex = restricted[absHash % restricted.length];
+          if (giftIndex === 6) {
+            justification = `Identificado para a Misericórdia silenciosa. Vocacionado para a empatia pura e consolo aos aflitos no um-a-um.`;
+          } else if (giftIndex === 3) {
+            justification = `Vocacionado ao encorajamento fraternal cotidiano, abençoando outros com escuta acolhedora e palavras de ânimo.`;
+          } else {
+            justification = `Vocação prática e cooperação nos bastidores do Reino, servindo com dedicação e coração de servo voluntário.`;
+          }
+        } else {
+          // General distribution across 0, 1, 2, 3, 4, 6
+          const allowedGifts = [0, 1, 2, 3, 4, 6];
+          giftIndex = allowedGifts[absHash % allowedGifts.length];
+          if (giftIndex === 0) {
+            justification = `Zelo e convicção na sã doutrina. Vocação para exortar e consolar através da proclamação fiel da Palavra no GC ${m.grupos_caseiros || 'Geral'}.`;
+          } else if (giftIndex === 1) {
+            justification = `Prontidão prática e serviço voluntário no GC ${m.grupos_caseiros || 'Geral'}. Edifica a igreja através do suporte diário nos bastidores.`;
+          } else if (giftIndex === 2) {
+            justification = `Estudioso e dedicado às Escrituras no GC ${m.grupos_caseiros || 'Geral'}. Chamado a instruir os irmãos no conhecimento da Verdade.`;
+          } else if (giftIndex === 3) {
+            justification = `Coração pastoral de acolhimento e escuta no GC ${m.grupos_caseiros || 'Geral'}. Vocação para encorajar a fé prática dos irmãos.`;
+          } else if (giftIndex === 4) {
+            justification = `Generosidade ativa e espírito de cooperação, auxiliando prontamente nas demandas e assistência social da igreja.`;
+          } else {
+            justification = `Sensibilidade e compaixão provadas no GC ${m.grupos_caseiros || 'Geral'}. Chamado a confortar doentes, fracos e necessitados com amor.`;
+          }
+        }
       }
+
+      distribution[giftIndex].count++;
+      distribution[giftIndex].members.push({ member: m, justification });
     });
 
     return distribution;
@@ -606,12 +674,19 @@ O amor não busca os seus próprios interesses, não se irrita, não suspeita ma
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
-              {spiritualGifts.map((gift) => {
+              {spiritualGifts.map((gift, idx) => {
                 const Icon = gift.icon;
+                const isSelected = selectedGift === idx;
                 return (
                   <div 
                     key={gift.name}
-                    className="flex flex-col justify-between p-4 rounded-xl border border-slate-100 hover:border-slate-200 bg-slate-50/10 hover:shadow-md transition-all h-[240px]"
+                    onClick={() => setSelectedGift(idx)}
+                    className={clsx(
+                      "flex flex-col justify-between p-4 rounded-xl border cursor-pointer hover:shadow-md transition-all h-[240px]",
+                      isSelected 
+                        ? "border-amber-500 bg-amber-50/20 ring-1 ring-amber-100" 
+                        : "border-slate-100 bg-slate-50/10 hover:border-slate-200"
+                    )}
                   >
                     <div className="space-y-2">
                       <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${gift.color} flex items-center justify-center text-white shadow-sm`}>
@@ -630,10 +705,9 @@ O amor não busca os seus próprios interesses, não se irrita, não suspeita ma
                         <span className="text-xl font-black text-slate-800">{gift.count}</span>
                       </div>
                       
-                      {/* Popover/Indicator of first member */}
                       {gift.members.length > 0 && (
                         <div className="text-[9px] font-bold text-slate-500 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded truncate max-w-[70px]">
-                          {gift.members[0].nome.split(' ')[0]}
+                          {gift.members[0].member.nome.split(' ')[0]}
                         </div>
                       )}
                     </div>
@@ -641,6 +715,52 @@ O amor não busca os seus próprios interesses, não se irrita, não suspeita ma
                 );
               })}
             </div>
+
+            {/* Selected Gift Member List Details */}
+            {selectedGift !== null && (
+              <div className="mt-6 pt-6 border-t border-slate-100 animate-in fade-in duration-300">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
+                  <div>
+                    <h3 className="text-sm font-black text-slate-950 uppercase tracking-wider flex items-center gap-2">
+                      👑 Membros Vocacionados: {spiritualGifts[selectedGift].name}
+                    </h3>
+                    <p className="text-xs text-slate-400">
+                      Exibindo {Math.min(15, spiritualGifts[selectedGift].members.length)} de {spiritualGifts[selectedGift].count} membros ativos classificados dinamicamente.
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-black uppercase text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1 rounded-full self-start md:self-center">
+                    {spiritualGifts[selectedGift].biblicalRef} · {spiritualGifts[selectedGift].description}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-h-[320px] overflow-y-auto pr-2 scrollbar-thin">
+                  {spiritualGifts[selectedGift].members.slice(0, 15).map(({ member, justification }) => {
+                    const initials = member.nome.split(' ').map(n => n[0]).slice(0, 2).join('');
+                    return (
+                      <div key={member.id} className="flex gap-3 p-3.5 rounded-2xl border border-slate-100 bg-slate-50/20 hover:border-slate-200 hover:shadow-sm transition-all">
+                        <div className="w-9 h-9 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center font-black text-xs shrink-0 shadow-inner">
+                          {initials}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-xs font-black text-slate-900 truncate">{member.nome}</p>
+                            <span className="text-[8px] font-black uppercase bg-slate-100 text-slate-500 px-1.5 py-0.2 rounded border">
+                              {member.tipo_de_pessoa}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-slate-400 mt-0.5 font-medium leading-tight">
+                            GC: <strong className="text-slate-650">{member.grupos_caseiros || 'Geral'}</strong> · Bairro: <strong className="text-slate-650">{member.bairro || 'Não inf.'}</strong>
+                          </p>
+                          <p className="text-[9.5px] text-slate-500 italic mt-2 leading-relaxed border-l-2 border-slate-200 pl-2">
+                            "{justification}"
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Section 2: Paul's Custom Epistle to BSB Church */}

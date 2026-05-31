@@ -27,6 +27,7 @@ import { LabVision } from './pages/LabVision';
 import { LabVisits } from './pages/LabVisits';
 import { LabQuery } from './pages/LabQuery';
 import { LabCounsel } from './pages/LabCounsel';
+import { Sectors } from './pages/Sectors';
 
 function App() {
   return (
@@ -48,6 +49,7 @@ function App() {
               <Route path="/families" element={<Families />} />
               <Route path="/birthdays" element={<Birthdays />} />
               <Route path="/cells" element={<Cells />} />
+              <Route path="/sectors" element={<Sectors />} />
               <Route path="/reports" element={<Reports />} />
               <Route path="/qa" element={<QA />} />
               <Route path="/discipleship" element={<Discipleship />} />
