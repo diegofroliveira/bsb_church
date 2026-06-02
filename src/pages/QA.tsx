@@ -87,7 +87,7 @@ export const QA: React.FC = () => {
         while (true) {
           const { data, error } = await supabase
             .from('membros')
-            .select('id, nome, status, tipo_cadastro, tipo_de_pessoa, nascimento, grupos_caseiros, celular_principal_sms, email, sexo, estado_civil, pai, mae')
+            .select('id, nome, status, tipo_cadastro, tipo_de_pessoa, nascimento, grupos_caseiros, celular_principal_sms, email, sexo, estado_civil, pai, mae, esposo_a')
             .range(from, from + 999);
           if (error) throw error;
           if (!data || data.length === 0) break;
@@ -215,11 +215,21 @@ export const QA: React.FC = () => {
             fromRel += 1000;
           }
 
-          // Map all members by ID
+          const cleanNameStr = (name: string | null | undefined): string => {
+            if (!name) return '';
+            return name.replace(/['"]/g, '').trim().toUpperCase().replace(/\s+/g, ' ');
+          };
+
+          // Map all members by ID and clean name
           const memberById = new Map<string, any>();
+          const memberByName = new Map<string, any>();
           membros.forEach(m => {
             if (m.id) {
               memberById.set(m.id.toString(), m);
+            }
+            const norm = cleanNameStr(m.nome);
+            if (norm) {
+              memberByName.set(norm, m);
             }
           });
 
@@ -246,12 +256,24 @@ export const QA: React.FC = () => {
             }
           };
 
+          // Step 1: Group strictly using the official Prover "Pessoas x Familiares" relations (where Mesmo Domicilio = "Sim")
           relationsList.forEach(rel => {
             if ((rel.mesmo_domicilio || '').toUpperCase().trim() === 'SIM') {
               const idA = rel.id_pessoa_a?.toString();
               const idB = rel.id_pessoa_b?.toString();
               if (idA && idB) {
                 union(idA, idB);
+              }
+            }
+          });
+
+          // Step 2: Fallback spouse grouping based on esposo_a text field (if they are spouses but not in relations table)
+          membros.forEach(m1 => {
+            if (m1.esposo_a) {
+              const spouseName = cleanNameStr(m1.esposo_a);
+              const m2 = memberByName.get(spouseName);
+              if (m2) {
+                union(m1.id.toString(), m2.id.toString());
               }
             }
           });
@@ -266,11 +288,6 @@ export const QA: React.FC = () => {
               components[root].push(idStr);
             }
           });
-
-          const cleanNameStr = (name: string | null | undefined): string => {
-            if (!name) return '';
-            return name.replace(/['"]/g, '').trim().toUpperCase().replace(/\s+/g, ' ');
-          };
 
           const calculateAgeVal = (birthDateStr: string | null | undefined): number => {
             if (!birthDateStr) return 0;
