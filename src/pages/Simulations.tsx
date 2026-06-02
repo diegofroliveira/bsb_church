@@ -250,11 +250,10 @@ export const Simulations: React.FC = () => {
   const loadBaseline = async () => {
     setIsLoading(true);
     try {
-      const [membersRes, cellsRes, discRes, relationsRes] = await Promise.all([
+      const [membersRes, cellsRes, discRes] = await Promise.all([
         supabase.from('membros').select('id, nome, grupos_caseiros, status, sexo, bairro, pai, mae, logradouro, celular_principal_sms, telefone_fixo, estado_civil, nascimento, latitude, longitude, tipo_de_pessoa'),
         supabase.from('celulas').select('id, grupo_caseiro, lider, setor, latitude, longitude'),
-        supabase.from('discipulado').select('discipulador, discipulo'),
-        supabase.from('pessoas_familiares').select('id_pessoa_a, pessoa_a, parentesco, id_pessoa_b, pessoa_b, mesmo_domicilio')
+        supabase.from('discipulado').select('discipulador, discipulo')
       ]);
 
       if (membersRes.data) {
@@ -277,9 +276,26 @@ export const Simulations: React.FC = () => {
         setDraftLinks(discRes.data);
         setBaselineLinks(discRes.data.map((l: any) => ({ ...l })));
       }
-      if (relationsRes.data) {
-        setFamilyRelations(relationsRes.data as FamilyRelation[]);
+
+      // Paginated loading for pessoas_familiares to bypass the 1000-row Supabase limit
+      let relationsList: FamilyRelation[] = [];
+      let fromIndex = 0;
+      const pageSize = 1000;
+      while (true) {
+        const { data, error } = await supabase.from('pessoas_familiares')
+          .select('id_pessoa_a, pessoa_a, parentesco, id_pessoa_b, pessoa_b, mesmo_domicilio')
+          .range(fromIndex, fromIndex + pageSize - 1);
+        
+        if (error) {
+          console.error('Error fetching relations chunk in Simulations:', error);
+          break;
+        }
+        if (!data || data.length === 0) break;
+        relationsList = [...relationsList, ...(data as FamilyRelation[])];
+        if (data.length < pageSize) break;
+        fromIndex += pageSize;
       }
+      setFamilyRelations(relationsList);
       
     } catch (err) {
       console.error('Error loading simulation data:', err);

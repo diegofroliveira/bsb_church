@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
-import { useFamilyEngine } from '../hooks/useFamilyEngine';
-import type { Member, Cell, Family, FamilyRelation } from '../hooks/useFamilyEngine';
+import { useFamilyEngine, useFlattenedFamilies } from '../hooks/useFamilyEngine';
+import type { Member, Cell, Family, FamilyRelation, EnrichedMember } from '../hooks/useFamilyEngine';
 import { 
   getAdministrativeRegion, 
   getGCRegion,
@@ -10,9 +10,11 @@ import {
 import { 
   Heart, Search, Users, MapPin, AlertCircle, Phone, 
   TrendingUp, Map as MapIcon, Filter, CheckCircle2, AlertTriangle, 
-  ChevronRight, Calendar, User, Eye, Sparkles
+  ChevronRight, Calendar, User, Eye, Sparkles, Download, Database
 } from 'lucide-react';
 import clsx from 'clsx';
+import * as XLSX from 'xlsx';
+
 
 const getNormalizedSectorName = (dbSector: string | null | undefined): string => {
   if (!dbSector) return 'Sem Setor';
@@ -33,30 +35,71 @@ export const Families: React.FC = () => {
   const [filterSector, setFilterSector] = useState('Todos');
   const [filterSectorEcl, setFilterSectorEcl] = useState('Todos');
   const [filterStatus, setFilterStatus] = useState('Todos');
-  const [activeTab, setActiveTab] = useState<'nucleos' | 'parentelas'>('nucleos');
+  const [activeTab, setActiveTab] = useState<'nucleos' | 'parentelas' | 'exportador'>('nucleos');
+
+  const [selectedExporterColumns, setSelectedExporterColumns] = useState<string[]>([
+    'titular_nome',
+    'nome',
+    'parentesco',
+    'mesmo_domicilio',
+    'celular_principal_sms',
+    'grupos_caseiros',
+    'bairro'
+  ]);
+
+  const exporterColumnOptions = [
+    { key: 'titular_nome', label: 'Titular da Família' },
+    { key: 'titular_id', label: 'ID do Titular' },
+    { key: 'nome', label: 'Nome do Membro' },
+    { key: 'parentesco', label: 'Parentesco com o Titular' },
+    { key: 'mesmo_domicilio', label: 'Mesmo Domicílio' },
+    { key: 'sexo', label: 'Sexo' },
+    { key: 'nascimento', label: 'Data de Nascimento' },
+    { key: 'estado_civil', label: 'Estado Civil' },
+    { key: 'celular_principal_sms', label: 'Celular' },
+    { key: 'telefone_fixo', label: 'Telefone Fixo' },
+    { key: 'logradouro', label: 'Endereço' },
+    { key: 'bairro', label: 'Bairro' },
+    { key: 'grupos_caseiros', label: 'Grupo Caseiro (GC)' },
+    { key: 'setor_eclesiastico', label: 'Setor do GC' },
+    { key: 'setor_residencial', label: 'Setor de Residência' }
+  ];
 
   // Load active members, cells and family relations
   useEffect(() => {
     const fetchData = async () => {
       try {
         setIsLoading(true);
-        const [membrosRes, celulasRes, relationsRes] = await Promise.all([
+        const [membrosRes, celulasRes] = await Promise.all([
           supabase.from('membros')
             .select('id, nome, grupos_caseiros, status, sexo, bairro, pai, mae, logradouro, celular_principal_sms, telefone_fixo, estado_civil, nascimento, latitude, longitude, cidade, estado, setor_eclesiastico, setor_residencial')
             .eq('status', 'Ativo'),
           supabase.from('celulas')
-            .select('grupo_caseiro, lider, auxiliar, setor'),
-          supabase.from('pessoas_familiares')
-            .select('id_pessoa_a, pessoa_a, parentesco, id_pessoa_b, pessoa_b, mesmo_domicilio')
+            .select('grupo_caseiro, lider, auxiliar, setor')
         ]);
 
         if (membrosRes.data) setMembers(membrosRes.data as Member[]);
         if (celulasRes.data) setCells(celulasRes.data as Cell[]);
-        if (relationsRes.data) {
-          setRelations(relationsRes.data as FamilyRelation[]);
-        } else {
-          console.warn('Could not load relations from Supabase:', relationsRes.error);
+
+        // Paginated loading for pessoas_familiares to bypass the 1000-row Supabase limit
+        let relationsList: FamilyRelation[] = [];
+        let fromIndex = 0;
+        const pageSize = 1000;
+        while (true) {
+          const { data, error } = await supabase.from('pessoas_familiares')
+            .select('id_pessoa_a, pessoa_a, parentesco, id_pessoa_b, pessoa_b, mesmo_domicilio')
+            .range(fromIndex, fromIndex + pageSize - 1);
+          
+          if (error) {
+            console.error('Error fetching relations chunk from Supabase:', error);
+            break;
+          }
+          if (!data || data.length === 0) break;
+          relationsList = [...relationsList, ...(data as FamilyRelation[])];
+          if (data.length < pageSize) break;
+          fromIndex += pageSize;
         }
+        setRelations(relationsList);
       } catch (err) {
         console.error('Error loading family data:', err);
       } finally {
@@ -69,6 +112,7 @@ export const Families: React.FC = () => {
 
   // Initialize high-performance disjoint-set clustering (DSU)
   const families = useFamilyEngine(members, relations);
+  const flattenedFamilyMembers = useFlattenedFamilies(members, relations, families);
 
   // Compute calculated family metrics and audit divisions
   const familyData = useMemo(() => {
@@ -347,6 +391,59 @@ export const Families: React.FC = () => {
     });
   }, [familyData, searchTerm, filterSector, filterSectorEcl, filterStatus, cells]);
 
+  // Filtering and sorting the flattened family members for the exportable table
+  const filteredFlattenedMembers = useMemo(() => {
+    return flattenedFamilyMembers.filter(m => {
+      // 1. Search Query
+      const matchesSearch = searchTerm === '' ||
+        m.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        m.titular_nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (m.bairro || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (m.grupos_caseiros || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (m.logradouro || '').toLowerCase().includes(searchTerm.toLowerCase());
+
+      // 2. Sector Residence
+      const residentSector = getMemberSector(m);
+      const matchesSector = filterSector === 'Todos' || residentSector === filterSector;
+
+      // 3. Sector GC
+      const rawEcl = m.setor_eclesiastico || (m.grupos_caseiros ? (cells.find(c => c.grupo_caseiro === m.grupos_caseiros)?.setor || '') : '');
+      const eclSector = getNormalizedSectorName(rawEcl);
+      const matchesSectorEcl = filterSectorEcl === 'Todos' || eclSector === filterSectorEcl;
+
+      // 4. Relation type filter
+      const matchesStatus = filterStatus === 'Todos' ||
+        (filterStatus === 'Titulares' && m.parentesco === 'Titular') ||
+        (filterStatus === 'Familiares' && m.parentesco !== 'Titular');
+
+      return matchesSearch && matchesSector && matchesSectorEcl && matchesStatus;
+    });
+  }, [flattenedFamilyMembers, searchTerm, filterSector, filterSectorEcl, filterStatus, cells]);
+
+  const handleExportExporterExcel = () => {
+    if (filteredFlattenedMembers.length === 0) return;
+
+    const data = filteredFlattenedMembers.map(item => {
+      const row: any = {};
+      selectedExporterColumns.forEach(key => {
+        const label = exporterColumnOptions.find(o => o.key === key)?.label || key;
+        
+        let val = item[key as keyof EnrichedMember];
+        if (key === 'nascimento' && val && typeof val === 'string') {
+          val = val.split('-').reverse().join('/');
+        }
+        
+        row[label] = val || '-';
+      });
+      return row;
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Base de Famílias");
+    XLSX.writeFile(workbook, `extracao_familias_alinhada_${new Date().getTime()}.xlsx`);
+  };
+
   if (isLoading) {
     return (
       <div className="flex h-96 items-center justify-center">
@@ -392,6 +489,17 @@ export const Families: React.FC = () => {
             )}
           >
             <Heart className="w-3.5 h-3.5 text-pink-500" /> Parentelas Estendidas ({parentelas.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('exportador')}
+            className={clsx(
+              "px-4 py-2 text-xs font-bold rounded-lg flex items-center gap-1.5 transition-all duration-200 cursor-pointer",
+              activeTab === 'exportador' 
+                ? "bg-white text-gray-900 shadow-sm" 
+                : "text-gray-500 hover:text-gray-800"
+            )}
+          >
+            <Database className="w-3.5 h-3.5 text-indigo-500" /> Exportador de Dados ({flattenedFamilyMembers.length})
           </button>
         </div>
       </header>
@@ -498,9 +606,11 @@ export const Families: React.FC = () => {
                 onChange={e => setFilterStatus(e.target.value)}
                 className="w-full pl-9 pr-4 py-2 border-gray-200 rounded-xl focus:ring-primary-500 focus:border-primary-500 text-sm bg-gray-50/50 font-semibold text-gray-700"
               >
-                <option value="Todos">Status do Lar (Todos)</option>
+                <option value="Todos">Status/Relação (Todos)</option>
                 <option value="Unified">🏠 GCs Unificados</option>
                 <option value="Divided">⚠️ Famílias Divididas</option>
+                <option value="Titulares">👑 Apenas Titulares</option>
+                <option value="Familiares">👥 Apenas Familiares</option>
               </select>
             </div>
           </div>
@@ -672,7 +782,7 @@ export const Families: React.FC = () => {
             )}
           </div>
         </>
-      ) : (
+      ) : activeTab === 'parentelas' ? (
         /* Parentelas/Relatives Tab Content */
         <div className="space-y-6">
           <div className="bg-pink-50/40 border border-pink-100 rounded-3xl p-6 text-pink-950 flex items-start gap-4">
@@ -741,6 +851,165 @@ export const Families: React.FC = () => {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      ) : (
+        /* Exportador Analítico Flat Content */
+        <div className="space-y-6 animate-in fade-in duration-500">
+          {/* Info Alert Banner */}
+          <div className="bg-indigo-50/50 border border-indigo-150 rounded-3xl p-6 text-indigo-950 flex items-start gap-4">
+            <Database className="w-10 h-10 text-indigo-600 shrink-0" />
+            <div>
+              <h3 className="text-base font-bold flex items-center gap-2">
+                Extração e Alinhamento de Famílias (Exportador Relacional Plano)
+              </h3>
+              <p className="text-xs text-indigo-750/90 leading-relaxed mt-1">
+                Esta tela resolve a quebra de colunas e leiaute alternado do Prover. Aqui, todos os familiares e chefes de lar são dispostos em um <strong>único grid tabular 100% alinhado</strong>. Cada linha representa um membro da família e traz o nome e ID do seu Titular, permitindo criar tabelas dinâmicas, filtros e análises perfeitas em Excel.
+              </p>
+            </div>
+          </div>
+
+          {/* Configuration Card: Checkboxes */}
+          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="bg-gray-50/50 px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h4 className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                <Filter className="w-4 h-4 text-primary-500" /> Configurar Colunas da Exportação
+              </h4>
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setSelectedExporterColumns(exporterColumnOptions.map(o => o.key))}
+                  className="text-[10px] font-bold text-primary-600 uppercase hover:underline cursor-pointer"
+                >
+                  Selecionar Tudo
+                </button>
+                <button
+                  onClick={() => setSelectedExporterColumns(['titular_nome', 'nome', 'parentesco'])}
+                  className="text-[10px] font-bold text-gray-400 uppercase hover:underline cursor-pointer"
+                >
+                  Mínimo
+                </button>
+              </div>
+            </div>
+            <div className="p-6">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
+                {exporterColumnOptions.map(opt => (
+                  <label key={opt.key} className="flex items-center gap-2 cursor-pointer group">
+                    <input 
+                      type="checkbox" 
+                      checked={selectedExporterColumns.includes(opt.key)}
+                      onChange={(e) => {
+                        if (e.target.checked) setSelectedExporterColumns([...selectedExporterColumns, opt.key]);
+                        else setSelectedExporterColumns(selectedExporterColumns.filter(c => c !== opt.key));
+                      }}
+                      className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 h-4 w-4"
+                    />
+                    <span className={clsx("text-xs font-semibold transition-colors", selectedExporterColumns.includes(opt.key) ? "text-gray-900" : "text-gray-400 group-hover:text-gray-600")}>
+                      {opt.label}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Actions & Preview Area */}
+          <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden flex flex-col relative">
+            <div className="bg-gray-50/50 px-6 py-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <span className="flex items-center gap-1.5 text-xs text-gray-700 font-bold">
+                  🔍 Registros Encontrados: <strong className="text-gray-900 font-black">{filteredFlattenedMembers.length}</strong>
+                  {filteredFlattenedMembers.length > 100 && (
+                    <span className="text-[9px] bg-amber-50 text-amber-700 border border-amber-100 px-2 py-0.5 rounded font-black uppercase shrink-0">
+                      Exibindo os primeiros 100 no painel
+                    </span>
+                  )}
+                </span>
+                <p className="text-[10px] text-gray-400 mt-0.5">Os filtros e a busca do topo aplicam-se a este exportador.</p>
+              </div>
+
+              <button
+                onClick={handleExportExporterExcel}
+                disabled={filteredFlattenedMembers.length === 0}
+                className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-4 py-2.5 rounded-xl font-bold text-xs shadow-sm transition-all duration-200 cursor-pointer shrink-0"
+              >
+                <Download className="w-4 h-4" /> Exportar Planilha de Famílias ({filteredFlattenedMembers.length})
+              </button>
+            </div>
+
+            {/* Grid Preview Table */}
+            {filteredFlattenedMembers.length === 0 ? (
+              <div className="py-20 text-center">
+                <AlertCircle className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-400 text-sm font-semibold">Nenhum membro familiar atende aos filtros aplicados.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50/80 sticky top-0 backdrop-blur-sm z-10">
+                    <tr>
+                      <th className="py-4 pl-6 pr-2 text-left text-[10px] font-bold text-gray-400 uppercase w-12">#</th>
+                      {exporterColumnOptions.filter(o => selectedExporterColumns.includes(o.key)).map(col => (
+                        <th key={col.key} className="px-3 py-4 text-left text-[10px] font-bold text-gray-600 uppercase tracking-wider">
+                          {col.label}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 bg-white">
+                    {filteredFlattenedMembers.slice(0, 100).map((m, idx) => {
+                      const isHead = m.parentesco === 'Titular';
+
+                      return (
+                        <tr key={m.id || idx} className={clsx("hover:bg-slate-50/50 transition-all", isHead && "bg-indigo-50/20 font-medium")}>
+                          <td className="whitespace-nowrap py-4 pl-6 pr-2 text-[11px] font-bold text-gray-400 w-12 text-left">
+                            {idx + 1}
+                          </td>
+                          {exporterColumnOptions.filter(o => selectedExporterColumns.includes(o.key)).map(col => {
+                            let val = m[col.key as keyof EnrichedMember];
+                            
+                            // Format birth date beautifully if showing
+                            if (col.key === 'nascimento' && val && typeof val === 'string') {
+                              val = val.split('-').reverse().join('/');
+                            }
+
+                            // Sector fallbacks for residence
+                            if (col.key === 'setor_residencial') {
+                              val = getMemberSector(m);
+                            }
+
+                            // Sector fallbacks for GC
+                            if (col.key === 'setor_eclesiastico') {
+                              const rawEcl = m.setor_eclesiastico || (m.grupos_caseiros ? (cells.find(c => c.grupo_caseiro === m.grupos_caseiros)?.setor || '') : '');
+                              val = getNormalizedSectorName(rawEcl);
+                            }
+
+                            return (
+                              <td key={col.key} className="whitespace-nowrap px-3 py-3.5 text-xs text-gray-700">
+                                {col.key === 'titular_nome' && isHead ? (
+                                  <span className="inline-flex items-center gap-1.5 font-bold text-indigo-700">
+                                    👑 {val as string}
+                                  </span>
+                                ) : col.key === 'parentesco' && isHead ? (
+                                  <span className="inline-flex items-center rounded-md bg-indigo-50 border border-indigo-150 px-1.5 py-0.5 text-[10px] font-extrabold text-indigo-700 uppercase">
+                                    TITULAR
+                                  </span>
+                                ) : col.key === 'parentesco' ? (
+                                  <span className="inline-flex items-center rounded-md bg-slate-50 border border-slate-200 px-1.5 py-0.5 text-[10px] font-semibold text-gray-600">
+                                    {val as string}
+                                  </span>
+                                ) : (
+                                  (val as string) || '-'
+                                )}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -3,14 +3,15 @@ import { supabase } from '../lib/supabase';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useFamilyEngine } from '../hooks/useFamilyEngine';
-import type { Member, FamilyRelation } from '../hooks/useFamilyEngine';
+import type { Member, FamilyRelation, Cell } from '../hooks/useFamilyEngine';
 import { getAdministrativeRegion } from '../lib/geoUtils';
 import { 
   Home, Search, Users, MapPin, AlertCircle, Phone, 
   TrendingUp, Filter, CheckCircle2, MessageSquare, 
-  Calendar, Sparkles, Check, Send, Heart
+  Calendar, Sparkles, Check, Send, Heart, Download
 } from 'lucide-react';
 import clsx from 'clsx';
+import * as XLSX from 'xlsx';
 
 // Interface for localStorage visit records
 interface VisitRecord {
@@ -53,6 +54,7 @@ export const LabVisits: React.FC = () => {
 
   const [members, setMembers] = useState<Member[]>([]);
   const [relations, setRelations] = useState<FamilyRelation[]>([]);
+  const [cells, setCells] = useState<Cell[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRA, setFilterRA] = useState('Todos');
@@ -71,23 +73,42 @@ export const LabVisits: React.FC = () => {
     const fetchData = async () => {
       try {
         setIsLoadingData(true);
-        const [membrosRes, relationsRes] = await Promise.all([
+        const [membrosRes, celulasRes] = await Promise.all([
           supabase
             .from('membros')
-            .select('id, nome, grupos_caseiros, status, sexo, bairro, pai, mae, logradouro, celular_principal_sms, telefone_fixo, estado_civil, nascimento, latitude, longitude')
+            .select('id, nome, grupos_caseiros, status, sexo, bairro, pai, mae, logradouro, celular_principal_sms, telefone_fixo, estado_civil, nascimento, latitude, longitude, email')
             .eq('status', 'Ativo'),
           supabase
-            .from('pessoas_familiares')
-            .select('id_pessoa_a, pessoa_a, parentesco, id_pessoa_b, pessoa_b, mesmo_domicilio')
+            .from('celulas')
+            .select('grupo_caseiro, lider, auxiliar, setor')
         ]);
 
         if (membrosRes.error) throw membrosRes.error;
+        if (celulasRes.error) throw celulasRes.error;
+        
         if (membrosRes.data) setMembers(membrosRes.data as Member[]);
-        if (relationsRes.data) {
-          setRelations(relationsRes.data as FamilyRelation[]);
-        } else {
-          console.warn('Could not load relations from Supabase:', relationsRes.error);
+        if (celulasRes.data) setCells(celulasRes.data as Cell[]);
+
+        // Paginated loading for pessoas_familiares to bypass the 1000-row Supabase limit
+        let relationsList: FamilyRelation[] = [];
+        let fromIndex = 0;
+        const pageSize = 1000;
+        while (true) {
+          const { data, error } = await supabase
+            .from('pessoas_familiares')
+            .select('id_pessoa_a, pessoa_a, parentesco, id_pessoa_b, pessoa_b, mesmo_domicilio')
+            .range(fromIndex, fromIndex + pageSize - 1);
+
+          if (error) {
+            console.error('Error fetching relations chunk in LabVisits:', error);
+            break;
+          }
+          if (!data || data.length === 0) break;
+          relationsList = [...relationsList, ...(data as FamilyRelation[])];
+          if (data.length < pageSize) break;
+          fromIndex += pageSize;
         }
+        setRelations(relationsList);
       } catch (err) {
         console.error('Error fetching members for visits:', err);
       } finally {
@@ -161,7 +182,27 @@ export const LabVisits: React.FC = () => {
 
   // Compute calculated statistics for the dashboard
   const statistics = useMemo(() => {
-    const totalFamilies = Object.keys(families).length;
+    const cleanName = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+    const userEmail = user?.email?.toLowerCase().trim();
+    const userNameClean = user?.name ? cleanName(user.name) : '';
+    
+    const userMember = members.find(m => 
+      (m.email && m.email.toLowerCase().trim() === userEmail) ||
+      (userNameClean && cleanName(m.nome).includes(userNameClean))
+    );
+
+    let userFamilyId: string | null = null;
+    if (userMember) {
+      const userMemberIdStr = userMember.id.toString();
+      Object.entries(families).forEach(([headId, fam]) => {
+        if (fam.memberIds.includes(userMemberIdStr)) {
+          userFamilyId = headId;
+        }
+      });
+    }
+
+    const filteredFamilyIds = Object.keys(families).filter(id => id !== userFamilyId);
+    const totalFamilies = filteredFamilyIds.length;
     if (totalFamilies === 0) {
       return { total: 0, visited: 0, visitedPct: 0, received: 0, receivedPct: 0, coverage: 0, coveragePct: 0 };
     }
@@ -170,7 +211,7 @@ export const LabVisits: React.FC = () => {
     let receivedCount = 0;
     let reachedCount = 0;
 
-    Object.keys(families).forEach(headId => {
+    filteredFamilyIds.forEach(headId => {
       const record = visitationRecords[headId];
       const isVisited = record?.visited ?? false;
       const isReceived = record?.received ?? false;
@@ -190,7 +231,7 @@ export const LabVisits: React.FC = () => {
       coverage: reachedCount,
       coveragePct: Math.round((reachedCount / totalFamilies) * 100)
     };
-  }, [families, visitationRecords]);
+  }, [families, visitationRecords, members, user]);
 
   // Handle Note Editing
   const openNotesEditor = (familyHeadId: string) => {
@@ -250,8 +291,30 @@ export const LabVisits: React.FC = () => {
   // Compile final filtered list of nuclear families
   const filteredFamilyList = useMemo(() => {
     const list: any[] = [];
+    
+    const cleanName = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+    const userEmail = user?.email?.toLowerCase().trim();
+    const userNameClean = user?.name ? cleanName(user.name) : '';
+    
+    const userMember = members.find(m => 
+      (m.email && m.email.toLowerCase().trim() === userEmail) ||
+      (userNameClean && cleanName(m.nome).includes(userNameClean))
+    );
+
+    let userFamilyId: string | null = null;
+    if (userMember) {
+      const userMemberIdStr = userMember.id.toString();
+      Object.entries(families).forEach(([headId, fam]) => {
+        if (fam.memberIds.includes(userMemberIdStr)) {
+          userFamilyId = headId;
+        }
+      });
+    }
 
     Object.entries(families).forEach(([headId, fam]) => {
+      // Exclude logged-in user's own family
+      if (headId === userFamilyId) return;
+
       const headMember = members.find(m => m.id.toString() === headId);
       if (!headMember) return;
 
@@ -324,7 +387,140 @@ export const LabVisits: React.FC = () => {
       if (b.membersCount !== a.membersCount) return b.membersCount - a.membersCount;
       return a.headName.localeCompare(b.headName);
     });
-  }, [families, members, visitationRecords, searchTerm, filterRA, filterGC, filterStatus]);
+  }, [families, members, visitationRecords, searchTerm, filterRA, filterGC, filterStatus, user]);
+
+  const analytics = useMemo(() => {
+    const cleanName = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+    const userEmail = user?.email?.toLowerCase().trim();
+    const userNameClean = user?.name ? cleanName(user.name) : '';
+    
+    const userMember = members.find(m => 
+      (m.email && m.email.toLowerCase().trim() === userEmail) ||
+      (userNameClean && cleanName(m.nome).includes(userNameClean))
+    );
+
+    let userFamilyId: string | null = null;
+    if (userMember) {
+      const userMemberIdStr = userMember.id.toString();
+      Object.entries(families).forEach(([headId, fam]) => {
+        if (fam.memberIds.includes(userMemberIdStr)) {
+          userFamilyId = headId;
+        }
+      });
+    }
+
+    const sectorMap: Record<string, { total: number; visited: number; received: number; reached: number }> = {};
+    const gcMap: Record<string, { total: number; visited: number; received: number; reached: number }> = {};
+
+    Object.entries(families).forEach(([headId, fam]) => {
+      if (headId === userFamilyId) return; // exclude logged-in user's own family
+
+      const headMember = members.find(m => m.id.toString() === headId);
+      if (!headMember) return;
+
+      const familyMembers = fam.memberIds
+        .map(idStr => members.find(m => m.id.toString() === idStr))
+        .filter((m): m is Member => !!m);
+
+      const record = visitationRecords[headId];
+      const isVisited = record?.visited ?? false;
+      const isReceived = record?.received ?? false;
+      const receivedMembers = record?.receivedMembers || {};
+      const receivedCount = familyMembers.filter(m => isReceived || !!receivedMembers[m.id.toString()]).length;
+      const hasAnyReceived = isReceived || receivedCount > 0;
+      const isReached = isVisited || hasAnyReceived;
+
+      // Determine Sector
+      const headGC = headMember.grupos_caseiros || 'Sem GC';
+      const cellInfo = cells.find(c => c.grupo_caseiro === headGC);
+      const sectorName = cellInfo?.setor || 'Sem Setor';
+
+      // Increment Sector
+      if (!sectorMap[sectorName]) {
+        sectorMap[sectorName] = { total: 0, visited: 0, received: 0, reached: 0 };
+      }
+      sectorMap[sectorName].total++;
+      if (isVisited) sectorMap[sectorName].visited++;
+      if (hasAnyReceived) sectorMap[sectorName].received++;
+      if (isReached) sectorMap[sectorName].reached++;
+
+      // Increment GC
+      if (headGC && headGC !== 'Sem GC') {
+        if (!gcMap[headGC]) {
+          gcMap[headGC] = { total: 0, visited: 0, received: 0, reached: 0 };
+        }
+        gcMap[headGC].total++;
+        if (isVisited) gcMap[headGC].visited++;
+        if (hasAnyReceived) gcMap[headGC].received++;
+        if (isReached) gcMap[headGC].reached++;
+      }
+    });
+
+    // Convert Sector Map to sorted array
+    const sectorsList = Object.entries(sectorMap).map(([name, stats]) => ({
+      name,
+      ...stats,
+      coveragePct: stats.total > 0 ? Math.round((stats.reached / stats.total) * 100) : 0
+    })).sort((a, b) => b.coveragePct - a.coveragePct || b.total - a.total);
+
+    // Find highlights for GCs (Top 5 Visited and Top 5 Received)
+    const top5VisitedGCs = Object.entries(gcMap)
+      .map(([name, stats]) => ({ name, count: stats.visited }))
+      .filter(gc => gc.count > 0)
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+      .slice(0, 5);
+
+    const top5ReceivedGCs = Object.entries(gcMap)
+      .map(([name, stats]) => ({ name, count: stats.received }))
+      .filter(gc => gc.count > 0)
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+      .slice(0, 5);
+
+    return {
+      sectorsList,
+      top5VisitedGCs,
+      top5ReceivedGCs
+    };
+  }, [families, members, cells, visitationRecords, user]);
+
+  const handleExportVisitsExcel = () => {
+    if (filteredFamilyList.length === 0) return;
+
+    const data = filteredFamilyList.map(fam => {
+      const statusText = fam.isVisited 
+        ? 'Realizado (Visita)' 
+        : fam.isReceived 
+          ? 'Realizado (Recepção)' 
+          : fam.hasIndividualReceived 
+            ? 'Realizado (Parcial)' 
+            : 'Pendente';
+            
+      const dateText = fam.visitedAt 
+        ? new Date(fam.visitedAt).toLocaleDateString('pt-BR') 
+        : fam.receivedAt 
+          ? new Date(fam.receivedAt).toLocaleDateString('pt-BR') 
+          : '-';
+
+      return {
+        'Titular da Família': fam.headName,
+        'Qtd de Membros': fam.membersCount,
+        'Nomes na Casa': fam.familyMembers.map((m: any) => m.nome).join(', '),
+        'Região Administrativa': fam.headRA || '-',
+        'Bairro': fam.headBairro,
+        'Endereço Completo': fam.address,
+        'Contato': fam.contact,
+        'Grupos Caseiros da Família': fam.attendedGCs.join(', ') || 'Nenhum',
+        'Status da Campanha': statusText,
+        'Data do Atendimento': dateText,
+        'Anotações Pastorais / Observações': fam.notes || '-'
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Visitas Pastorais por Lar");
+    XLSX.writeFile(workbook, `campanha_visitas_lares_${new Date().getTime()}.xlsx`);
+  };
 
   if (isLoadingData) {
     return (
@@ -461,6 +657,133 @@ export const LabVisits: React.FC = () => {
         </div>
       </section>
 
+      {/* Analytics Section: Pastoral Sectors and GC Highlights */}
+      <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Pastoral Sectors Table */}
+        <div className="lg:col-span-2 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-sm font-bold text-slate-800 tracking-tight flex items-center gap-2">
+                  📊 Cobertura por Setor Pastoral
+                </h3>
+                <p className="text-[10px] text-slate-400">Total de lares e índice de pastoreio ativo por setor residencial.</p>
+              </div>
+            </div>
+            
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    <th className="py-2.5">Setor</th>
+                    <th className="py-2.5 text-center">Lares</th>
+                    <th className="py-2.5 text-center">Visitados</th>
+                    <th className="py-2.5 text-center">Recebidos</th>
+                    <th className="py-2.5 text-right">Cobertura</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {analytics.sectorsList.map((sector) => (
+                    <tr key={sector.name} className="text-xs hover:bg-slate-50/50 transition-colors">
+                      <td className="py-3 font-semibold text-slate-700">{sector.name}</td>
+                      <td className="py-3 text-center text-slate-600 font-medium">{sector.total}</td>
+                      <td className="py-3 text-center text-slate-500">{sector.visited}</td>
+                      <td className="py-3 text-center text-slate-500">{sector.received}</td>
+                      <td className="py-3 text-right">
+                        <div className="flex items-center justify-end gap-2.5">
+                          <span className="font-extrabold text-teal-600 text-[11px] shrink-0">{sector.coveragePct}%</span>
+                          <div className="w-16 bg-slate-100 h-1.5 rounded-full overflow-hidden shrink-0">
+                            <div className="bg-teal-500 h-full rounded-full transition-all duration-500" style={{ width: `${sector.coveragePct}%` }} />
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {analytics.sectorsList.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-slate-400 text-xs">
+                        Nenhum setor identificado no momento.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        {/* GC Highlights Cards */}
+        <div className="space-y-4 flex flex-col justify-between">
+          {/* Card: Top 5 Visited GCs */}
+          <div className="bg-gradient-to-br from-white to-slate-50/20 p-6 rounded-3xl border border-slate-100 shadow-sm flex-1 flex flex-col justify-between">
+            <div>
+              <div className="flex items-start justify-between mb-4">
+                <div className="space-y-1">
+                  <span className="text-[9px] font-black uppercase text-indigo-500 tracking-wider block bg-indigo-50 px-2 py-0.5 rounded-md w-fit">
+                    🏆 Ranking de Visitas
+                  </span>
+                  <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider">Top 5 GCs Visitados</h4>
+                </div>
+                <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-2xl">
+                  <CheckCircle2 className="w-5 h-5" />
+                </div>
+              </div>
+              
+              <div className="space-y-2.5">
+                {analytics.top5VisitedGCs.map((gc, idx) => (
+                  <div key={gc.name} className="flex items-center justify-between text-xs border-b border-slate-50/50 pb-1.5 last:border-0 last:pb-0">
+                    <div className="flex items-center gap-2 truncate">
+                      <span className="font-extrabold text-slate-400 w-4 shrink-0 text-center">{idx + 1}º</span>
+                      <span className="font-bold text-slate-700 truncate" title={gc.name}>{gc.name}</span>
+                    </div>
+                    <span className="font-black text-indigo-600 text-[11px] shrink-0 bg-indigo-50/40 px-2 py-0.5 rounded">
+                      {gc.count} <span className="text-[9px] font-bold text-slate-400">lares</span>
+                    </span>
+                  </div>
+                ))}
+                {analytics.top5VisitedGCs.length === 0 && (
+                  <div className="text-center py-6 text-slate-400 text-xs">Nenhum registro de visitas.</div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Card: Top 5 Received GCs */}
+          <div className="bg-gradient-to-br from-white to-slate-50/20 p-6 rounded-3xl border border-slate-100 shadow-sm flex-1 flex flex-col justify-between">
+            <div>
+              <div className="flex items-start justify-between mb-4">
+                <div className="space-y-1">
+                  <span className="text-[9px] font-black uppercase text-amber-500 tracking-wider block bg-amber-50 px-2 py-0.5 rounded-md w-fit">
+                    🏠 Ranking de Hospitalidade
+                  </span>
+                  <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider">Top 5 GCs Recebidos</h4>
+                </div>
+                <div className="p-2.5 bg-amber-50 text-amber-600 rounded-2xl">
+                  <Home className="w-5 h-5" />
+                </div>
+              </div>
+              
+              <div className="space-y-2.5">
+                {analytics.top5ReceivedGCs.map((gc, idx) => (
+                  <div key={gc.name} className="flex items-center justify-between text-xs border-b border-slate-50/50 pb-1.5 last:border-0 last:pb-0">
+                    <div className="flex items-center gap-2 truncate">
+                      <span className="font-extrabold text-slate-400 w-4 shrink-0 text-center">{idx + 1}º</span>
+                      <span className="font-bold text-slate-700 truncate" title={gc.name}>{gc.name}</span>
+                    </div>
+                    <span className="font-black text-amber-600 text-[11px] shrink-0 bg-amber-50/40 px-2 py-0.5 rounded">
+                      {gc.count} <span className="text-[9px] font-bold text-slate-400">lares</span>
+                    </span>
+                  </div>
+                ))}
+                {analytics.top5ReceivedGCs.length === 0 && (
+                  <div className="text-center py-6 text-slate-400 text-xs">Nenhum registro de recepção.</div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Filtering and Controls Bar */}
       <section className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col md:flex-row items-center gap-3">
         {/* Search */}
@@ -520,6 +843,16 @@ export const LabVisits: React.FC = () => {
             <option value="Pending">⏳ Lares Pendentes</option>
           </select>
         </div>
+
+        {/* Export Button */}
+        <button
+          onClick={handleExportVisitsExcel}
+          disabled={filteredFamilyList.length === 0}
+          className="w-full md:w-auto flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition-all duration-200 cursor-pointer shrink-0"
+          title="Exportar campanha de visitas para planilha Excel"
+        >
+          <Download className="w-3.5 h-3.5" /> Exportar ({filteredFamilyList.length})
+        </button>
       </section>
 
       {/* Household Grid */}

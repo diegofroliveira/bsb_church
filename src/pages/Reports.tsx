@@ -131,7 +131,10 @@ export const Reports: React.FC = () => {
     { key: 'uf', label: 'UF' },
     { key: 'status', label: 'Status' },
     { key: 'tipo_de_pessoa', label: 'Tipo de Pessoa' },
-    { key: 'status_pessoa', label: 'Status Pessoa' }
+    { key: 'status_pessoa', label: 'Status Pessoa' },
+    { key: 'titular_nome', label: 'Titular da Família' },
+    { key: 'parentesco', label: 'Parentesco com o Titular' },
+    { key: 'mesmo_domicilio', label: 'Mesmo Domicílio' }
   ];
 
   useEffect(() => {
@@ -143,6 +146,25 @@ export const Reports: React.FC = () => {
            supabase.from('celulas').select('grupo_caseiro, setor'),
            supabase.from('discipulado').select('discipulo, discipulador, status')
         ]);
+        
+        // Paginated loading for pessoas_familiares to bypass the 1000-row Supabase limit
+        let familyRelations: any[] = [];
+        let fromIndex = 0;
+        const pageSize = 1000;
+        while (true) {
+          const { data, error } = await supabase.from('pessoas_familiares')
+            .select('id_pessoa_a, pessoa_a, parentesco, id_pessoa_b, pessoa_b, mesmo_domicilio')
+            .range(fromIndex, fromIndex + pageSize - 1);
+          
+          if (error) {
+            console.error('Error fetching relations chunk in Reports:', error);
+            break;
+          }
+          if (!data || data.length === 0) break;
+          familyRelations = [...familyRelations, ...data];
+          if (data.length < pageSize) break;
+          fromIndex += pageSize;
+        }
         
         const allMembrosRaw = membrosRes.data || [];
         const excludedTypes = ['APOSTOLO', 'CONTADOR', 'EXTERNO', 'EXTRA LOCAL', 'FUNCIONARIO', 'VISITANTE'];
@@ -188,26 +210,172 @@ export const Reports: React.FC = () => {
           return 'Sem Setor';
         };
 
+        // Replicate DSU clustering to identify family titulars and relationship mappings
+        const memberById = new Map<string, any>();
+        const cleanName = (name: string | null | undefined): string => {
+          if (!name) return '';
+          return name.replace(/['"]/g, '').trim().toUpperCase().replace(/\s+/g, ' ');
+        };
+
+        allMembros.forEach(m => {
+          memberById.set(m.id.toString(), m);
+        });
+
+        const parentDSU = new Map<string, string>();
+        const find = (i: string): string => {
+          let root = i;
+          while (parentDSU.get(root) !== undefined) {
+            root = parentDSU.get(root)!;
+          }
+          let curr = i;
+          while (curr !== root) {
+            let nxt = parentDSU.get(curr)!;
+            parentDSU.set(curr, root);
+            curr = nxt;
+          }
+          return root;
+        };
+        
+        const union = (i: string, j: string) => {
+          const rootI = find(i);
+          const rootJ = find(j);
+          if (rootI !== rootJ) {
+            parentDSU.set(rootI, rootJ);
+          }
+        };
+
+        familyRelations.forEach((rel: any) => {
+          const mesmoDomicilio = rel.mesmo_domicilio || '';
+          if (mesmoDomicilio.toUpperCase().trim() === 'SIM') {
+            const idAStr = rel.id_pessoa_a?.toString();
+            const idBStr = rel.id_pessoa_b?.toString();
+            if (idAStr && idBStr && memberById.has(idAStr) && memberById.has(idBStr)) {
+              union(idAStr, idBStr);
+            }
+          }
+        });
+
+        // Collect components
+        const components: Record<string, string[]> = {};
+        allMembros.forEach(m => {
+          const idStr = m.id.toString();
+          const root = find(idStr);
+          if (!components[root]) components[root] = [];
+          components[root].push(idStr);
+        });
+
+        // Determine Head of Family for each component
+        const headByRoot = new Map<string, any>();
+        const memberIdsByRoot = new Map<string, string[]>();
+
+        Object.entries(components).forEach(([rootId, mIds]) => {
+          const familyMembers = mIds.map(id => memberById.get(id)!);
+          
+          let head = familyMembers[0];
+          const marriedMale = familyMembers.find(m => 
+            m.sexo === 'Masculino' && 
+            m.estado_civil && 
+            m.estado_civil.toUpperCase().includes('CASADO')
+          );
+          if (marriedMale) {
+            head = marriedMale;
+          } else {
+            const parent = familyMembers.find(m => {
+              const normName = cleanName(m.nome);
+              return familyMembers.some(c => 
+                cleanName(c.pai) === normName || 
+                cleanName(c.mae) === normName
+              );
+            });
+            if (parent) {
+              head = parent;
+            } else {
+              let oldest = head;
+              let oldestAge = -1;
+              familyMembers.forEach(m => {
+                const dob = m.nascimento || m.data_nascimento || m.birth_date;
+                let age = -1;
+                if (dob) {
+                  let parts = dob.includes('/') ? dob.split('/') : dob.split('-');
+                  const birth = dob.includes('/') ? new Date(Number(parts[2]), Number(parts[1])-1, Number(parts[0])) : new Date(dob);
+                  if (!isNaN(birth.getTime())) {
+                    const now = new Date();
+                    age = now.getFullYear() - birth.getFullYear();
+                    if (now.getMonth() < birth.getMonth() || (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate())) age--;
+                  }
+                }
+                if (age > oldestAge) {
+                  oldestAge = age;
+                  oldest = m;
+                }
+              });
+              head = oldest;
+            }
+          }
+          headByRoot.set(rootId, head);
+          memberIdsByRoot.set(rootId, mIds);
+        });
+
         // Enrich members with relational data
         const enrichedMembers = allMembros.map((m: any) => {
-           const nomeLower = (m.nome || m.name || '').trim().toLowerCase();
-           const gcLower = (m.grupos_caseiros || '').trim().toLowerCase();
-           
-           // Ecclesiastical Sector: database column with GC mapping fallback
-           const rawEcl = m.setor_eclesiastico || setorMap[gcLower] || 'Sem Setor';
-           const setorEcl = getNormalizedSectorName(rawEcl);
-           
-           // Resident Sector: database column with in-memory fallback (simulated via Prover sectors or empty)
-           const rawRes = m.setor_residencial || m.setor_residencial_calculado || '';
-           const setorRes = rawRes ? getNormalizedSectorName(rawRes) : (setorMap[gcLower] ? getNormalizedSectorName(setorMap[gcLower]) : 'Sem Setor');
-           
-           return {
-               ...m,
-               setor: setorRes, // default filter and display represents residence
-               setor_eclesiastico_display: setorEcl,
-               setor_residencial_display: setorRes,
-               discipulador: discipuladorMap[nomeLower] || 'Sem Discipulador'
-           };
+            const nomeLower = (m.nome || m.name || '').trim().toLowerCase();
+            const gcLower = (m.grupos_caseiros || '').trim().toLowerCase();
+            
+            // Ecclesiastical Sector: database column with GC mapping fallback
+            const rawEcl = m.setor_eclesiastico || setorMap[gcLower] || 'Sem Setor';
+            const setorEcl = getNormalizedSectorName(rawEcl);
+            
+            // Resident Sector: database column with in-memory fallback (simulated via Prover sectors or empty)
+            const rawRes = m.setor_residencial || m.setor_residencial_calculado || '';
+            const setorRes = rawRes ? getNormalizedSectorName(rawRes) : (setorMap[gcLower] ? getNormalizedSectorName(setorMap[gcLower]) : 'Sem Setor');
+            
+            // Family details
+            const root = find(m.id.toString());
+            const head = headByRoot.get(root);
+            const mIds = memberIdsByRoot.get(root) || [];
+            
+            let titularNome = '-';
+            let titularId = '-';
+            let parentesco = '-';
+            let mesmoDomicilio = '-';
+
+            if (head) {
+              titularNome = head.nome;
+              titularId = head.id.toString();
+              
+              if (m.id === head.id) {
+                parentesco = 'Titular';
+                mesmoDomicilio = 'Sim';
+              } else {
+                const rel = familyRelations.find((r: any) => 
+                  (r.id_pessoa_a === m.id && r.id_pessoa_b === head.id) ||
+                  (r.id_pessoa_b === m.id && r.id_pessoa_a === head.id)
+                );
+                if (rel) {
+                  parentesco = rel.parentesco || 'Familiar';
+                  mesmoDomicilio = rel.mesmo_domicilio || 'Não';
+                } else {
+                  const fallbackRel = familyRelations.find((r: any) => 
+                    (r.id_pessoa_a === m.id && mIds.includes(r.id_pessoa_b.toString())) ||
+                    (r.id_pessoa_b === m.id && mIds.includes(r.id_pessoa_a.toString()))
+                  );
+                  parentesco = fallbackRel ? fallbackRel.parentesco : 'Familiar';
+                  mesmoDomicilio = fallbackRel ? fallbackRel.mesmo_domicilio : 'Não';
+                }
+              }
+            }
+
+            return {
+                ...m,
+                setor: setorRes, // default filter and display represents residence
+                setor_eclesiastico_display: setorEcl,
+                setor_residencial_display: setorRes,
+                discipulador: discipuladorMap[nomeLower] || 'Sem Discipulador',
+                titular_nome: titularNome,
+                titular_id: titularId,
+                parentesco: parentesco,
+                mesmo_domicilio: mesmoDomicilio
+            };
         });
 
         setMembers(enrichedMembers);

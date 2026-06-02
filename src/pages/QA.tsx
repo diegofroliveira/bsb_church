@@ -87,7 +87,7 @@ export const QA: React.FC = () => {
         while (true) {
           const { data, error } = await supabase
             .from('membros')
-            .select('nome, status, tipo_cadastro, tipo_de_pessoa, nascimento, grupos_caseiros, celular_principal_sms, email')
+            .select('id, nome, status, tipo_cadastro, tipo_de_pessoa, nascimento, grupos_caseiros, celular_principal_sms, email, sexo, estado_civil, pai, mae')
             .range(from, from + 999);
           if (error) throw error;
           if (!data || data.length === 0) break;
@@ -198,6 +198,165 @@ export const QA: React.FC = () => {
           if (dupeGroups.length >= 50) break;
         }
         newReports.push({ id: 'duplicatas', title: 'Possíveis Membros Duplicados', description: 'Nomes muito semelhantes que podem representar o mesmo cadastro em duplicidade.', count: dupeGroups.length, severity: 'medium', data: dupeGroups.map((d, i) => ({ num: i + 1, nome_a: d.a, nome_b: d.b })), columns: [{ key: 'num', label: '#' }, { key: 'nome_a', label: 'Cadastro 1' }, { key: 'nome_b', label: 'Cadastro 2' }] });
+
+        // 12. Famílias Sem Titular Ativo
+        let relationsList: any[] = [];
+        let fromRel = 0;
+        try {
+          while (true) {
+            const { data, error } = await supabase
+              .from('pessoas_familiares')
+              .select('id_pessoa_a, pessoa_a, parentesco, id_pessoa_b, pessoa_b, mesmo_domicilio')
+              .range(fromRel, fromRel + 999);
+            if (error) throw error;
+            if (!data || data.length === 0) break;
+            relationsList = relationsList.concat(data);
+            if (data.length < 1000) break;
+            fromRel += 1000;
+          }
+
+          // Map all members by ID
+          const memberById = new Map<string, any>();
+          membros.forEach(m => {
+            if (m.id) {
+              memberById.set(m.id.toString(), m);
+            }
+          });
+
+          // DSU for all members
+          const parentDSU = new Map<string, string>();
+          const find = (i: string): string => {
+            let root = i;
+            while (parentDSU.get(root) !== undefined) {
+              root = parentDSU.get(root)!;
+            }
+            let curr = i;
+            while (curr !== root) {
+              let nxt = parentDSU.get(curr)!;
+              parentDSU.set(curr, root);
+              curr = nxt;
+            }
+            return root;
+          };
+          const union = (i: string, j: string) => {
+            const rI = find(i);
+            const rJ = find(j);
+            if (rI !== rJ) {
+              parentDSU.set(rI, rJ);
+            }
+          };
+
+          relationsList.forEach(rel => {
+            if ((rel.mesmo_domicilio || '').toUpperCase().trim() === 'SIM') {
+              const idA = rel.id_pessoa_a?.toString();
+              const idB = rel.id_pessoa_b?.toString();
+              if (idA && idB) {
+                union(idA, idB);
+              }
+            }
+          });
+
+          // Group members by components
+          const components: Record<string, string[]> = {};
+          membros.forEach(m => {
+            if (m.id) {
+              const idStr = m.id.toString();
+              const root = find(idStr);
+              if (!components[root]) components[root] = [];
+              components[root].push(idStr);
+            }
+          });
+
+          const cleanNameStr = (name: string | null | undefined): string => {
+            if (!name) return '';
+            return name.replace(/['"]/g, '').trim().toUpperCase().replace(/\s+/g, ' ');
+          };
+
+          const calculateAgeVal = (birthDateStr: string | null | undefined): number => {
+            if (!birthDateStr) return 0;
+            try {
+              const birth = new Date(birthDateStr);
+              const today = new Date();
+              let age = today.getFullYear() - birth.getFullYear();
+              const m = today.getMonth() - birth.getMonth();
+              if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+                age--;
+              }
+              return age;
+            } catch {
+              return 0;
+            }
+          };
+
+          const familiasSemTitular: any[] = [];
+
+          Object.entries(components).forEach(([_, mIds]) => {
+            const familyMembers = mIds.map(id => memberById.get(id)).filter(Boolean);
+            const activeMembers = familyMembers.filter(m => m.status === 'Ativo');
+            
+            if (activeMembers.length > 0) {
+              // Determine the "original head" of the entire component (active + inactive)
+              let head = familyMembers[0];
+              const marriedMale = familyMembers.find(m => 
+                m.sexo === 'Masculino' && 
+                m.estado_civil && 
+                m.estado_civil.toUpperCase().includes('CASADO')
+              );
+              if (marriedMale) {
+                head = marriedMale;
+              } else {
+                const parent = familyMembers.find(m => {
+                  const normName = cleanNameStr(m.nome);
+                  return familyMembers.some(c => 
+                    cleanNameStr(c.pai) === normName || 
+                    cleanNameStr(c.mae) === normName
+                  );
+                });
+                if (parent) {
+                  head = parent;
+                } else {
+                  let oldest = head;
+                  let oldestAge = -1;
+                  familyMembers.forEach(m => {
+                    const age = calculateAgeVal(m.nascimento);
+                    if (age > oldestAge) {
+                      oldestAge = age;
+                      oldest = m;
+                    }
+                  });
+                  head = oldest;
+                }
+              }
+
+              // If the original head is inactive, then we have active dependents without an active titular head!
+              if (head && head.status !== 'Ativo') {
+                familiasSemTitular.push({
+                  titular: head.nome,
+                  status_titular: head.status || 'Inativo',
+                  dependentes: activeMembers.map(m => m.nome).join(', '),
+                  qtd_ativos: activeMembers.length
+                });
+              }
+            }
+          });
+
+          newReports.push({
+            id: 'familias_sem_titular',
+            title: 'Famílias com Titular Inativo',
+            description: 'Famílias cujo titular oficial está inativo (ex: falecimento/saída), mas possuem dependentes ativos na base.',
+            count: familiasSemTitular.length,
+            severity: 'medium',
+            data: familiasSemTitular,
+            columns: [
+              { key: 'titular', label: 'Titular Inativo' },
+              { key: 'status_titular', label: 'Status' },
+              { key: 'dependentes', label: 'Dependentes Ativos' },
+              { key: 'qtd_ativos', label: 'Qtd Ativos' }
+            ]
+          });
+        } catch (err) {
+          console.error('Error generating familias_sem_titular report:', err);
+        }
 
         setReports(newReports.sort((a, b) => {
           const sev = { high: 3, medium: 2, low: 1 };

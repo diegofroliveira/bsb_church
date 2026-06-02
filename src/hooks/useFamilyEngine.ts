@@ -27,6 +27,7 @@ export interface Member {
   estado?: string | null;
   setor_eclesiastico?: string | null;
   setor_residencial?: string | null;
+  email?: string | null;
 }
 
 export interface Cell {
@@ -114,7 +115,9 @@ export const useFamilyEngine = (
         if (mesmoDomicilio.toUpperCase().trim() === 'SIM') {
           const idAStr = rel.id_pessoa_a?.toString();
           const idBStr = rel.id_pessoa_b?.toString();
-          if (idAStr && idBStr && memberById.has(idAStr) && memberById.has(idBStr)) {
+          if (idAStr && idBStr) {
+            // Union regardless of whether they are active or inactive in the database,
+            // so that if a titular becomes inactive, their active dependents still stay connected in the DSU!
             union(idAStr, idBStr);
           }
         }
@@ -191,3 +194,92 @@ export const useFamilyEngine = (
     return result;
   }, [draftMembers, relations]);
 };
+
+export interface EnrichedMember extends Member {
+  titular_nome: string;
+  titular_id: string;
+  parentesco: string;
+  mesmo_domicilio: string;
+  tamanho_familia: number;
+  familia_dividida: boolean;
+}
+
+export const useFlattenedFamilies = (
+  members: Member[],
+  relations: FamilyRelation[],
+  families: Record<string, Family>
+): EnrichedMember[] => {
+  return useMemo(() => {
+    if (members.length === 0 || Object.keys(families).length === 0) {
+      return [];
+    }
+
+    const memberById = new Map<string, Member>();
+    members.forEach(m => memberById.set(m.id.toString(), m));
+
+    const enrichedList: EnrichedMember[] = [];
+
+    Object.entries(families).forEach(([headId, fam]) => {
+      const headMember = memberById.get(headId);
+      if (!headMember) return;
+
+      const familyMembers = fam.memberIds
+        .map(idStr => memberById.get(idStr))
+        .filter((m): m is Member => !!m);
+
+      const attendedGCs = new Set<string>();
+      familyMembers.forEach(m => {
+        if (m.grupos_caseiros) attendedGCs.add(m.grupos_caseiros);
+      });
+      const isDivided = attendedGCs.size > 1;
+
+      familyMembers.forEach(m => {
+        let parentesco = 'Titular';
+        let mesmoDomicilio = 'Sim';
+
+        if (m.id.toString() !== headId) {
+          // Find relation between this member and the head
+          const rel = relations.find(r => 
+            (r.id_pessoa_a === m.id && r.id_pessoa_b === headMember.id) ||
+            (r.id_pessoa_b === m.id && r.id_pessoa_a === headMember.id)
+          );
+
+          if (rel) {
+            parentesco = rel.parentesco || 'Familiar';
+            mesmoDomicilio = rel.mesmo_domicilio || 'Não';
+          } else {
+            // Check if there is any parentesco record to other members of same family
+            const fallbackRel = relations.find(r => 
+              (r.id_pessoa_a === m.id && fam.memberIds.includes(r.id_pessoa_b.toString())) ||
+              (r.id_pessoa_b === m.id && fam.memberIds.includes(r.id_pessoa_a.toString()))
+            );
+            parentesco = fallbackRel ? fallbackRel.parentesco : 'Familiar';
+            mesmoDomicilio = fallbackRel ? fallbackRel.mesmo_domicilio : 'Não';
+          }
+        }
+
+        enrichedList.push({
+          ...m,
+          titular_nome: headMember.nome,
+          titular_id: headId,
+          parentesco,
+          mesmo_domicilio: mesmoDomicilio,
+          tamanho_familia: familyMembers.length,
+          familia_dividida: isDivided
+        });
+      });
+    });
+
+    // Sort by titular name, then by parentesco (Titular first), then by name
+    return enrichedList.sort((a, b) => {
+      const compTitular = a.titular_nome.localeCompare(b.titular_nome);
+      if (compTitular !== 0) return compTitular;
+      
+      if (a.parentesco === 'Titular' && b.parentesco !== 'Titular') return -1;
+      if (a.parentesco !== 'Titular' && b.parentesco === 'Titular') return 1;
+      
+      return a.nome.localeCompare(b.nome);
+    });
+  }, [members, relations, families]);
+};
+
