@@ -76,7 +76,7 @@ export const LabVisits: React.FC = () => {
         const [membrosRes, celulasRes] = await Promise.all([
           supabase
             .from('membros')
-            .select('id, nome, grupos_caseiros, status, sexo, bairro, pai, mae, logradouro, celular_principal_sms, telefone_fixo, estado_civil, nascimento, latitude, longitude, email')
+            .select('id, nome, grupos_caseiros, status, sexo, bairro, pai, mae, logradouro, celular_principal_sms, telefone_fixo, estado_civil, nascimento, latitude, longitude, email, tipo_de_pessoa')
             .eq('status', 'Ativo'),
           supabase
             .from('celulas')
@@ -86,7 +86,12 @@ export const LabVisits: React.FC = () => {
         if (membrosRes.error) throw membrosRes.error;
         if (celulasRes.error) throw celulasRes.error;
         
-        if (membrosRes.data) setMembers(membrosRes.data as Member[]);
+        if (membrosRes.data) {
+          const nonExternal = (membrosRes.data as any[]).filter(
+            m => (m.tipo_de_pessoa || '').toUpperCase().trim() !== 'EXTERNO'
+          );
+          setMembers(nonExternal as Member[]);
+        }
         if (celulasRes.data) setCells(celulasRes.data as Cell[]);
 
         // Paginated loading for pessoas_familiares to bypass the 1000-row Supabase limit
