@@ -136,6 +136,28 @@ export const Families: React.FC = () => {
       const headMember = members.find(m => m.id.toString() === headId);
       if (!headMember) return;
 
+      // Check head age - do not consider minors (under 18) as family heads/titulares
+      let birthDateStr = headMember.nascimento;
+      let headAge = -1;
+      if (birthDateStr) {
+        let parts = birthDateStr.includes('/') ? birthDateStr.split('/') : birthDateStr.split('-');
+        if (parts.length === 3) {
+          const birth = birthDateStr.includes('/') 
+            ? new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0])) 
+            : new Date(birthDateStr);
+          if (!isNaN(birth.getTime())) {
+            const now = new Date();
+            headAge = now.getFullYear() - birth.getFullYear();
+            if (now.getMonth() < birth.getMonth() || (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate())) {
+              headAge--;
+            }
+          }
+        }
+      }
+      if (headAge >= 0 && headAge < 18) {
+        return; // Skip minors as family heads
+      }
+
       const familyMembers = fam.memberIds
         .map(idStr => members.find(m => m.id.toString() === idStr))
         .filter((m): m is Member => !!m);
@@ -400,6 +422,31 @@ export const Families: React.FC = () => {
     const searchVal = cleanSearch(searchTerm);
 
     return flattenedFamilyMembers.filter(m => {
+      // Skip minors as family heads and their dependents
+      const headMember = members.find(h => h.id.toString() === m.titular_id);
+      if (headMember) {
+        let birthDateStr = headMember.nascimento;
+        let headAge = -1;
+        if (birthDateStr) {
+          let parts = birthDateStr.includes('/') ? birthDateStr.split('/') : birthDateStr.split('-');
+          if (parts.length === 3) {
+            const birth = birthDateStr.includes('/') 
+              ? new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0])) 
+              : new Date(birthDateStr);
+            if (!isNaN(birth.getTime())) {
+              const now = new Date();
+              headAge = now.getFullYear() - birth.getFullYear();
+              if (now.getMonth() < birth.getMonth() || (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate())) {
+                headAge--;
+              }
+            }
+          }
+        }
+        if (headAge >= 0 && headAge < 18) {
+          return false;
+        }
+      }
+
       // 1. Search Query
       const matchesSearch = searchVal === '' ||
         cleanSearch(m.nome).includes(searchVal) ||
