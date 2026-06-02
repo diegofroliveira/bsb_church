@@ -410,7 +410,8 @@ export const Families: React.FC = () => {
       // 3. GC Status Filter
       const matchesStatus = filterStatus === 'Todos' ||
         (filterStatus === 'Unified' && !fam.isDivided) ||
-        (filterStatus === 'Divided' && fam.isDivided);
+        (filterStatus === 'Divided' && fam.isDivided) ||
+        (filterStatus === 'Unipessoais' && fam.membersCount === 1);
 
       return matchesSearch && matchesSector && matchesSectorEcl && matchesStatus;
     });
@@ -466,7 +467,7 @@ export const Families: React.FC = () => {
 
       // 4. Relation type filter
       const matchesStatus = filterStatus === 'Todos' ||
-        (filterStatus === 'Titulares' && m.parentesco === 'Titular') ||
+        (filterStatus === 'Unipessoais' && m.tamanho_familia === 1) ||
         (filterStatus === 'Familiares' && m.parentesco !== 'Titular');
 
       return matchesSearch && matchesSector && matchesSectorEcl && matchesStatus;
@@ -662,7 +663,7 @@ export const Families: React.FC = () => {
                 <option value="Todos">Status/Relação (Todos)</option>
                 <option value="Unified">🏠 GCs Unificados</option>
                 <option value="Divided">⚠️ Famílias Divididas</option>
-                <option value="Titulares">👑 Apenas Titulares</option>
+                <option value="Unipessoais">👤 Lares Unipessoais (Mora Só)</option>
                 <option value="Familiares">👥 Apenas Familiares</option>
               </select>
             </div>
