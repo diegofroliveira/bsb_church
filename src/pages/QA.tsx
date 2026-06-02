@@ -290,9 +290,10 @@ export const QA: React.FC = () => {
           });
 
           const calculateAgeVal = (birthDateStr: string | null | undefined): number => {
-            if (!birthDateStr) return 0;
+            if (!birthDateStr) return -1;
             try {
               const birth = new Date(birthDateStr);
+              if (isNaN(birth.getTime())) return -1;
               const today = new Date();
               let age = today.getFullYear() - birth.getFullYear();
               const m = today.getMonth() - birth.getMonth();
@@ -301,11 +302,12 @@ export const QA: React.FC = () => {
               }
               return age;
             } catch {
-              return 0;
+              return -1;
             }
           };
 
           const familiasSemTitular: any[] = [];
+          const menoresTitulares: any[] = [];
 
           Object.entries(components).forEach(([_, mIds]) => {
             const familyMembers = mIds.map(id => memberById.get(id)).filter(Boolean);
@@ -354,8 +356,92 @@ export const QA: React.FC = () => {
                   qtd_ativos: activeMembers.length
                 });
               }
+
+              // Alert: Minors (under 18) who are head of a family and active
+              if (head && head.status === 'Ativo') {
+                const headAge = calculateAgeVal(head.nascimento);
+                if (headAge >= 0 && headAge < 18) {
+                  menoresTitulares.push({
+                    nome: head.nome,
+                    idade: `${headAge} ${headAge === 1 ? 'ano' : 'anos'}`,
+                    bairro: head.bairro || '-',
+                    tamanho_familia: activeMembers.length,
+                    membros_ativos: activeMembers.map(m => m.nome).join(', ')
+                  });
+                }
+              }
             }
           });
+
+          // Compute divergent/missing domiciles for active minor children
+          const divergentMap = new Map<string, { filho: string; idade: number; pais: string[]; bairro: string }>();
+          
+          relationsList.forEach(rel => {
+            if ((rel.parentesco || '').toUpperCase().trim() === 'FILHO(A)' && 
+                (rel.mesmo_domicilio || '').toUpperCase().trim() === 'NÃO') {
+              
+              const idA = rel.id_pessoa_a?.toString();
+              const idB = rel.id_pessoa_b?.toString();
+              if (idA && idB) {
+                const memA = memberById.get(idA);
+                const memB = memberById.get(idB);
+                
+                if (memA && memB) {
+                  const ageA = calculateAgeVal(memA.nascimento);
+                  const ageB = calculateAgeVal(memB.nascimento);
+                  
+                  let child = null;
+                  let parent = null;
+                  
+                  if (ageA >= 0 && ageB >= 0) {
+                    if (ageA < ageB) {
+                      child = memA;
+                      parent = memB;
+                    } else {
+                      child = memB;
+                      parent = memA;
+                    }
+                  } else {
+                    const normA = cleanNameStr(memA.nome);
+                    const normB = cleanNameStr(memB.nome);
+                    if (cleanNameStr(memA.pai) === normB || cleanNameStr(memA.mae) === normB) {
+                      child = memA;
+                      parent = memB;
+                    } else if (cleanNameStr(memB.pai) === normA || cleanNameStr(memB.mae) === normA) {
+                      child = memB;
+                      parent = memA;
+                    }
+                  }
+                  
+                  if (child && parent) {
+                    const childAge = calculateAgeVal(child.nascimento);
+                    if (childAge >= 0 && childAge < 18 && child.status === 'Ativo') {
+                      const childKey = child.nome;
+                      if (!divergentMap.has(childKey)) {
+                        divergentMap.set(childKey, {
+                          filho: child.nome,
+                          idade: childAge,
+                          pais: [],
+                          bairro: child.bairro || '-'
+                        });
+                      }
+                      const entry = divergentMap.get(childKey)!;
+                      if (!entry.pais.includes(parent.nome)) {
+                        entry.pais.push(parent.nome);
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          });
+          
+          const minorChildrenDivergent = Array.from(divergentMap.values()).map(entry => ({
+            filho: entry.filho,
+            idade: `${entry.idade} ${entry.idade === 1 ? 'ano' : 'anos'}`,
+            pais: entry.pais.join(' e '),
+            bairro: entry.bairro
+          }));
 
           newReports.push({
             id: 'familias_sem_titular',
@@ -371,8 +457,38 @@ export const QA: React.FC = () => {
               { key: 'qtd_ativos', label: 'Qtd Ativos' }
             ]
           });
+
+          newReports.push({
+            id: 'menores_titulares',
+            title: 'Menores como Titular de Família',
+            description: 'Casos onde o chefe de família (titular) identificado pelo sistema tem menos de 18 anos, geralmente por erros de domicílio.',
+            count: menoresTitulares.length,
+            severity: 'high',
+            data: menoresTitulares,
+            columns: [
+              { key: 'nome', label: 'Nome do Menor' },
+              { key: 'idade', label: 'Idade' },
+              { key: 'bairro', label: 'Bairro' },
+              { key: 'tamanho_familia', label: 'Membros Ativos' }
+            ]
+          });
+
+          newReports.push({
+            id: 'filhos_menores_fora_domicilio',
+            title: 'Filhos Menores com Domicílio Divergente',
+            description: 'Filhos menores de 18 anos cujo vínculo de domicílio com seus pais está marcado como "Não", separando-os de sua família.',
+            count: minorChildrenDivergent.length,
+            severity: 'medium',
+            data: minorChildrenDivergent,
+            columns: [
+              { key: 'filho', label: 'Nome do Filho' },
+              { key: 'idade', label: 'Idade' },
+              { key: 'pais', label: 'Pais' },
+              { key: 'bairro', label: 'Bairro' }
+            ]
+          });
         } catch (err) {
-          console.error('Error generating familias_sem_titular report:', err);
+          console.error('Error generating family reports:', err);
         }
 
         setReports(newReports.sort((a, b) => {
