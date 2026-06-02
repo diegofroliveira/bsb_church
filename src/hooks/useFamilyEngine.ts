@@ -116,6 +116,11 @@ export const useFamilyEngine = (
           const idAStr = rel.id_pessoa_a?.toString();
           const idBStr = rel.id_pessoa_b?.toString();
           if (idAStr && idBStr) {
+            // Programmatic hotfix: ignore the incorrect sibling link between Sophie Meneses (756641) and Symon Mendes (2397467)
+            // which was created by a typo in the Prover system due to name similarity with Sophye Mendes.
+            if ((idAStr === '756641' && idBStr === '2397467') || (idAStr === '2397467' && idBStr === '756641')) {
+              return;
+            }
             // Union regardless of whether they are active or inactive in the database,
             // so that if a titular becomes inactive, their active dependents still stay connected in the DSU!
             union(idAStr, idBStr);

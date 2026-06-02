@@ -262,6 +262,10 @@ export const QA: React.FC = () => {
               const idA = rel.id_pessoa_a?.toString();
               const idB = rel.id_pessoa_b?.toString();
               if (idA && idB) {
+                // Programmatic hotfix: ignore the incorrect sibling link between Sophie Meneses (756641) and Symon Mendes (2397467)
+                if ((idA === '756641' && idB === '2397467') || (idA === '2397467' && idB === '756641')) {
+                  return;
+                }
                 union(idA, idB);
               }
             }
