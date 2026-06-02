@@ -364,14 +364,17 @@ export const Families: React.FC = () => {
 
   // Filtering nuclear family cards
   const filteredFamilies = useMemo(() => {
+    const cleanSearch = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    const searchVal = cleanSearch(searchTerm);
+
     return familyData.list.filter(fam => {
       // 1. Text search
-      const matchesSearch = searchTerm === '' || 
-        fam.headName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        fam.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        fam.headBairro.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        fam.familyMembers.some((m: Member) => m.nome.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        fam.gcsAttended.some((g: string) => g.toLowerCase().includes(searchTerm.toLowerCase()));
+      const matchesSearch = searchVal === '' || 
+        cleanSearch(fam.headName).includes(searchVal) ||
+        cleanSearch(fam.address).includes(searchVal) ||
+        cleanSearch(fam.headBairro).includes(searchVal) ||
+        fam.familyMembers.some((m: Member) => cleanSearch(m.nome).includes(searchVal)) ||
+        fam.gcsAttended.some((g: string) => cleanSearch(g).includes(searchVal));
 
       // 2. Sector Filter
       const headMember = fam.familyMembers.find((m: Member) => m.id.toString() === fam.headId);
@@ -393,14 +396,17 @@ export const Families: React.FC = () => {
 
   // Filtering and sorting the flattened family members for the exportable table
   const filteredFlattenedMembers = useMemo(() => {
+    const cleanSearch = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    const searchVal = cleanSearch(searchTerm);
+
     return flattenedFamilyMembers.filter(m => {
       // 1. Search Query
-      const matchesSearch = searchTerm === '' ||
-        m.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        m.titular_nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (m.bairro || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (m.grupos_caseiros || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (m.logradouro || '').toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch = searchVal === '' ||
+        cleanSearch(m.nome).includes(searchVal) ||
+        cleanSearch(m.titular_nome).includes(searchVal) ||
+        cleanSearch(m.bairro || '').includes(searchVal) ||
+        cleanSearch(m.grupos_caseiros || '').includes(searchVal) ||
+        cleanSearch(m.logradouro || '').includes(searchVal);
 
       // 2. Sector Residence
       const residentSector = getMemberSector(m);

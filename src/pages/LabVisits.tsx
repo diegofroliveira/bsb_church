@@ -311,6 +311,9 @@ export const LabVisits: React.FC = () => {
       });
     }
 
+    const cleanSearch = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    const searchVal = cleanSearch(searchTerm);
+
     Object.entries(families).forEach(([headId, fam]) => {
       // Exclude logged-in user's own family
       if (headId === userFamilyId) return;
@@ -335,12 +338,12 @@ export const LabVisits: React.FC = () => {
       const attendedGCs = Array.from(new Set(familyMembers.map(m => m.grupos_caseiros).filter(Boolean)));
 
       // 1. Text Search matching
-      const matchesSearch = searchTerm === '' ||
-        headMember.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (headMember.logradouro || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (headMember.bairro || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        familyMembers.some(m => m.nome.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        notes.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch = searchVal === '' ||
+        cleanSearch(headMember.nome).includes(searchVal) ||
+        cleanSearch(headMember.logradouro || '').includes(searchVal) ||
+        cleanSearch(headMember.bairro || '').includes(searchVal) ||
+        familyMembers.some(m => cleanSearch(m.nome).includes(searchVal)) ||
+        cleanSearch(notes).includes(searchVal);
 
       // 2. RA Filter
       const matchesRA = filterRA === 'Todos' || headRA === filterRA;
