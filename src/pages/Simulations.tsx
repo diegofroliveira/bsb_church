@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, Circle, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import * as XLSX from 'xlsx';
 import { BairroTag } from './simulations/BairroTag';
 import { SimulationsMap } from './simulations/SimulationsMap';
 
@@ -56,7 +57,8 @@ import {
   Users, Home, Play, RotateCcw, ArrowRight, ArrowLeft,
   Search, ShieldAlert, CheckCircle2, Download, Filter,
   Network, TrendingUp, AlertTriangle, Brain, MapPin,
-  ChevronDown, ChevronUp, UserCheck, Eye, EyeOff, Plus, X, PlusCircle, Zap, Lightbulb
+  ChevronDown, ChevronUp, UserCheck, Eye, EyeOff, Plus, X, PlusCircle, Zap, Lightbulb,
+  FileSpreadsheet, ClipboardCopy, Check, FileText
 } from 'lucide-react';
 import clsx from 'clsx';
 import { 
@@ -585,8 +587,122 @@ export const Simulations: React.FC = () => {
 
   // PROVER API Integration Modal States
   const [proverModalOpen, setProverModalOpen] = useState(false);
-  const [proverLoadingStep, setProverLoadingStep] = useState(0);
-  const [proverComplete, setProverComplete] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
+
+  const generateTextReport = () => {
+    // 1. New GCs
+    const newCells = draftCells.filter(c => c.id.toString().startsWith('draft_cell_'));
+    // 2. Member transfers
+    const memberChanges = draftMembers.filter(m => {
+      const base = baselineMembers.find(bm => bm.id === m.id);
+      return base && base.grupos_caseiros !== m.grupos_caseiros;
+    });
+    // 3. Discipleship changes
+    const discipleshipChanges = draftLinks.filter(l => {
+      return !baselineLinks.some(bl => bl.discipulo === l.discipulo && bl.discipulador === l.discipulador);
+    });
+
+    let text = `📋 *RELATÓRIO DE TRANSIÇÃO E REMANEJAMENTO — SECRETARIA BSB CHURCH*\n`;
+    text += `📅 Gerado em: ${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}\n\n`;
+
+    if (newCells.length > 0) {
+      text += `⛪ *NOVOS GRUPOS CASEIROS A CRIAR NO PROVER:* (${newCells.length})\n`;
+      newCells.forEach(c => {
+        text += `• *GC:* ${c.grupo_caseiro} | *Líder:* ${c.lider || 'A definir'} | *Setor:* ${c.setor || 'Central'}\n`;
+      });
+      text += `\n`;
+    }
+
+    if (memberChanges.length > 0) {
+      text += `🔄 *REMANEJAMENTO DE MEMBROS:* (${memberChanges.length})\n`;
+      memberChanges.forEach(m => {
+        const base = baselineMembers.find(bm => bm.id === m.id);
+        text += `• *${m.nome}*: Mudar do GC *"${base?.grupos_caseiros || 'Sem GC'}"* ➔ *"${m.grupos_caseiros || 'Sem GC'}"*\n`;
+      });
+      text += `\n`;
+    }
+
+    if (discipleshipChanges.length > 0) {
+      text += `🤝 *NOVOS VÍNCULOS DE DISCIPULADO:* (${discipleshipChanges.length})\n`;
+      discipleshipChanges.forEach(l => {
+        text += `• *Discípulo:* ${l.discipulo} ➔ *Discipulador:* ${l.discipulador}\n`;
+      });
+      text += `\n`;
+    }
+
+    if (newCells.length === 0 && memberChanges.length === 0 && discipleshipChanges.length === 0) {
+      text += `✨ Nenhuma alteração pendente no cenário atual.`;
+    }
+
+    return text;
+  };
+
+  const handleExportExcel = () => {
+    const newCells = draftCells
+      .filter(c => c.id.toString().startsWith('draft_cell_'))
+      .map(c => ({
+        'Nome do Grupo Caseiro': c.grupo_caseiro,
+        'Líder Simulado': c.lider || 'A definir',
+        'Setor': c.setor || 'Sem Setor'
+      }));
+
+    const memberChanges = draftMembers
+      .filter(m => {
+        const base = baselineMembers.find(bm => bm.id === m.id);
+        return base && base.grupos_caseiros !== m.grupos_caseiros;
+      })
+      .map(m => {
+        const base = baselineMembers.find(bm => bm.id === m.id);
+        return {
+          'Nome do Membro': m.nome,
+          'GC Anterior': base?.grupos_caseiros || 'Nenhum',
+          'Novo GC (Simulado)': m.grupos_caseiros || 'Nenhum',
+          'Bairro/RA': m.bairro || 'Não informado',
+          'Tipo de Pessoa': m.tipo_de_pessoa || 'Membro'
+        };
+      });
+
+    const discipleshipChanges = draftLinks
+      .filter(l => {
+        return !baselineLinks.some(bl => bl.discipulo === l.discipulo && bl.discipulador === l.discipulador);
+      })
+      .map(l => ({
+        'Discípulo': l.discipulo,
+        'Novo Discipulador': l.discipulador
+      }));
+
+    const wb = XLSX.utils.book_new();
+
+    if (newCells.length > 0) {
+      const wsCells = XLSX.utils.json_to_sheet(newCells);
+      XLSX.utils.book_append_sheet(wb, wsCells, 'Novas Células');
+    }
+
+    if (memberChanges.length > 0) {
+      const wsMembers = XLSX.utils.json_to_sheet(memberChanges);
+      XLSX.utils.book_append_sheet(wb, wsMembers, 'Transferências de Membros');
+    }
+
+    if (discipleshipChanges.length > 0) {
+      const wsDisc = XLSX.utils.json_to_sheet(discipleshipChanges);
+      XLSX.utils.book_append_sheet(wb, wsDisc, 'Novos Vínculos');
+    }
+
+    if (newCells.length === 0 && memberChanges.length === 0 && discipleshipChanges.length === 0) {
+      alert("Nenhuma alteração simulada para exportar.");
+      return;
+    }
+
+    XLSX.writeFile(wb, `IgrejaPro_Relatorio_Transicao_Secretaria_${Date.now()}.xlsx`);
+  };
+
+  const handleCopyToClipboard = () => {
+    const textReport = generateTextReport();
+    navigator.clipboard.writeText(textReport).then(() => {
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    });
+  };
 
   // Conselheiro de Expansão (IA de Expansão) Calculations
   // const expansionRecommendations = useMemo(() => {
@@ -1627,16 +1743,10 @@ export const Simulations: React.FC = () => {
             disabled={activeTab === 'gc' ? impactStats.changes === 0 : discipleshipImpactStats.changes === 0}
             onClick={() => {
               setProverModalOpen(true);
-              setProverLoadingStep(0);
-              setProverComplete(false);
-              setTimeout(() => setProverLoadingStep(1), 1200);
-              setTimeout(() => setProverLoadingStep(2), 2400);
-              setTimeout(() => setProverLoadingStep(3), 3600);
-              setTimeout(() => setProverComplete(true), 4800);
             }}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 rounded-xl active:scale-95 shadow-lg shadow-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none transition-all cursor-pointer animate-pulse"
+            className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 rounded-xl active:scale-95 shadow-lg shadow-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none transition-all cursor-pointer"
           >
-            <Zap className="w-4 h-4 text-emerald-100 animate-bounce" /> Homologar no PROVER
+            <FileText className="w-4 h-4 text-emerald-100" /> Relatório p/ Secretaria
           </button>
 
         </div>
@@ -4259,98 +4369,65 @@ export const Simulations: React.FC = () => {
       {/* PROVER API Integration Modal */}
       {proverModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 max-w-md w-full p-6 text-center space-y-6 animate-in zoom-in-95 duration-200">
-            <div className="flex flex-col items-center space-y-2">
-              <div className="p-3.5 bg-emerald-50 text-emerald-600 rounded-full animate-bounce">
-                <Zap className="w-6 h-6" />
+          <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 max-w-lg w-full p-6 text-center space-y-6 animate-in zoom-in-95 duration-200">
+            <div className="flex flex-col items-center space-y-2 border-b pb-4">
+              <div className="p-3 bg-emerald-50 text-emerald-600 rounded-full">
+                <FileText className="w-6 h-6" />
               </div>
               <h3 className="text-lg font-black text-gray-900">
-                Ponte de Homologação PROVER API
+                Relatório de Transição para Secretaria
               </h3>
               <p className="text-xs text-gray-400 font-medium leading-relaxed">
-                Transmitindo com segurança as alterações do cenário Sandbox para a moderação e banco de dados oficial do sistema PROVER.
+                Como o Sistema Prover é fechado, exporte as alterações simuladas abaixo para que a secretaria realize os remanejamentos e criações de células.
               </p>
             </div>
 
-            {/* Status Steps */}
-            <div className="text-left space-y-3.5 border border-gray-100 bg-gray-50/50 p-4.5 rounded-2xl">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-bold text-gray-700 flex items-center gap-2">
-                  🔐 1. Estabelecer túnel SSL criptografado
-                </span>
-                {proverLoadingStep >= 1 ? (
-                  <span className="text-[10px] text-emerald-600 font-extrabold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">CONECTADO</span>
-                ) : (
-                  <span className="text-[10px] text-indigo-600 font-extrabold bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100 animate-pulse">PROCESSANDO...</span>
-                )}
-              </div>
-
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-bold text-gray-700 flex items-center gap-2">
-                  👤 2. Autenticar credenciais de Pastor Titular
-                </span>
-                {proverLoadingStep >= 2 ? (
-                  <span className="text-[10px] text-emerald-600 font-extrabold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">AUTENTICADO</span>
-                ) : proverLoadingStep === 1 ? (
-                  <span className="text-[10px] text-indigo-600 font-extrabold bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100 animate-pulse">AUTENTICANDO...</span>
-                ) : (
-                  <span className="text-[10px] text-gray-400 font-bold">AGUARDANDO</span>
-                )}
-              </div>
-
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-bold text-gray-700 flex items-center gap-2">
-                  {activeTab === 'gc' ? (
-                    <>📊 3. Transmitir lote de {impactStats.changes} remanejamentos</>
-                  ) : (
-                    <>📊 3. Transmitir lote de {discipleshipImpactStats.changes} novos vínculos</>
-                  )}
-                </span>
-                {proverComplete ? (
-                  <span className="text-[10px] text-emerald-600 font-extrabold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">HOMOLOGADO</span>
-                ) : proverLoadingStep === 2 ? (
-                  <span className="text-[10px] text-indigo-600 font-extrabold bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100 animate-pulse">TRANSMITINDO...</span>
-                ) : (
-                  <span className="text-[10px] text-gray-400 font-bold">AGUARDANDO</span>
-                )}
-              </div>
+            {/* Changes Summary View */}
+            <div className="text-left space-y-3.5 border border-gray-100 bg-gray-50/50 p-4.5 rounded-2xl max-h-64 overflow-y-auto scrollbar-thin">
+              <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Resumo das Alterações:</div>
+              <pre className="text-[11px] font-mono text-gray-700 bg-white border border-gray-100 p-3 rounded-xl whitespace-pre-wrap leading-relaxed select-all">
+                {generateTextReport()}
+              </pre>
             </div>
 
-            {/* Progress Bar */}
-            <div className="w-full bg-gray-100 h-2.5 rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-gradient-to-r from-emerald-400 to-teal-500 transition-all duration-500"
-                style={{ 
-                  width: proverComplete ? '100%' : `${proverLoadingStep * 33 + 10}%` 
-                }}
-              />
+            {/* Actions */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button
+                onClick={handleExportExcel}
+                className="py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-95 border-0"
+              >
+                <FileSpreadsheet className="w-4 h-4" /> Baixar Planilha (.xlsx)
+              </button>
+              <button
+                onClick={handleCopyToClipboard}
+                className={clsx(
+                  "py-2.5 px-4 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-95 border border-gray-200",
+                  isCopied 
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    : "bg-white hover:bg-gray-50 text-gray-700"
+                )}
+              >
+                {isCopied ? (
+                  <>
+                    <Check className="w-4 h-4 text-emerald-600" /> Copiado!
+                  </>
+                ) : (
+                  <>
+                    <ClipboardCopy className="w-4 h-4" /> Copiar Resumo (WhatsApp)
+                  </>
+                )}
+              </button>
             </div>
 
             {/* Bottom Actions */}
-            {proverComplete ? (
-              <div className="space-y-4">
-                <div className="p-3 bg-emerald-50 text-emerald-800 text-[11px] leading-relaxed font-bold border border-emerald-100 rounded-xl">
-                  {activeTab === 'gc' ? (
-                    "🎉 Lote de Simulação Homologado com Sucesso! Os remanejamentos e novas células foram enviados e integrados à moderação administrativa do PROVER. As mudanças estarão ativas em instantes."
-                  ) : (
-                    "🎉 Lote de Simulação de Discipulado Homologado com Sucesso! Os novos vínculos de discipulado foram enviados e integrados à moderação administrativa do PROVER. As mudanças estarão ativas em instantes."
-                  )}
-                </div>
-                <button
-                  onClick={() => setProverModalOpen(false)}
-                  className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow transition-all cursor-pointer active:scale-95"
-                >
-                  Concluir e Voltar
-                </button>
-              </div>
-            ) : (
+            <div className="border-t pt-4">
               <button
                 onClick={() => setProverModalOpen(false)}
-                className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl text-xs font-black transition-all cursor-pointer active:scale-95"
+                className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl text-xs font-black transition-all cursor-pointer active:scale-95 border-0"
               >
-                Cancelar Transmissão
+                Fechar
               </button>
-            )}
+            </div>
           </div>
         </div>
       )}
