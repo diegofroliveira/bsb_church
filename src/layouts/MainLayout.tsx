@@ -121,9 +121,9 @@ export const MainLayout: React.FC = () => {
 
     { id: 'Discipulado',     name: 'Discipulado',     path: '/discipleship', icon: BookOpen,        group: 'Pastoreio' },
     { id: 'Companheirismo',  name: 'Companheirismo',  path: '/companionship', icon: Handshake,       group: 'Pastoreio' },
+    { id: 'Simulações',      name: 'Simulações',      path: '/simulations',  icon: Play,            group: 'Pastoreio' },
 
     { id: 'Financeiro',      name: 'Financeiro',      path: '/finance',      icon: DollarSign,      group: 'Gestão & Ferramentas' },
-    { id: 'Simulações',      name: 'Simulações',      path: '/simulations',  icon: Play,            group: 'Gestão & Ferramentas' },
     { id: 'Consultor IA',    name: 'IA',              path: '/ai-consultant', icon: Brain,           group: 'Gestão & Ferramentas' },
     { id: 'QA',              name: 'QA',              path: '/qa',           icon: AlertTriangle,   group: 'Gestão & Ferramentas' },
     { id: 'Configurações',   name: 'Configurações',   path: '/admin/users',  icon: Settings,        group: 'Gestão & Ferramentas' },
