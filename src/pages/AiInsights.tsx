@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Sparkles, RefreshCw, AlertCircle, Eye, EyeOff, ShieldAlert, BookOpen, Heart, TrendingUp } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { supabaseReader } from '../lib/supabase';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 interface Insight {
@@ -104,8 +104,8 @@ export const AiInsights: React.FC = () => {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const { data: mData } = await supabase.from('membros').select('*');
-      const { data: cData } = await supabase.from('celulas').select('*');
+      const { data: mData } = await supabaseReader.from('membros').select('*');
+      const { data: cData } = await supabaseReader.from('celulas').select('*');
       if (mData) setMembers(mData);
       if (cData) setCells(cData);
 

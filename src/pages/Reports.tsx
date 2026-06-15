@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabaseReader } from '../lib/supabase';
 import { Filter, Download, Loader2, Search, FileText, ArrowUpDown, ChevronUp, ChevronDown, Home, ShieldAlert, Users, Heart } from 'lucide-react';
 import clsx from 'clsx';
 import * as XLSX from 'xlsx';
@@ -7,6 +7,17 @@ import * as XLSX from 'xlsx';
 const normalizeStr = (s: string | null | undefined): string => {
   if (!s) return '';
   return s.trim().replace(/\s+/g, ' ').toUpperCase();
+};
+
+const invertParentesco = (parentesco: string, relativeGender: string | null | undefined): string => {
+  const p = parentesco.trim();
+  if (p === 'Mãe' || p === 'Pai') return 'Filho(a)';
+  if (p === 'Filho(a)') return relativeGender === 'Feminino' ? 'Mãe' : 'Pai';
+  if (p === 'Sogro(a)') return 'Genro / Nora';
+  if (p === 'Genro / Nora') return 'Sogro(a)';
+  if (p === 'Tio(a)') return 'Sobrinho(a)';
+  if (p === 'Sobrinho(a)') return 'Tio(a)';
+  return p;
 };
 
 const MultiSelect: React.FC<{
@@ -142,9 +153,9 @@ export const Reports: React.FC = () => {
       setIsLoading(true);
       try {
         const [membrosRes, celulasRes, discRes] = await Promise.all([
-           supabase.from('membros').select('*').limit(10000),
-           supabase.from('celulas').select('grupo_caseiro, setor'),
-           supabase.from('discipulado').select('discipulo, discipulador, status')
+           supabaseReader.from('membros').select('*').limit(10000),
+           supabaseReader.from('celulas').select('grupo_caseiro, setor'),
+           supabaseReader.from('discipulado').select('discipulo, discipulador, status')
         ]);
         
         // Paginated loading for pessoas_familiares to bypass the 1000-row Supabase limit
@@ -152,7 +163,7 @@ export const Reports: React.FC = () => {
         let fromIndex = 0;
         const pageSize = 1000;
         while (true) {
-          const { data, error } = await supabase.from('pessoas_familiares')
+          const { data, error } = await supabaseReader.from('pessoas_familiares')
             .select('id_pessoa_a, pessoa_a, parentesco, id_pessoa_b, pessoa_b, mesmo_domicilio')
             .range(fromIndex, fromIndex + pageSize - 1);
           
@@ -352,15 +363,22 @@ export const Reports: React.FC = () => {
                   (r.id_pessoa_b === m.id && r.id_pessoa_a === head.id)
                 );
                 if (rel) {
-                  parentesco = rel.parentesco || 'Familiar';
+                  const isB = rel.id_pessoa_b === m.id;
+                  parentesco = isB ? (rel.parentesco || 'Familiar') : invertParentesco(rel.parentesco || 'Familiar', m.sexo);
                   mesmoDomicilio = rel.mesmo_domicilio || 'Não';
                 } else {
                   const fallbackRel = familyRelations.find((r: any) => 
                     (r.id_pessoa_a === m.id && mIds.includes(r.id_pessoa_b.toString())) ||
                     (r.id_pessoa_b === m.id && mIds.includes(r.id_pessoa_a.toString()))
                   );
-                  parentesco = fallbackRel ? fallbackRel.parentesco : 'Familiar';
-                  mesmoDomicilio = fallbackRel ? fallbackRel.mesmo_domicilio : 'Não';
+                  if (fallbackRel) {
+                    const isB = fallbackRel.id_pessoa_b === m.id;
+                    parentesco = isB ? (fallbackRel.parentesco || 'Familiar') : invertParentesco(fallbackRel.parentesco || 'Familiar', m.sexo);
+                    mesmoDomicilio = fallbackRel.mesmo_domicilio || 'Não';
+                  } else {
+                    parentesco = 'Familiar';
+                    mesmoDomicilio = 'Não';
+                  }
                 }
               }
             }

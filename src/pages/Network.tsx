@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { Search, Loader2, ChevronDown, ChevronRight, Network as NetworkIcon, Users } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { supabaseReader } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import clsx from 'clsx';
 
@@ -197,8 +197,8 @@ export const Network: React.FC = () => {
         }
 
         const [discRes, membRes] = await Promise.all([
-          supabase.from('discipulado').select('*'),
-          supabase.from('membros').select('nome, tipo_cadastro').ilike('tipo_cadastro', '%pastor%')
+          supabaseReader.from('discipulado').select('*'),
+          supabaseReader.from('membros').select('nome, tipo_cadastro').ilike('tipo_cadastro', '%pastor%')
         ]);
         if (discRes.error) throw discRes.error;
 

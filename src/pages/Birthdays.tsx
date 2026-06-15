@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, supabaseReader } from '../lib/supabase';
 import { 
   Calendar, 
   Copy, 
@@ -249,16 +249,75 @@ export const Birthdays: React.FC = () => {
       } else if (filterMode === 'month') {
         matchDate = month === currentMonth;
       } else if (filterMode === 'specific') {
-        const specParts = specificDate.split('-');
-        if (specParts.length >= 3) {
-          const specDay = parseInt(specParts[2]);
-          const specMonth = parseInt(specParts[1]);
-          matchDate = day === specDay && month === specMonth;
-        } else {
-          const spec = new Date(specificDate);
-          const specDay = spec.getDate() + 1;
-          const specMonth = spec.getMonth() + 1;
-          matchDate = day === specDay && month === specMonth;
+        let specDay = 0;
+        let specMonth = 0;
+        
+        if (specificDate) {
+          const cleanDate = specificDate.trim();
+          if (cleanDate.includes('-')) {
+            const parts = cleanDate.split('-');
+            if (parts.length >= 3) {
+              if (parts[0].length === 4) {
+                // YYYY-MM-DD
+                specDay = parseInt(parts[2], 10);
+                specMonth = parseInt(parts[1], 10);
+              } else {
+                // DD-MM-YYYY or MM-DD-YYYY
+                specDay = parseInt(parts[1], 10);
+                specMonth = parseInt(parts[0], 10);
+              }
+            }
+          } else if (cleanDate.includes('/')) {
+            const parts = cleanDate.split('/');
+            if (parts.length >= 3) {
+              if (parts[2].length === 4) {
+                // DD/MM/YYYY
+                specDay = parseInt(parts[0], 10);
+                specMonth = parseInt(parts[1], 10);
+              } else if (parts[0].length === 4) {
+                // YYYY/MM/DD
+                specDay = parseInt(parts[2], 10);
+                specMonth = parseInt(parts[1], 10);
+              }
+            }
+          }
+
+          if (!specDay || !specMonth || isNaN(specDay) || isNaN(specMonth)) {
+            const spec = new Date(cleanDate);
+            if (!isNaN(spec.getTime())) {
+              if (cleanDate.includes('-')) {
+                specDay = spec.getUTCDate();
+                specMonth = spec.getUTCMonth() + 1;
+              } else {
+                specDay = spec.getDate();
+                specMonth = spec.getMonth() + 1;
+              }
+            }
+          }
+        }
+        
+        matchDate = day === specDay && month === specMonth;
+
+        if (filterMode === 'specific' && (month === 5 || m.nome.includes('ARTHUR'))) {
+          console.log('[DEBUG-SPECIFIC]', {
+            nome: m.nome,
+            nascimento: m.nascimento,
+            calculatedDay: day,
+            calculatedMonth: month,
+            selectedDate: specificDate,
+            specDay,
+            specMonth,
+            matchDate,
+            age: calculateAge(m.nascimento),
+            filterMinAge,
+            filterMaxAge,
+            gender: m.sexo,
+            filterGender,
+            gc: m.grupos_caseiros,
+            filterGC,
+            marital: m.estado_civil,
+            filterMaritalStatus
+          });
         }
       }
       return matchDate;
@@ -487,6 +546,17 @@ export const Birthdays: React.FC = () => {
         });
 
       if (uploadError) throw uploadError;
+
+      // Get the public URL of the uploaded image
+      const publicUrl = supabase.storage.from('avatars').getPublicUrl(filePath).data.publicUrl;
+
+      // Update the member profile in the database
+      const { error: dbError } = await supabase
+        .from('membros')
+        .update({ foto: publicUrl })
+        .eq('id', memberId);
+
+      if (dbError) throw dbError;
 
       setAvatarCacheBuster(Date.now());
       fetchMembers();

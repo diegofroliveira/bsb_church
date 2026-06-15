@@ -209,6 +209,17 @@ export interface EnrichedMember extends Member {
   familia_dividida: boolean;
 }
 
+export const invertParentesco = (parentesco: string, relativeGender: string | null | undefined): string => {
+  const p = parentesco.trim();
+  if (p === 'Mãe' || p === 'Pai') return 'Filho(a)';
+  if (p === 'Filho(a)') return relativeGender === 'Feminino' ? 'Mãe' : 'Pai';
+  if (p === 'Sogro(a)') return 'Genro / Nora';
+  if (p === 'Genro / Nora') return 'Sogro(a)';
+  if (p === 'Tio(a)') return 'Sobrinho(a)';
+  if (p === 'Sobrinho(a)') return 'Tio(a)';
+  return p;
+};
+
 export const useFlattenedFamilies = (
   members: Member[],
   relations: FamilyRelation[],
@@ -250,7 +261,8 @@ export const useFlattenedFamilies = (
           );
 
           if (rel) {
-            parentesco = rel.parentesco || 'Familiar';
+            const isB = rel.id_pessoa_b === m.id;
+            parentesco = isB ? (rel.parentesco || 'Familiar') : invertParentesco(rel.parentesco || 'Familiar', m.sexo);
             mesmoDomicilio = rel.mesmo_domicilio || 'Não';
           } else {
             // Check if there is any parentesco record to other members of same family
@@ -258,8 +270,14 @@ export const useFlattenedFamilies = (
               (r.id_pessoa_a === m.id && fam.memberIds.includes(r.id_pessoa_b.toString())) ||
               (r.id_pessoa_b === m.id && fam.memberIds.includes(r.id_pessoa_a.toString()))
             );
-            parentesco = fallbackRel ? fallbackRel.parentesco : 'Familiar';
-            mesmoDomicilio = fallbackRel ? fallbackRel.mesmo_domicilio : 'Não';
+            if (fallbackRel) {
+              const isB = fallbackRel.id_pessoa_b === m.id;
+              parentesco = isB ? (fallbackRel.parentesco || 'Familiar') : invertParentesco(fallbackRel.parentesco || 'Familiar', m.sexo);
+              mesmoDomicilio = fallbackRel.mesmo_domicilio || 'Não';
+            } else {
+              parentesco = 'Familiar';
+              mesmoDomicilio = 'Não';
+            }
           }
         }
 
@@ -275,14 +293,40 @@ export const useFlattenedFamilies = (
       });
     });
 
-    // Sort by titular name, then by parentesco (Titular first), then by name
+    const isSpouseParentesco = (p: string): boolean => {
+      const norm = (p || '').trim().toUpperCase();
+      return norm.includes('CÔNJUGE') || 
+             norm.includes('CONJUGE') || 
+             norm.includes('ESPOSA') || 
+             norm.includes('ESPOSO') || 
+             norm.includes('MARIDO') || 
+             norm.includes('COMPANHEIR');
+    };
+
+    const getPriority = (m: any): number => {
+      const isHead = m.parentesco === 'Titular';
+      const isSameHome = m.mesmo_domicilio === 'Sim';
+      const isSpouse = isSpouseParentesco(m.parentesco) || (m.estado_civil?.toUpperCase().includes('CASADO') && !isHead);
+
+      if (isSameHome) {
+        if (isHead) return 0;
+        if (isSpouse) return 1;
+        return 2;
+      } else {
+        if (isSpouse) return 3;
+        return 4;
+      }
+    };
+
+    // Sort by titular name, then by priority (Titular ➔ Spouse same-home ➔ Dependent same-home ➔ Spouse other-home ➔ Dependent other-home), then by name
     return enrichedList.sort((a, b) => {
       const compTitular = a.titular_nome.localeCompare(b.titular_nome);
       if (compTitular !== 0) return compTitular;
       
-      if (a.parentesco === 'Titular' && b.parentesco !== 'Titular') return -1;
-      if (a.parentesco !== 'Titular' && b.parentesco === 'Titular') return 1;
-      
+      const aPri = getPriority(a);
+      const bPri = getPriority(b);
+      if (aPri !== bPri) return aPri - bPri;
+
       return a.nome.localeCompare(b.nome);
     });
   }, [members, relations, families]);

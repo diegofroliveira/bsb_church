@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { supabase } from '../lib/supabase';
-import { useFamilyEngine, useFlattenedFamilies } from '../hooks/useFamilyEngine';
+import { Link } from 'react-router-dom';
+import { rawGet, rawGetAll } from '../lib/supabase';
+import { useFamilyEngine, useFlattenedFamilies, invertParentesco } from '../hooks/useFamilyEngine';
 import type { Member, Cell, Family, FamilyRelation, EnrichedMember } from '../hooks/useFamilyEngine';
 import { 
   getAdministrativeRegion, 
@@ -70,12 +71,11 @@ export const Families: React.FC = () => {
     const fetchData = async () => {
       try {
         setIsLoading(true);
-        const [membrosRes, celulasRes] = await Promise.all([
-          supabase.from('membros')
-            .select('id, nome, grupos_caseiros, status, sexo, bairro, pai, mae, logradouro, celular_principal_sms, telefone_fixo, estado_civil, nascimento, latitude, longitude, cidade, estado, setor_eclesiastico, setor_residencial, tipo_de_pessoa')
-            .eq('status', 'Ativo'),
-          supabase.from('celulas')
-            .select('grupo_caseiro, lider, auxiliar, setor')
+        const membrosSelectCols = 'id,nome,grupos_caseiros,status,sexo,bairro,pai,mae,logradouro,celular_principal_sms,telefone_fixo,estado_civil,nascimento,latitude,longitude,cidade,estado,setor_eclesiastico,setor_residencial,tipo_de_pessoa';
+        const [membrosRes, celulasRes, relsRes] = await Promise.all([
+          rawGet('membros', `select=${membrosSelectCols}&status=eq.Ativo`),
+          rawGet('celulas', 'select=grupo_caseiro,lider,auxiliar,setor'),
+          rawGetAll('pessoas_familiares', 'id_pessoa_a,pessoa_a,parentesco,id_pessoa_b,pessoa_b,mesmo_domicilio'),
         ]);
 
         if (membrosRes.data) {
@@ -85,26 +85,7 @@ export const Families: React.FC = () => {
           setMembers(nonExternal as Member[]);
         }
         if (celulasRes.data) setCells(celulasRes.data as Cell[]);
-
-        // Paginated loading for pessoas_familiares to bypass the 1000-row Supabase limit
-        let relationsList: FamilyRelation[] = [];
-        let fromIndex = 0;
-        const pageSize = 1000;
-        while (true) {
-          const { data, error } = await supabase.from('pessoas_familiares')
-            .select('id_pessoa_a, pessoa_a, parentesco, id_pessoa_b, pessoa_b, mesmo_domicilio')
-            .range(fromIndex, fromIndex + pageSize - 1);
-          
-          if (error) {
-            console.error('Error fetching relations chunk from Supabase:', error);
-            break;
-          }
-          if (!data || data.length === 0) break;
-          relationsList = [...relationsList, ...(data as FamilyRelation[])];
-          if (data.length < pageSize) break;
-          fromIndex += pageSize;
-        }
-        setRelations(relationsList);
+        setRelations((relsRes.data || []) as FamilyRelation[]);
       } catch (err) {
         console.error('Error loading family data:', err);
       } finally {
@@ -163,9 +144,87 @@ export const Families: React.FC = () => {
         return; // Skip minors as family heads
       }
 
+      const getMesmoDomicilio = (m: Member): string => {
+        if (m.id.toString() === headId) return 'Sim';
+        const rel = relations.find(r => 
+          (r.id_pessoa_a === m.id && r.id_pessoa_b === headMember.id) ||
+          (r.id_pessoa_b === m.id && r.id_pessoa_a === headMember.id)
+        );
+        if (rel) return rel.mesmo_domicilio || 'Não';
+        
+        const fallbackRel = relations.find(r => 
+          (r.id_pessoa_a === m.id && fam.memberIds.includes(r.id_pessoa_b.toString())) ||
+          (r.id_pessoa_b === m.id && fam.memberIds.includes(r.id_pessoa_a.toString()))
+        );
+        if (fallbackRel) return fallbackRel.mesmo_domicilio || 'Não';
+        
+        return 'Não';
+      };
+
+      const getParentesco = (m: Member): string => {
+        if (m.id.toString() === headId) return 'Titular';
+        const rel = relations.find(r => 
+          (r.id_pessoa_a === m.id && r.id_pessoa_b === headMember.id) ||
+          (r.id_pessoa_b === m.id && r.id_pessoa_a === headMember.id)
+        );
+        if (rel) {
+          const isB = rel.id_pessoa_b === m.id;
+          return isB ? (rel.parentesco || 'Familiar') : invertParentesco(rel.parentesco || 'Familiar', m.sexo);
+        }
+        
+        const fallbackRel = relations.find(r => 
+          (r.id_pessoa_a === m.id && fam.memberIds.includes(r.id_pessoa_b.toString())) ||
+          (r.id_pessoa_b === m.id && fam.memberIds.includes(r.id_pessoa_a.toString()))
+        );
+        if (fallbackRel) {
+          const isB = fallbackRel.id_pessoa_b === m.id;
+          return isB ? (fallbackRel.parentesco || 'Familiar') : invertParentesco(fallbackRel.parentesco || 'Familiar', m.sexo);
+        }
+        
+        return 'Familiar';
+      };
+
       const familyMembers = fam.memberIds
         .map(idStr => members.find(m => m.id.toString() === idStr))
-        .filter((m): m is Member => !!m);
+        .filter((m): m is Member => !!m)
+        .map(m => ({
+          ...m,
+          mesmoDomicilio: getMesmoDomicilio(m),
+          parentesco: getParentesco(m)
+        }));
+
+      const isSpouseParentesco = (p: string): boolean => {
+        const norm = (p || '').trim().toUpperCase();
+        return norm.includes('CÔNJUGE') || 
+               norm.includes('CONJUGE') || 
+               norm.includes('ESPOSA') || 
+               norm.includes('ESPOSO') || 
+               norm.includes('MARIDO') || 
+               norm.includes('COMPANHEIR');
+      };
+
+      const getPriority = (m: any): number => {
+        const isHead = m.id.toString() === headId;
+        const isSameHome = m.mesmoDomicilio === 'Sim';
+        const isSpouse = isSpouseParentesco(m.parentesco) || (m.estado_civil?.toUpperCase().includes('CASADO') && !isHead);
+
+        if (isSameHome) {
+          if (isHead) return 0;
+          if (isSpouse) return 1;
+          return 2;
+        } else {
+          if (isSpouse) return 3;
+          return 4;
+        }
+      };
+
+      familyMembers.sort((a, b) => {
+        const aPri = getPriority(a);
+        const bPri = getPriority(b);
+        if (aPri !== bPri) return aPri - bPri;
+        
+        return a.nome.localeCompare(b.nome);
+      });
 
       // Collect all active cell groups attended by members of this family
       const attendedGCs = new Set<string>();
@@ -698,7 +757,9 @@ export const Families: React.FC = () => {
                         <div className="min-w-0">
                           <span className="block text-[9px] font-bold text-gray-400 uppercase tracking-widest">Chefe da Casa</span>
                           <h3 className="text-sm font-bold text-gray-900 truncate leading-snug">
-                            Família de {fam.headName.split(' ')[0]} {fam.headName.split(' ').slice(-1)[0]}
+                            <Link to={`/membro/${fam.headId}`} className="hover:text-primary-650 hover:underline transition-colors">
+                              Família de {fam.headName.split(' ')[0]} {fam.headName.split(' ').slice(-1)[0]}
+                            </Link>
                           </h3>
                         </div>
 
@@ -749,7 +810,7 @@ export const Families: React.FC = () => {
 
                     {/* Members List */}
                     <div className="p-5 flex-1 space-y-4">
-                      {fam.familyMembers.map((m: Member) => {
+                      {fam.familyMembers.map((m: any) => {
                         const isHead = m.id.toString() === fam.headId;
                         const isSpouse = spouse && m.id.toString() === spouse.id;
 
@@ -777,7 +838,7 @@ export const Families: React.FC = () => {
                                 {m.nome.charAt(0)}
                               </div>
                               <div className="min-w-0">
-                                <span className="block font-bold text-gray-800 truncate flex items-center gap-1.5 leading-snug">
+                                <Link to={`/membro/${m.id}`} className="block font-bold text-gray-800 truncate hover:text-primary-650 hover:underline flex items-center gap-1.5 leading-snug">
                                   {m.nome.split(' ')[0]} {m.nome.split(' ').slice(-1)[0]}
                                   {isHead && (
                                     <span className="text-[8px] bg-indigo-50 border border-indigo-100 text-indigo-700 px-1 rounded-md font-bold uppercase shrink-0">
@@ -789,8 +850,13 @@ export const Families: React.FC = () => {
                                       Cônjuge
                                     </span>
                                   )}
-                                </span>
-                                <span className="block text-[9px] text-gray-400">
+                                  {!isHead && m.mesmoDomicilio !== 'Sim' && (
+                                    <span className="text-[8px] bg-amber-50 border border-amber-100 text-amber-600 px-1 py-0.2 rounded font-bold uppercase shrink-0" title="Reside em outro domicílio">
+                                      Outro Lar
+                                    </span>
+                                  )}
+                                </Link>
+                                <span className="block text-[9px] text-gray-400 mt-0.5">
                                   {age >= 0 ? `${age} anos` : 'Idade não cadastrada'} • {m.sexo === 'Masculino' ? 'M' : 'F'}
                                 </span>
                               </div>
@@ -877,9 +943,9 @@ export const Families: React.FC = () => {
                     {p.subFamilies.map((fam) => (
                       <div key={fam.headId} className="bg-gray-50/70 border border-gray-100 rounded-2xl p-4 flex items-center justify-between gap-4">
                         <div>
-                          <span className="block text-xs font-bold text-gray-800">
+                          <Link to={`/membro/${fam.headId}`} className="block text-xs font-bold text-gray-800 hover:text-primary-650 hover:underline transition-colors">
                             Núcleo de {fam.headName}
-                          </span>
+                          </Link>
                           <span className="block text-[9px] text-gray-400">
                             📍 {fam.headBairro} • {fam.address}
                           </span>
@@ -1044,10 +1110,14 @@ export const Families: React.FC = () => {
 
                             return (
                               <td key={col.key} className="whitespace-nowrap px-3 py-3.5 text-xs text-gray-700">
-                                {col.key === 'titular_nome' && isHead ? (
-                                  <span className="inline-flex items-center gap-1.5 font-bold text-indigo-700">
-                                    👑 {val as string}
-                                  </span>
+                                {col.key === 'titular_nome' ? (
+                                  <Link to={`/membro/${m.titular_id}`} className="inline-flex items-center gap-1.5 font-bold text-indigo-700 hover:text-indigo-900 hover:underline">
+                                    {isHead && <span>👑</span>} {val as string}
+                                  </Link>
+                                ) : col.key === 'nome' ? (
+                                  <Link to={`/membro/${m.id}`} className="font-bold text-primary-650 hover:text-primary-850 hover:underline">
+                                    {val as string}
+                                  </Link>
                                 ) : col.key === 'parentesco' && isHead ? (
                                   <span className="inline-flex items-center rounded-md bg-indigo-50 border border-indigo-150 px-1.5 py-0.5 text-[10px] font-extrabold text-indigo-700 uppercase">
                                     TITULAR

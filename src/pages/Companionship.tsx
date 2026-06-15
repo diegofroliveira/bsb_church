@@ -54,14 +54,15 @@ interface SimulatedPair {
   distance: number;
   compatScore: number; // 0-100
   scoreBreakdown: {
-    maturidade: number;      // 0-15
-    tempoIgreja: number;     // 0-10
-    estadoCivil: number;     // 0-10
-    redeDisc: number;        // 0-15
-    mesmaFuncao: number;     // 0-15
-    faixaEtaria: number;     // 0-5
-    momentoVida: number;     // 0-10
-    distancia: number;       // 0-20
+    maturidade: number;
+    tempoIgreja: number;
+    estadoCivil: number;
+    redeDisc: number;
+    mesmaFuncao: number;
+    faixaEtaria: number;
+    momentoVida: number;
+    bairroRegiao: number;
+    distancia: number;
   };
 }
 
@@ -85,6 +86,7 @@ export const Companionship: React.FC = () => {
   const [simulatedMatches, setSimulatedMatches] = useState<SimulatedPair[]>([]);
   const [simulatedUnmatched, setSimulatedUnmatched] = useState<string[]>([]);
   const [simMaxDistance, setSimMaxDistance] = useState<number>(15); // Padrão: 15km para Brasília
+  const [simMinScore, setSimMinScore] = useState<number>(50); // Padrão: 50 pontos
   const [simAllowTrios, setSimAllowTrios] = useState<boolean>(true);
   
   // Simulation Filter Toggles
@@ -639,7 +641,7 @@ export const Companionship: React.FC = () => {
         
         // Se as flags adicionais não forem atendidas, tratar como totalmente incompatível (score = 0)
         if (!meetsSimulatorConstraints(member, m, dist)) {
-          return { ...m, distance: dist, compatScore: 0, scoreBreakdown: { maturidade: 0, tempoIgreja: 0, estadoCivil: 0, redeDisc: 0, mesmaFuncao: 0, faixaEtaria: 0, momentoVida: 0, distancia: 0 } };
+          return { ...m, distance: dist, compatScore: 0, scoreBreakdown: { maturidade: 0, tempoIgreja: 0, estadoCivil: 0, redeDisc: 0, mesmaFuncao: 0, faixaEtaria: 0, momentoVida: 0, bairroRegiao: 0, distancia: 0 } };
         }
         
         const breakdown = calculateCompatibilityScore(member, m, dist);
@@ -655,6 +657,7 @@ export const Companionship: React.FC = () => {
             mesmaFuncao: breakdown.mesmaFuncao,
             faixaEtaria: breakdown.faixaEtaria, 
             momentoVida: breakdown.momentoVida,
+            bairroRegiao: breakdown.bairroRegiao,
             distancia: breakdown.distancia 
           } 
         };
@@ -677,11 +680,11 @@ export const Companionship: React.FC = () => {
       tooltip: string;
     }[] = [];
 
-    // --- MATURIDADE (0-15 pts) ---
+    // --- MATURIDADE (0-10 pts) ---
     if (bd.maturidade > 0) {
       let label = 'Maturidade Compatível';
-      if (bd.maturidade === 15) label = 'Mesma Maturidade';
-      else if (bd.maturidade === 9) label = 'Maturidade Próxima';
+      if (bd.maturidade === 10) label = 'Mesma Maturidade';
+      else if (bd.maturidade === 6) label = 'Maturidade Próxima';
       
       reasons.push({
         label,
@@ -692,13 +695,12 @@ export const Companionship: React.FC = () => {
       });
     }
 
-    // --- TEMPO DE IGREJA (0-10 pts) ---
+    // --- TEMPO DE IGREJA (0-5 pts) ---
     if (bd.tempoIgreja > 0) {
       let label = 'Tempo de Igreja';
-      if (bd.tempoIgreja === 10) label = 'Tempo de Igreja Idêntico';
-      else if (bd.tempoIgreja === 7) label = 'Tempo de Igreja Próximo';
-      else if (bd.tempoIgreja === 4) label = 'Tempo de Igreja Compatível';
-      else if (bd.tempoIgreja === 1) label = 'Tempo de Igreja Similar';
+      if (bd.tempoIgreja === 5) label = 'Tempo de Igreja Idêntico';
+      else if (bd.tempoIgreja === 3) label = 'Tempo de Igreja Próximo';
+      else if (bd.tempoIgreja === 1) label = 'Tempo de Igreja Compatível';
 
       reasons.push({
         label,
@@ -724,7 +726,7 @@ export const Companionship: React.FC = () => {
       });
     }
 
-    // --- REDE DE DISCIPULADO + GC (0-20 pts) ---
+    // --- REDE DE DISCIPULADO + GC (0-30 pts) ---
     if (bd.redeDisc > 0) {
       let label = 'Rede de Discipulado';
       const gc1 = (member.grupos_caseiros || '').trim().toUpperCase();
@@ -746,17 +748,17 @@ export const Companionship: React.FC = () => {
 
       if (bothLeadership) {
         label = '👑 Núcleo de GC';
-      } else if (bd.redeDisc === 18 && sameGC) {
+      } else if (bd.redeDisc === 28 && sameGC && sameDisc) {
         label = '🏠 Mesmo GC + 🔗 Mesmo Disc.';
-      } else if (bd.redeDisc === 18 && hasMultipleGCs && sameDisc) {
+      } else if (bd.redeDisc === 28 && hasMultipleGCs && sameDisc) {
         label = '🔗 Mesmo Disc. (Região)';
       } else if (sameGC) {
         label = '🏠 Mesmo GC';
-      } else if (bd.redeDisc === 14) {
-        label = '📍 Mesmo Bairro (GCs Distintos)';
+      } else if (bd.redeDisc === 20) {
+        label = '📍 Mesma Região (GCs Distintos)';
       } else if (sameDisc) {
         label = '🔗 Mesmo Discipulador';
-      } else if (bd.redeDisc === 4) {
+      } else if (bd.redeDisc === 5) {
         label = 'Redes Distintas';
       } else if (bd.redeDisc === 2) {
         label = 'Discipulado Direto';
@@ -771,15 +773,15 @@ export const Companionship: React.FC = () => {
       });
     }
 
-    // --- FUNÇÃO MINISTERIAL (0-10 pts) ---
+    // --- FUNÇÃO MINISTERIAL (0-5 pts) ---
     if (bd.mesmaFuncao > 0) {
       let label = 'Função Ministerial';
-      if (bd.mesmaFuncao === 10) {
+      if (bd.mesmaFuncao === 5) {
         const role = getMemberRole(candidate);
         label = `Mesma Função (${role === 'DISCIPULADOR' ? 'Discipulador' : role === 'LIDER' ? 'Líder' : role === 'AUXILIAR' ? 'Auxiliar' : 'Membro'})`;
       }
-      else if (bd.mesmaFuncao === 7) label = 'Líder & Auxiliar (GC)';
-      else if (bd.mesmaFuncao === 3) label = 'Sinergia de Liderança';
+      else if (bd.mesmaFuncao === 3) label = 'Líder & Auxiliar (GC)';
+      else if (bd.mesmaFuncao === 1) label = 'Sinergia de Liderança';
 
       reasons.push({
         label,
@@ -794,9 +796,8 @@ export const Companionship: React.FC = () => {
     if (bd.faixaEtaria > 0) {
       let label = 'Idade Compatível';
       if (bd.faixaEtaria === 5) label = 'Idades Muito Próximas (±3a)';
-      else if (bd.faixaEtaria === 4) label = 'Idades Próximas (±7a)';
-      else if (bd.faixaEtaria === 2) label = 'Idades Compatíveis (±12a)';
-      else if (bd.faixaEtaria === 1) label = 'Faixa Etária Similar';
+      else if (bd.faixaEtaria === 3) label = 'Idades Próximas (±7a)';
+      else if (bd.faixaEtaria === 1) label = 'Idades Compatíveis (±12a)';
 
       reasons.push({
         label,
@@ -807,13 +808,30 @@ export const Companionship: React.FC = () => {
       });
     }
 
-    // --- MOMENTO DE VIDA (0-10 pts) ---
+    // --- MOMENTO DE VIDA (0-5 pts) ---
     if (bd.momentoVida > 0) {
       let label = 'Momento de Vida';
-      if (bd.momentoVida === 10) label = 'Filhos com Idade Próxima (±3a)';
-      else if (bd.momentoVida === 7) label = 'Filhos com Idade Compatível (±6a)';
-      else if (bd.momentoVida === 3) label = 'Ambos têm Filhos';
-      else if (bd.momentoVida === 6) label = 'Ambos sem Filhos';
+      const getChildrenAges = (m: Member): number[] => {
+        const nName = normName(m.nome);
+        if (!nName) return [];
+        return members
+          .filter(c => {
+            const pName = normName(c.pai);
+            const mName = normName(c.mae);
+            return (pName && pName === nName) || (mName && mName === nName);
+          })
+          .map(c => getAge(c.nascimento))
+          .filter((age): age is number => age !== null);
+      };
+      const ages1 = getChildrenAges(member);
+      const ages2 = getChildrenAges(candidate);
+      if (ages1.length > 0 && ages2.length > 0) {
+        if (bd.momentoVida === 5) label = 'Filhos com Idade Próxima (±3a)';
+        else if (bd.momentoVida === 3) label = 'Filhos com Idade Compatível (±6a)';
+        else label = 'Ambos têm Filhos';
+      } else if (ages1.length === 0 && ages2.length === 0) {
+        label = 'Ambos sem Filhos';
+      }
 
       reasons.push({
         label,
@@ -824,15 +842,30 @@ export const Companionship: React.FC = () => {
       });
     }
 
-    // --- DISTÂNCIA (0-20 pts) ---
+    // --- BAIRRO / REGIÃO (0-15 pts) ---
+    if (bd.bairroRegiao > 0) {
+      let label = 'Geografia Local';
+      if (bd.bairroRegiao === 15) label = 'Mesmo Bairro';
+      else if (bd.bairroRegiao === 10) label = 'Mesma Região';
+      else if (bd.bairroRegiao === 5) label = 'Regiões Próximas';
+
+      reasons.push({
+        label,
+        points: bd.bairroRegiao,
+        icon: <Map className="h-3 w-3 shrink-0" />,
+        color: 'bg-cyan-50 text-cyan-700 border-cyan-100/70',
+        tooltip: 'Alinhamento residencial por bairro e proximidade de regiões'
+      });
+    }
+
+    // --- DISTÂNCIA (0-15 pts) ---
     if (bd.distancia > 0) {
       let label = 'Distância';
-      if (bd.distancia === 20) label = 'Mora Perto';
-      else if (bd.distancia === 16) label = 'Mora Perto';
-      else if (bd.distancia === 10) label = 'Distância Acessível';
-      else if (bd.distancia === 4) label = 'Mora mais longe';
+      if (bd.distancia === 15) label = 'Mora Perto';
+      else if (bd.distancia === 12) label = 'Mora Perto';
+      else if (bd.distancia === 8) label = 'Distância Acessível';
+      else if (bd.distancia === 3) label = 'Mora mais longe';
       else if (bd.distancia === 1) label = 'Mora muito longe';
-      else if (bd.distancia === 2) label = 'Sem Coordenadas';
 
       reasons.push({
         label,
@@ -841,6 +874,32 @@ export const Companionship: React.FC = () => {
         color: 'bg-slate-50 text-slate-700 border-slate-200',
         tooltip: 'Proximidade geográfica residencial'
       });
+    }
+
+    // --- PENALIDADE DE IDADE/GERACIONAL ---
+    if (member.nascimento && candidate.nascimento) {
+      const age1 = getAge(member.nascimento);
+      const age2 = getAge(candidate.nascimento);
+      if (age1 !== null && age2 !== null) {
+        const ageDiff = Math.abs(age1 - age2);
+        if (ageDiff > 20) {
+          reasons.push({
+            label: 'Diferença Geracional (>20a)',
+            points: -20,
+            icon: <AlertTriangle className="h-3 w-3 shrink-0 text-red-500" />,
+            color: 'bg-red-50 text-red-700 border-red-100/70',
+            tooltip: 'Grande diferença de idade (relação tende a ser vertical/geracional)'
+          });
+        } else if (ageDiff > 15) {
+          reasons.push({
+            label: 'Diferença Geracional (>15a)',
+            points: -10,
+            icon: <AlertTriangle className="h-3 w-3 shrink-0 text-amber-500" />,
+            color: 'bg-amber-50 text-amber-700 border-amber-100/70',
+            tooltip: 'Diferença de idade relevante (relação tende a ser vertical/geracional)'
+          });
+        }
+      }
     }
 
     return reasons;
@@ -871,6 +930,21 @@ export const Companionship: React.FC = () => {
       .replace(/\s+(SUL|NORTE|LESTE|OESTE|I|II|III|IV|V)\b/g, '')
       .replace(/\(.*?\)/g, '')
       .trim();
+  };
+
+  const areRegionsAdjacent = (r1: string, r2: string): boolean => {
+    const adjacencies: Record<string, string[]> = {
+      'VICENTE PIRES': ['TAGUATINGA', 'AGUAS CLARAS', 'GUARA'],
+      'AGUAS CLARAS': ['VICENTE PIRES', 'TAGUATINGA', 'GUARA', 'ARNIQUEIRA'],
+      'TAGUATINGA': ['CEILANDIA', 'SAMAMBAIA', 'AGUAS CLARAS', 'VICENTE PIRES'],
+      'GUARA': ['AGUAS CLARAS', 'VICENTE PIRES', 'ASA SUL'],
+      'CEILANDIA': ['TAGUATINGA', 'SAMAMBAIA'],
+      'SAMAMBAIA': ['TAGUATINGA', 'CEILANDIA', 'RECANTO DAS EMAS'],
+      'ASA SUL': ['GUARA', 'ASA NORTE'],
+      'ASA NORTE': ['ASA SUL', 'SETOR NOROESTE', 'LAGO NORTE'],
+      'SETOR NOROESTE': ['ASA NORTE'],
+    };
+    return adjacencies[r1]?.includes(r2) || adjacencies[r2]?.includes(r1) || false;
   };
 
   // Mapeia região para conjunto de GCs únicos
@@ -928,16 +1002,16 @@ export const Companionship: React.FC = () => {
   };
 
   // Pontua compatibilidade entre dois membros (0-100)
-  // Pesos: Maturidade=15, Tempo=10, EstadoCivil=10, RedeDisc=20, Função=10, FaixaEtária=5, MomentoVida=10, Distância=20
+  // Pesos: Maturidade=10, Função=5, Tempo=5, EstadoCivil=10, FaixaEtária=5, MomentoVida=5, RedeDisc=30, BairroRegião=15, Distância=15
   const calculateCompatibilityScore = (
     m1: Member, m2: Member, distKm: number | null
   ): SimulatedPair['scoreBreakdown'] & { total: number } => {
     // --- EXCLUSÕES CRÍTICAS (Irmãos de sangue e Relações Verticais) ---
     if (isSibling(m1, m2) || isVertical(m1, m2)) {
-      return { maturidade: 0, tempoIgreja: 0, estadoCivil: 0, redeDisc: 0, mesmaFuncao: 0, faixaEtaria: 0, momentoVida: 0, distancia: 0, total: 0 };
+      return { maturidade: 0, tempoIgreja: 0, estadoCivil: 0, redeDisc: 0, mesmaFuncao: 0, faixaEtaria: 0, momentoVida: 0, bairroRegiao: 0, distancia: 0, total: 0 };
     }
 
-    // --- MATURIDADE ESPIRITUAL (0-15 pts) ---
+    // --- MATURIDADE ESPIRITUAL (0-10 pts) ---
     const role1 = getMemberRole(m1);
     const role2 = getMemberRole(m2);
     const rawR1 = MATURITY_RANK[(m1.tipo_de_pessoa || '').toUpperCase().trim()] ?? 1;
@@ -945,13 +1019,31 @@ export const Companionship: React.FC = () => {
     const r1 = Math.max(rawR1, MATURITY_RANK[role1] ?? 1);
     const r2 = Math.max(rawR2, MATURITY_RANK[role2] ?? 1);
     const rankDiff = Math.abs(r1 - r2);
-    const maturidade = rankDiff === 0 ? 15 : rankDiff === 1 ? 9 : rankDiff === 2 ? 4 : 0;
+    const maturidade = rankDiff === 0 ? 10 : rankDiff === 1 ? 6 : rankDiff === 2 ? 2 : 0;
 
-    // --- TEMPO DE IGREJA (0-10 pts) ---
+    // --- ALINHAMENTO DE FUNÇÃO MINISTERIAL (0-5 pts) ---
+    let mesmaFuncao = 0;
+    if (role1 === role2) {
+      mesmaFuncao = 5;
+    } else if (
+      (role1 === 'LIDER' && role2 === 'AUXILIAR') ||
+      (role1 === 'AUXILIAR' && role2 === 'LIDER')
+    ) {
+      mesmaFuncao = 3;
+    } else if (
+      (role1 === 'DISCIPULADOR' && (role2 === 'LIDER' || role2 === 'AUXILIAR')) ||
+      (role2 === 'DISCIPULADOR' && (role1 === 'LIDER' || role1 === 'AUXILIAR'))
+    ) {
+      mesmaFuncao = 1;
+    } else {
+      mesmaFuncao = 0;
+    }
+
+    // --- TEMPO DE IGREJA (0-5 pts) ---
     const t1 = getTenureYears(m1);
     const t2 = getTenureYears(m2);
     const tenureDiff = Math.abs(t1 - t2);
-    const tempoIgreja = tenureDiff <= 1 ? 10 : tenureDiff <= 3 ? 7 : tenureDiff <= 5 ? 4 : tenureDiff <= 8 ? 1 : 0;
+    const tempoIgreja = tenureDiff <= 1 ? 5 : tenureDiff <= 3 ? 3 : tenureDiff <= 5 ? 1 : 0;
 
     // --- ESTADO CIVIL (0-10 pts) ---
     const ec1 = normalizeMarital(m1.estado_civil);
@@ -959,77 +1051,20 @@ export const Companionship: React.FC = () => {
     const estadoCivil = ec1 === ec2 && ec1 !== 'DESCONHECIDO' ? 10 :
       (ec1 === 'DESCONHECIDO' || ec2 === 'DESCONHECIDO') ? 5 : 0;
 
-    // --- REDE DE DISCIPULADO + GC (0-20 pts) ---
-    const disc1 = m1.discipuladorNome?.trim().toUpperCase() || null;
-    const disc2 = m2.discipuladorNome?.trim().toUpperCase() || null;
-    const nome1 = m1.nome.trim().toUpperCase();
-    const nome2 = m2.nome.trim().toUpperCase();
-    const gc1 = (m1.grupos_caseiros || '').trim().toUpperCase();
-    const gc2 = (m2.grupos_caseiros || '').trim().toUpperCase();
-    const sameGC = gc1.length > 0 && gc1 === gc2;
-    const sameDisc = disc1 !== null && disc2 !== null && disc1 === disc2;
-    const isVerticalRel = disc1 === nome2 || disc2 === nome1;
-
-    const r1Region = getNormalizedRegion(m1.bairro, m1.grupos_caseiros);
-    const r2Region = getNormalizedRegion(m2.bairro, m2.grupos_caseiros);
-    const sameRegion = r1Region === r2Region;
-    const hasMultipleGCs = sameRegion && (regionGcCounters[r1Region] > 1);
-
-    // Bônus de núcleo de liderança: líder/auxiliar do mesmo GC
-    const bothLeadership = sameGC &&
-      (m1.gcRole === 'LIDER' || m1.gcRole === 'AUXILIAR') &&
-      (m2.gcRole === 'LIDER' || m2.gcRole === 'AUXILIAR');
-    let redeDisc = 0;
-    if (bothLeadership) {
-      redeDisc = 20; // Núcleo de liderança do mesmo GC — companheirismo preferencial!
-    } else if (sameGC && sameDisc) {
-      redeDisc = 18; // Mesmo GC + mesmo discipulador
-    } else if (hasMultipleGCs && sameDisc) {
-      redeDisc = 18; // Múltiplos GCs na mesma região + mesmo discipulador
-    } else if (sameGC) {
-      redeDisc = 16; // Mesmo GC
-    } else if (hasMultipleGCs) {
-      redeDisc = 14; // Mesma Região (Múltiplos GCs) — companheirismo altamente compatível!
-    } else if (sameDisc) {
-      redeDisc = 10; // Mesmo discipulador, GCs diferentes (em Vicente Pires ou regiões sem múltiplos GCs)
-    } else if (isVerticalRel) {
-      redeDisc = 2;  // Relação vertical (não ideal para companheirismo horizontal)
-    } else {
-      redeDisc = 4;  // Redes distintas/neutro
-    }
-
-    // --- ALINHAMENTO DE FUNÇÃO MINISTERIAL (0-10 pts) ---
-    let mesmaFuncao = 0;
-    if (role1 === role2) {
-      mesmaFuncao = 10;
-    } else if (
-      (role1 === 'LIDER' && role2 === 'AUXILIAR') ||
-      (role1 === 'AUXILIAR' && role2 === 'LIDER')
-    ) {
-      mesmaFuncao = 7;
-    } else if (
-      (role1 === 'DISCIPULADOR' && (role2 === 'LIDER' || role2 === 'AUXILIAR')) ||
-      (role2 === 'DISCIPULADOR' && (role1 === 'LIDER' || role1 === 'AUXILIAR'))
-    ) {
-      mesmaFuncao = 3;
-    } else {
-      mesmaFuncao = 0;
-    }
-
     // --- FAIXA ETÁRIA (0-5 pts) ---
     const age1 = getAge(m1.nascimento);
     const age2 = getAge(m2.nascimento);
     let faixaEtaria = 2;
     if (age1 !== null && age2 !== null) {
       const ageDiff = Math.abs(age1 - age2);
-      faixaEtaria = ageDiff <= 3 ? 5 : ageDiff <= 7 ? 4 : ageDiff <= 12 ? 2 : ageDiff <= 18 ? 1 : 0;
+      faixaEtaria = ageDiff <= 3 ? 5 : ageDiff <= 7 ? 3 : ageDiff <= 12 ? 1 : 0;
     }
 
-    // --- MOMENTO DE VIDA / FILHOS (0-10 pts) ---
+    // --- MOMENTO DE VIDA / FILHOS (0-5 pts) ---
     const getChildrenAges = (m: Member): number[] => {
       const nName = normName(m.nome);
       if (!nName) return [];
-      return rawMembers
+      return members
         .filter(c => {
           const pName = normName(c.pai);
           const mName = normName(c.mae);
@@ -1055,43 +1090,102 @@ export const Companionship: React.FC = () => {
       }
       
       if (minAgeDiff <= 3) {
-        momentoVida = 10; // Filhos com idades próximas (0 a 3 anos)
+        momentoVida = 5;
       } else if (minAgeDiff <= 6) {
-        momentoVida = 7;  // Diferença razoável (4 a 6 anos)
+        momentoVida = 3;
       } else {
-        momentoVida = 3;  // Ambos têm filhos, mas idades distantes
+        momentoVida = 1;
       }
     } else if (ages1.length === 0 && ages2.length === 0) {
-      momentoVida = 6; // Ambos sem filhos (fase similar)
+      momentoVida = 3;
     } else {
-      momentoVida = 0; // Fase de vida diferente (um tem filhos e o outro não)
+      momentoVida = 0;
     }
 
-    // --- DISTÂNCIA GEOGRÁFICA (0-20 pts) ---
+    // --- REDE DE DISCIPULADO + GC (0-30 pts) ---
+    const disc1 = m1.discipuladorNome?.trim().toUpperCase() || null;
+    const disc2 = m2.discipuladorNome?.trim().toUpperCase() || null;
+    const gc1 = (m1.grupos_caseiros || '').trim().toUpperCase();
+    const gc2 = (m2.grupos_caseiros || '').trim().toUpperCase();
+    const sameGC = gc1.length > 0 && gc1 === gc2;
+    const sameDisc = disc1 !== null && disc2 !== null && disc1 === disc2;
+
+    const r1Region = getNormalizedRegion(m1.bairro, m1.grupos_caseiros);
+    const r2Region = getNormalizedRegion(m2.bairro, m2.grupos_caseiros);
+    const sameRegion = r1Region === r2Region;
+    const hasMultipleGCs = sameRegion && (regionGcCounters[r1Region] > 1);
+
+    // Bônus de núcleo de liderança: líder/auxiliar do mesmo GC
+    const bothLeadership = sameGC &&
+      (m1.gcRole === 'LIDER' || m1.gcRole === 'AUXILIAR') &&
+      (m2.gcRole === 'LIDER' || m2.gcRole === 'AUXILIAR');
+    let redeDisc = 0;
+    if (bothLeadership) {
+      redeDisc = 30; // Núcleo de liderança do mesmo GC
+    } else if (sameGC && sameDisc) {
+      redeDisc = 28; // Mesmo GC + mesmo discipulador
+    } else if (hasMultipleGCs && sameDisc) {
+      redeDisc = 28; // Múltiplos GCs na mesma região + mesmo discipulador
+    } else if (sameGC) {
+      redeDisc = 25; // Mesmo GC
+    } else if (hasMultipleGCs) {
+      redeDisc = 20; // Mesma Região (Múltiplos GCs)
+    } else if (sameDisc) {
+      redeDisc = 15; // Mesmo discipulador, GCs diferentes
+    } else {
+      redeDisc = 5;  // Redes distintas/neutro
+    }
+
+    // --- BAIRRO / REGIÃO (0-15 pts) ---
+    let bairroRegiao = 0;
+    const b1 = normName(m1.bairro);
+    const b2 = normName(m2.bairro);
+    const sameBairro = b1.length > 0 && b1 === b2;
+    if (sameBairro) {
+      bairroRegiao = 15;
+    } else if (sameRegion) {
+      bairroRegiao = 10;
+    } else if (areRegionsAdjacent(r1Region, r2Region)) {
+      bairroRegiao = 5;
+    }
+
+    // --- DISTÂNCIA GEOGRÁFICA (0-15 pts) ---
     let distancia = 0;
     if (distKm === null) {
       distancia = 2; // Sem coordenadas: pontuação neutra mínima
     } else if (distKm <= 2.5) {
-      distancia = 20; // Vizinhos muito próximos
+      distancia = 15; // Vizinhos muito próximos
     } else if (distKm <= 5) {
-      distancia = 16; // Próximos
+      distancia = 12; // Próximos
     } else if (distKm <= 8) {
-      distancia = 10; // Acessível
+      distancia = 8;  // Acessível
     } else if (distKm <= 12) {
-      distancia = 4;  // Distante
+      distancia = 3;  // Distante
     } else if (distKm <= 15) {
       distancia = 1;  // Muito distante
     } else {
       distancia = 0;  // Inviável
     }
 
-    // Calcular total e aplicar penalidade suave para cunhados
-    let total = maturidade + tempoIgreja + estadoCivil + redeDisc + mesmaFuncao + faixaEtaria + momentoVida + distancia;
+    // Calcular total
+    let total = maturidade + mesmaFuncao + tempoIgreja + estadoCivil + faixaEtaria + momentoVida + redeDisc + bairroRegiao + distancia;
+
+    // Penalidade por diferença geracional grande (relação deixa de ser horizontal/parcerias)
+    if (age1 !== null && age2 !== null) {
+      const ageDiff = Math.abs(age1 - age2);
+      if (ageDiff > 20) {
+        total = Math.max(0, total - 20); // Penalidade de 20 pontos para gap > 20 anos
+      } else if (ageDiff > 15) {
+        total = Math.max(0, total - 10); // Penalidade de 10 pontos para gap > 15 anos
+      }
+    }
+
+    // Penalidade suave para cunhados
     if (isCunhadoOrInLaw(m1, m2)) {
       total = Math.max(0, total - 15); // Deduz 15 pontos para evitar incentivar cunhados na mesma dupla primária
     }
 
-    return { maturidade, tempoIgreja, estadoCivil, redeDisc, mesmaFuncao, faixaEtaria, momentoVida, distancia, total };
+    return { maturidade, tempoIgreja, estadoCivil, redeDisc, mesmaFuncao, faixaEtaria, momentoVida, bairroRegiao, distancia, total };
   };
 
   const handleGenerateSimulation = () => {
@@ -1134,7 +1228,7 @@ export const Companionship: React.FC = () => {
           if (!meetsSimulatorConstraints(m1, m2, dist)) continue;
 
           const breakdown = calculateCompatibilityScore(m1, m2, dist);
-          if (breakdown.total > 0 && breakdown.total > bestScore) {
+          if (breakdown.total >= simMinScore && breakdown.total > bestScore) {
             bestScore = breakdown.total;
             bestPartner = m2;
             bestDist = dist ?? 0;
@@ -1146,12 +1240,13 @@ export const Companionship: React.FC = () => {
               mesmaFuncao: breakdown.mesmaFuncao,
               faixaEtaria: breakdown.faixaEtaria, 
               momentoVida: breakdown.momentoVida,
+              bairroRegiao: breakdown.bairroRegiao,
               distancia: breakdown.distancia 
             };
           }
         }
 
-        if (bestPartner && bestBreakdown) {
+        if (bestPartner && bestBreakdown && bestScore >= simMinScore) {
           visited.add(m1.id);
           visited.add(bestPartner.id);
           simulated.push({
@@ -1213,7 +1308,7 @@ export const Companionship: React.FC = () => {
           }
 
           const bd = calculateCompatibilityScore(unmatchedMember, pairLeader, dist);
-          if (bd.total > 0 && bd.total > bestPairScore) {
+          if (bd.total >= simMinScore && bd.total > bestPairScore) {
             bestPairScore = bd.total;
             bestPairIdx = i;
           }
@@ -1300,7 +1395,7 @@ export const Companionship: React.FC = () => {
 
       // Calcular score de compatibilidade
       const breakdown = calculateCompatibilityScore(m1, m2, dist);
-      if (breakdown.total > 0) {
+      if (breakdown.total >= simMinScore) {
         results.push({
           member: m2,
           score: breakdown.total,
@@ -1313,6 +1408,7 @@ export const Companionship: React.FC = () => {
             mesmaFuncao: breakdown.mesmaFuncao,
             faixaEtaria: breakdown.faixaEtaria,
             momentoVida: breakdown.momentoVida,
+            bairroRegiao: breakdown.bairroRegiao,
             distancia: breakdown.distancia
           }
         });
@@ -1390,6 +1486,7 @@ export const Companionship: React.FC = () => {
             mesmaFuncao: bd.mesmaFuncao,
             faixaEtaria: bd.faixaEtaria,
             momentoVida: bd.momentoVida,
+            bairroRegiao: bd.bairroRegiao,
             distancia: bd.distancia
           }
         };
@@ -1823,6 +1920,17 @@ export const Companionship: React.FC = () => {
                         /> km
                       </div>
 
+                      <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-gray-100 shadow-sm text-xs font-semibold text-gray-700">
+                        <Sliders className="h-4 w-4 text-gray-400" />
+                        Mín. Pontos: 
+                        <input
+                          type="number"
+                          className="w-12 text-center text-blue-600 bg-gray-50 border-0 p-0 font-bold focus:ring-0 focus:outline-none"
+                          value={simMinScore}
+                          onChange={(e) => setSimMinScore(Math.max(0, Math.min(100, parseInt(e.target.value) || 0)))}
+                        /> pts
+                      </div>
+
                       <label className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-gray-100 shadow-sm text-xs font-semibold text-gray-700 cursor-pointer select-none">
                         <input
                           type="checkbox"
@@ -2098,7 +2206,7 @@ export const Companionship: React.FC = () => {
                                             >
                                               {reason.icon}
                                               <span>{reason.label}</span>
-                                              <span className="font-extrabold">+{reason.points}p</span>
+                                              <span className="font-extrabold">{reason.points > 0 ? '+' : ''}{reason.points}p</span>
                                             </span>
                                           ))}
                                         </div>
@@ -2288,16 +2396,17 @@ export const Companionship: React.FC = () => {
                             </div>
 
                             {/* Score Breakdown */}
-                            <div className="grid grid-cols-8 gap-1 pt-1 border-t border-gray-50">
+                            <div className="grid grid-cols-9 gap-0.5 pt-1 border-t border-gray-50">
                               {[
-                                { label: 'Maturidade', val: sm.scoreBreakdown.maturidade, max: 15, color: 'bg-purple-400' },
-                                { label: 'Tempo', val: sm.scoreBreakdown.tempoIgreja, max: 10, color: 'bg-teal-400' },
+                                { label: 'Maturidade', val: sm.scoreBreakdown.maturidade, max: 10, color: 'bg-purple-400' },
+                                { label: 'Tempo', val: sm.scoreBreakdown.tempoIgreja, max: 5, color: 'bg-teal-400' },
                                 { label: 'Est. Civil', val: sm.scoreBreakdown.estadoCivil, max: 10, color: 'bg-pink-400' },
-                                { label: 'Rede Disc.', val: sm.scoreBreakdown.redeDisc, max: 15, color: 'bg-emerald-400' },
-                                { label: 'Função', val: sm.scoreBreakdown.mesmaFuncao, max: 15, color: 'bg-indigo-400' },
+                                { label: 'Rede Disc.', val: sm.scoreBreakdown.redeDisc, max: 30, color: 'bg-emerald-400' },
+                                { label: 'Função', val: sm.scoreBreakdown.mesmaFuncao, max: 5, color: 'bg-indigo-400' },
                                 { label: 'Faixa Et.', val: sm.scoreBreakdown.faixaEtaria, max: 5, color: 'bg-blue-400' },
-                                { label: 'Mom. Vida', val: sm.scoreBreakdown.momentoVida, max: 10, color: 'bg-orange-400' },
-                                { label: 'Distância', val: sm.scoreBreakdown.distancia, max: 20, color: 'bg-gray-400' },
+                                { label: 'Mom. Vida', val: sm.scoreBreakdown.momentoVida, max: 5, color: 'bg-orange-400' },
+                                { label: 'Região', val: sm.scoreBreakdown.bairroRegiao, max: 15, color: 'bg-cyan-400' },
+                                { label: 'Distância', val: sm.scoreBreakdown.distancia, max: 15, color: 'bg-gray-400' },
                               ].map(({ label, val, max, color }) => (
                                 <div key={label} className="text-center space-y-0.5">
                                   <div className="text-[7px] text-gray-400 font-medium leading-tight">{label}</div>

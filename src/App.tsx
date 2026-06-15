@@ -53,7 +53,7 @@ function App() {
               <Route path="/qa" element={<QA />} />
               <Route path="/discipleship" element={<Discipleship />} />
               <Route path="/network" element={<Network />} />
-               <Route path="/crm/:name" element={<MemberProfile />} />
+               <Route path="/membro/:name" element={<MemberProfile />} />
               <Route path="/finance" element={<Finance />} />
                <Route path="/admin/users" element={<AdminUsers />} />
               <Route path="/settings" element={<Settings />} />

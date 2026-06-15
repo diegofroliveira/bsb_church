@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabaseReader } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { 
@@ -65,9 +65,38 @@ const getAge = (birthdayStr: string | null | undefined): number | null => {
   }
 };
 
+const DEFAULT_ROLES: Record<string, string[]> = {
+  admin: ['Dashboard', 'Aniversariantes', 'Mapa', 'Membros', 'Famílias', 'GCs/Localidades', 'Setores', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Financeiro', 'Consultor IA', 'Insights IA', 'Configurações', 'Simulações', 'Companheirismo', 'Lab: Visão da Plenitude', 'Lab: Gestão de Visitas', 'Lab: Consultas & Estudos'],
+  pastor: ['Dashboard', 'Aniversariantes', 'Mapa', 'Membros', 'Famílias', 'GCs/Localidades', 'Setores', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Financeiro', 'Consultor IA', 'Insights IA', 'Simulações', 'Companheirismo', 'Lab: Visão da Plenitude', 'Lab: Gestão de Visitas', 'Lab: Consultas & Estudos'],
+  secretaria: ['Dashboard', 'Aniversariantes', 'Membros', 'Famílias', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Consultor IA'],
+  financeiro: ['Dashboard', 'Financeiro']
+};
+
 export const Sectors: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+
+  const hasFinanceAccess = useMemo(() => {
+    if (!user) return false;
+    const userRole = user.role;
+    if (userRole === 'admin' || userRole === 'pastor' || userRole === 'financeiro') {
+      return true;
+    }
+    
+    try {
+      const stored = localStorage.getItem('church_dynamic_roles');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed[userRole]) {
+          const modules = parsed[userRole].modules || [];
+          return modules.includes('Financeiro');
+        }
+      }
+    } catch (_) {}
+
+    const defaultModules = DEFAULT_ROLES[userRole] || [];
+    return defaultModules.includes('Financeiro');
+  }, [user]);
 
   // Route security & allowed modules
   const allowedModules = useMemo(() => {
@@ -523,9 +552,11 @@ export const Sectors: React.FC = () => {
                 <span className={isSelected ? "text-slate-400" : "text-slate-400"}>
                   Líderes: <strong className={isSelected ? "text-slate-200" : "text-slate-700"}>{sector.leadersCount}</strong>
                 </span>
-                <span className={isSelected ? "text-slate-400" : "text-slate-400"}>
-                  Dizimistas: <strong className={isSelected ? "text-slate-200" : "text-slate-700"}>{sector.tithersCount}</strong>
-                </span>
+                {hasFinanceAccess && (
+                  <span className={isSelected ? "text-slate-400" : "text-slate-400"}>
+                    Dizimistas: <strong className={isSelected ? "text-slate-200" : "text-slate-700"}>{sector.tithersCount}</strong>
+                  </span>
+                )}
               </div>
             </div>
           );
@@ -623,15 +654,17 @@ export const Sectors: React.FC = () => {
                 <option value="AGREGADO">Agregado</option>
               </select>
 
-              <select 
-                value={titherFilter}
-                onChange={(e) => setTitherFilter(e.target.value)}
-                className="bg-slate-50 hover:bg-slate-100 border border-slate-100 rounded-xl px-3 py-2 text-[10px] font-bold uppercase text-slate-650 transition-all outline-none"
-              >
-                <option value="Todos">Dizimista (Todos)</option>
-                <option value="Sim">Sim</option>
-                <option value="Não">Não</option>
-              </select>
+              {hasFinanceAccess && (
+                <select 
+                  value={titherFilter}
+                  onChange={(e) => setTitherFilter(e.target.value)}
+                  className="bg-slate-50 hover:bg-slate-100 border border-slate-100 rounded-xl px-3 py-2 text-[10px] font-bold uppercase text-slate-650 transition-all outline-none"
+                >
+                  <option value="Todos">Dizimista (Todos)</option>
+                  <option value="Sim">Sim</option>
+                  <option value="Não">Não</option>
+                </select>
+              )}
             </div>
           )}
         </div>
@@ -686,7 +719,7 @@ export const Sectors: React.FC = () => {
                   <th className="px-6 py-4">Cargo / Função</th>
                   <th className="px-6 py-4">Grupo Caseiro (GC)</th>
                   <th className="px-6 py-4">Localidade (Bairro)</th>
-                  <th className="px-6 py-4">Dizimista</th>
+                  {hasFinanceAccess && <th className="px-6 py-4">Dizimista</th>}
                   <th className="px-6 py-4 text-right">Ação</th>
                 </tr>
               </thead>
@@ -720,17 +753,19 @@ export const Sectors: React.FC = () => {
                     <td className="px-6 py-4 font-medium text-slate-500">
                       {m.bairro || <span className="text-slate-400 italic">Sem Bairro</span>}
                     </td>
-                    <td className="px-6 py-4">
-                      <span className={clsx(
-                        "text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded",
-                        m.e_dizimista === 'Sim' ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-500"
-                      )}>
-                        {m.e_dizimista || 'Não'}
-                      </span>
-                    </td>
+                    {hasFinanceAccess && (
+                      <td className="px-6 py-4">
+                        <span className={clsx(
+                          "text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded",
+                          m.e_dizimista === 'Sim' ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-500"
+                        )}>
+                          {m.e_dizimista || 'Não'}
+                        </span>
+                      </td>
+                    )}
                     <td className="px-6 py-4 text-right">
                       <button 
-                        onClick={() => navigate(`/crm/${m.nome}`)}
+                        onClick={() => navigate(`/membro/${m.id}`)}
                         className="text-slate-400 hover:text-blue-600 transition-colors inline-flex items-center gap-1 font-bold text-[10px] uppercase cursor-pointer"
                       >
                         Perfil <ChevronRight className="w-3.5 h-3.5" />

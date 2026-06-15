@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { supabase } from '../lib/supabase';
+import { supabaseReader } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { Home, Users, Navigation, Search, Filter, X, ClipboardList } from 'lucide-react';
 import { differenceInYears, parseISO } from 'date-fns';
@@ -135,8 +135,8 @@ const Georeferencing: React.FC = () => {
     try {
       setLoading(true);
       
-      let celQuery = supabase.from('celulas').select('id, grupo_caseiro, latitude, longitude, lider, setor');
-      let membQuery = supabase.from('membros').select(`
+      let celQuery = supabaseReader.from('celulas').select('id, grupo_caseiro, latitude, longitude, lider, setor');
+      let membQuery = supabaseReader.from('membros').select(`
         id, nome, latitude, longitude, grupos_caseiros, estado_civil, sexo, nascimento, tipo_de_pessoa,
         logradouro, bairro, cidade, estado, setor_eclesiastico, setor_residencial
       `).eq('status', 'Ativo');
@@ -166,7 +166,7 @@ const Georeferencing: React.FC = () => {
         membros = filterMembrosByAllowedTypes(fullMembros);
       } else {
         if (mError) console.error('Erro ao buscar membros com endereços:', mError.message);
-        let fallbackQuery = supabase.from('membros').select('id, nome, latitude, longitude, grupos_caseiros, estado_civil, sexo, nascimento, tipo_de_pessoa').eq('status', 'Ativo');
+        let fallbackQuery = supabaseReader.from('membros').select('id, nome, latitude, longitude, grupos_caseiros, estado_civil, sexo, nascimento, tipo_de_pessoa').eq('status', 'Ativo');
         if (user?.assigned_gc) {
           fallbackQuery = fallbackQuery.ilike('grupos_caseiros', `%${user.assigned_gc}%`);
         }

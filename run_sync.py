@@ -41,11 +41,11 @@ def main():
     start_time = time.time()
     
     # Passo 1: Extrair do Prover
-    if not run_step("Extração Prover (Playwright)", ["extrator_prover.py"]):
+    if not run_step("Extração Prover (Playwright)", ["scripts/extrator_prover.py"]):
         sys.exit(1)
         
     # Passo 2: Importar para o Supabase
-    if not run_step("Importação Supabase (UPSERT)", ["importador_supabase.py"]):
+    if not run_step("Importação Supabase (UPSERT)", ["scripts/importador_supabase.py"]):
         sys.exit(1)
     
     duration = time.time() - start_time

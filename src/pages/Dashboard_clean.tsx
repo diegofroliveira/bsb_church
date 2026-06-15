@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../lib/supabase';
+import { supabaseReader } from '../lib/supabase';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, Legend, PieChart, Pie, Cell
@@ -39,10 +39,10 @@ export const Dashboard: React.FC = () => {
       setIsLoading(true);
       try {
         const [membrosRes, celulasRes, financeiroRes, discRes] = await Promise.all([
-          supabase.from('membros').select('status, tipo_cadastro, nascimento, grupos_caseiros', { count: 'exact' }),
-          supabase.from('celulas').select('grupo_caseiro, lider, setor'),
-          supabase.from('financeiro').select('tipo, valor, data').order('data', { ascending: false }).limit(5000),
-          supabase.from('discipulado').select('discipulador, discipulo, status')
+          supabaseReader.from('membros').select('status, tipo_cadastro, nascimento, grupos_caseiros', { count: 'exact' }),
+          supabaseReader.from('celulas').select('grupo_caseiro, lider, setor'),
+          supabaseReader.from('financeiro').select('tipo, valor, data').order('data', { ascending: false }).limit(5000),
+          supabaseReader.from('discipulado').select('discipulador, discipulo, status')
         ]);
 
         const allMembros = membrosRes.data || [];
@@ -138,13 +138,13 @@ export const Dashboard: React.FC = () => {
     try {
       let dataResp: any[] = [];
       if (type === 'grupo') {
-        const { data } = await supabase.from('membros').select('nome, tipo_cadastro, celular_principal_sms').eq('grupos_caseiros', title);
+        const { data } = await supabaseReader.from('membros').select('nome, tipo_cadastro, celular_principal_sms').eq('grupos_caseiros', title);
         dataResp = (data||[]).map(d => ({ col1: d.nome, col2: d.tipo_cadastro||'Membro', col3: d.celular_principal_sms||'-' }));
       } else if (type === 'setor') {
-        const { data } = await supabase.from('celulas').select('grupo_caseiro, lider').eq('setor', title);
+        const { data } = await supabaseReader.from('celulas').select('grupo_caseiro, lider').eq('setor', title);
         dataResp = (data||[]).map(d => ({ col1: d.grupo_caseiro, col2: d.lider||'Sem L├¡der', col3: 'C├®lula' }));
       } else if (type === 'discipulador') {
-        const { data } = await supabase.from('discipulado').select('discipulo, status, tipo').eq('discipulador', title);
+        const { data } = await supabaseReader.from('discipulado').select('discipulo, status, tipo').eq('discipulador', title);
         dataResp = (data||[]).map(d => ({ col1: d.discipulo, col2: d.status||'Ativo', col3: d.tipo||'-' }));
       }
       setModalItems(dataResp);

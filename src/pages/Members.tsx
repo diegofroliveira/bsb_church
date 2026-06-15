@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Filter, Mail, Phone, MoreVertical, Loader2 } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { Search, Filter, Mail, Phone, MoreVertical, Loader2, Eye } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { supabaseReader } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import clsx from 'clsx';
 
@@ -34,13 +35,14 @@ export const Members: React.FC = () => {
   const [filterMaritalStatus, setFilterMaritalStatus] = useState('Todos');
   const [filterMinAge, setFilterMinAge] = useState<number>(0);
   const [filterMaxAge, setFilterMaxAge] = useState<number>(120);
+  const [showInactive, setShowInactive] = useState(false);
 
   useEffect(() => {
     const fetchAllData = async () => {
       setIsLoading(true);
       try {
-        let membrosQuery = supabase.from('membros').select('*').limit(10000);
-        let celulasQuery = supabase.from('celulas').select('grupo_caseiro, setor');
+        let membrosQuery = supabaseReader.from('membros').select('*').order('nome').limit(10000);
+        let celulasQuery = supabaseReader.from('celulas').select('grupo_caseiro, setor');
 
         if (user?.assigned_gc) {
           membrosQuery = membrosQuery.ilike('grupos_caseiros', `%${user.assigned_gc}%`);
@@ -50,7 +52,7 @@ export const Members: React.FC = () => {
         const [membrosRes, celulasRes, discRes] = await Promise.all([
            membrosQuery,
            celulasQuery,
-           supabase.from('discipulado').select('mestre, discipulo, status')
+           supabaseReader.from('discipulado').select('discipulador, discipulo, status')
         ]);
         
         const allMembros = membrosRes.data || [];
@@ -62,9 +64,9 @@ export const Members: React.FC = () => {
            if (c.grupo_caseiro && c.setor) setorMap[c.grupo_caseiro.toLowerCase()] = c.setor;
         });
 
-        const mestreMap: Record<string, string> = {};
+        const discipuladorMap: Record<string, string> = {};
         allDisc.forEach(d => {
-           if (d.discipulo && d.mestre) mestreMap[d.discipulo.toLowerCase()] = d.mestre;
+           if (d.discipulo && d.discipulador) discipuladorMap[d.discipulo.toLowerCase()] = d.discipulador;
         });
 
         const enriched = allMembros.map(m => {
@@ -82,7 +84,7 @@ export const Members: React.FC = () => {
                setor: setorRes,
                setor_eclesiastico_display: setorEcl,
                setor_residencial_display: setorRes,
-               discipulador: mestreMap[nomeLower] || 'Sem Discipulador'
+               discipulador: discipuladorMap[nomeLower] || 'Sem Discipulador'
            };
         });
 
@@ -129,6 +131,7 @@ export const Members: React.FC = () => {
 
   const filteredMembers = useMemo(() => {
     return members.filter(m => {
+      if (!showInactive && m.status !== 'Ativo') return false;
       if (filterQuery) {
         const queryLower = filterQuery.toLowerCase();
         if (!(m.nome || '').toLowerCase().includes(queryLower)) return false;
@@ -148,7 +151,7 @@ export const Members: React.FC = () => {
       
       return true;
     });
-  }, [members, filterQuery, filterType, filterGC, filterGender, filterAgeCategory, filterMinAge, filterMaxAge, filterMaritalStatus, filterState, filterSetor, filterSetorEcl, filterMestre]);
+  }, [members, showInactive, filterQuery, filterType, filterGC, filterGender, filterAgeCategory, filterMinAge, filterMaxAge, filterMaritalStatus, filterState, filterSetor, filterSetorEcl, filterMestre]);
 
   const totalCount = filteredMembers.length;
   const paginatedMembers = filteredMembers.slice((page - 1) * pageSize, page * pageSize);
@@ -183,6 +186,7 @@ export const Members: React.FC = () => {
               setFilterQuery(''); setFilterType('Todos'); setFilterGC('Todos'); setFilterGender('Todos');
               setFilterAgeCategory('Todas'); setFilterState('Todos'); setFilterSetor('Todos'); setFilterSetorEcl('Todos'); setFilterMestre('Todos');
               setFilterMinAge(0); setFilterMaxAge(120); setFilterMaritalStatus('Todos');
+              setShowInactive(false);
             }}
             className="text-xs text-red-600 font-medium hover:underline"
           >
@@ -282,6 +286,20 @@ export const Members: React.FC = () => {
                 <input type="number" value={filterMaxAge} onChange={e => { setFilterMaxAge(parseInt(e.target.value) || 120); setPage(1); }} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white" placeholder="Max" />
              </div>
           </div>
+
+          <div className="flex items-end pb-1.5">
+             <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input 
+                  type="checkbox" 
+                  checked={showInactive} 
+                  onChange={e => { setShowInactive(e.target.checked); setPage(1); }} 
+                  className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 h-4.5 w-4.5 cursor-pointer"
+                />
+                <span className="text-xs font-semibold text-gray-700">
+                  Mostrar Inativos
+                </span>
+             </label>
+          </div>
         </div>
       </div>
 
@@ -310,14 +328,29 @@ export const Members: React.FC = () => {
                          <td className="whitespace-nowrap py-4 pl-6 pr-3">
                             <div className="flex items-center gap-3">
                                <div className="h-10 w-10 flex-shrink-0 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-bold border border-primary-200 overflow-hidden text-sm uppercase">
-                                  {person.foto ? (
-                                    <img src={person.foto} alt="" className="w-full h-full object-cover" />
-                                  ) : (
-                                    (person.nome || '?').charAt(0)
-                                  )}
+                                   {person.foto ? (
+                                     <img src={person.foto} alt="" className="w-full h-full object-cover" />
+                                   ) : (
+                                     <>
+                                       <img 
+                                         src={`https://vadufkgbluisdamgkbln.supabase.co/storage/v1/object/public/avatars/avatars/${person.id}.jpg`} 
+                                         alt="" 
+                                         className="w-full h-full object-cover" 
+                                         onError={(e) => {
+                                           (e.target as HTMLImageElement).classList.add('hidden');
+                                           (e.target as HTMLImageElement).parentElement?.querySelector('.list-fallback-char')?.classList.remove('hidden');
+                                         }}
+                                       />
+                                       <span className="list-fallback-char hidden">
+                                         {(person.nome || '?').charAt(0)}
+                                       </span>
+                                     </>
+                                   )}
                                </div>
                                <div className="flex flex-col min-w-0">
-                                  <span className="font-medium text-gray-900 truncate max-w-[200px]">{person.nome}</span>
+                                  <Link to={`/membro/${person.id}`} className="font-bold text-primary-650 hover:text-primary-850 hover:underline truncate max-w-[200px]">
+                                    {person.nome}
+                                  </Link>
                                   <span className="text-[10px] text-gray-500 font-medium truncate max-w-[150px]">
                                     {person.discipulador !== 'Sem Discipulador' ? `Disc: ${person.discipulador}` : ''}
                                   </span>
@@ -364,11 +397,11 @@ export const Members: React.FC = () => {
                                {person.status}
                             </span>
                          </td>
-                         <td className="relative whitespace-nowrap py-4 pl-3 pr-6 text-right text-sm font-medium">
-                            <button className="text-gray-400 hover:text-gray-900 p-1 rounded-md transition-colors opacity-0 group-hover:opacity-100">
-                               <MoreVertical className="w-5 h-5"/>
-                            </button>
-                         </td>
+                          <td className="relative whitespace-nowrap py-4 pl-3 pr-6 text-right text-xs font-bold">
+                             <Link to={`/membro/${person.id}`} className="text-primary-600 hover:text-primary-800 flex items-center justify-end gap-1 transition-colors">
+                                <Eye className="w-4 h-4"/> Ver Ficha
+                             </Link>
+                          </td>
                       </tr>
                    ))}
                    {paginatedMembers.length === 0 && !isLoading && (

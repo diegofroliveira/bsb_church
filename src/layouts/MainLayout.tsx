@@ -107,22 +107,35 @@ export const MainLayout: React.FC = () => {
   const handleLogout = () => { logout(); navigate('/login'); };
 
   const navItems = [
-    { id: 'Dashboard',       name: 'Dashboard',       path: '/',             icon: LayoutDashboard },
-    { id: 'Aniversariantes', name: 'Aniversariantes', path: '/birthdays',    icon: Calendar },
-    { id: 'Mapa',            name: 'Mapa',            path: '/georeferencing', icon: MapPin },
-    { id: 'Membros',         name: 'Membros',         path: '/members',      icon: Users },
-    { id: 'Famílias',        name: 'Famílias',        path: '/families',     icon: Heart },
-    { id: 'GCs/Localidades', name: 'GCs/Localidades', path: '/cells',        icon: Home },
-    { id: 'Setores',         name: 'Setores',         path: '/sectors',      icon: Compass },
-    { id: 'Discipulado',     name: 'Discipulado',     path: '/discipleship', icon: BookOpen },
-    { id: 'Companheirismo',   name: 'Companheirismo',   path: '/companionship', icon: Handshake },
-    { id: 'Rede',            name: 'Rede',            path: '/network',      icon: Network },
-    { id: 'Relatórios',      name: 'Relatórios',      path: '/reports',      icon: FileText },
-    { id: 'QA',              name: 'QA',              path: '/qa',           icon: AlertTriangle },
-    { id: 'Financeiro',      name: 'Financeiro',      path: '/finance',      icon: DollarSign },
-    { id: 'Simulações',      name: 'Simulações',      path: '/simulations',  icon: Play },
-    { id: 'Consultor IA',    name: 'IA',              path: '/ai-consultant', icon: Brain },
-    { id: 'Configurações',   name: 'Configurações',   path: '/admin/users',  icon: Settings },
+    { id: 'Dashboard',       name: 'Dashboard',       path: '/',             icon: LayoutDashboard, group: 'Geral' },
+    { id: 'Mapa',            name: 'Mapa',            path: '/georeferencing', icon: MapPin,         group: 'Geral' },
+    { id: 'Relatórios',      name: 'Relatórios',      path: '/reports',      icon: FileText,        group: 'Geral' },
+
+    { id: 'Membros',         name: 'Membros',         path: '/members',      icon: Users,           group: 'Pessoas' },
+    { id: 'Famílias',        name: 'Famílias',        path: '/families',     icon: Heart,           group: 'Pessoas' },
+    { id: 'Aniversariantes', name: 'Aniversariantes', path: '/birthdays',    icon: Calendar,        group: 'Pessoas' },
+
+    { id: 'GCs/Localidades', name: 'GCs/Localidades', path: '/cells',        icon: Home,            group: 'Comunidade' },
+    { id: 'Setores',         name: 'Setores',         path: '/sectors',      icon: Compass,         group: 'Comunidade' },
+    { id: 'Rede',            name: 'Rede',            path: '/network',      icon: Network,         group: 'Comunidade' },
+
+    { id: 'Discipulado',     name: 'Discipulado',     path: '/discipleship', icon: BookOpen,        group: 'Pastoreio' },
+    { id: 'Companheirismo',  name: 'Companheirismo',  path: '/companionship', icon: Handshake,       group: 'Pastoreio' },
+
+    { id: 'Financeiro',      name: 'Financeiro',      path: '/finance',      icon: DollarSign,      group: 'Gestão & Ferramentas' },
+    { id: 'Simulações',      name: 'Simulações',      path: '/simulations',  icon: Play,            group: 'Gestão & Ferramentas' },
+    { id: 'Consultor IA',    name: 'IA',              path: '/ai-consultant', icon: Brain,           group: 'Gestão & Ferramentas' },
+    { id: 'QA',              name: 'QA',              path: '/qa',           icon: AlertTriangle,   group: 'Gestão & Ferramentas' },
+    { id: 'Configurações',   name: 'Configurações',   path: '/admin/users',  icon: Settings,        group: 'Gestão & Ferramentas' },
+    { id: 'Lab',             name: 'Laboratório',     path: '#',             icon: FlaskConical,    group: 'Gestão & Ferramentas' },
+  ];
+
+  const GROUPS = [
+    { id: 'Geral', name: 'Geral' },
+    { id: 'Pessoas', name: 'Pessoas' },
+    { id: 'Comunidade', name: 'Comunidade' },
+    { id: 'Pastoreio', name: 'Pastoreio' },
+    { id: 'Gestão & Ferramentas', name: 'Gestão & Ferramentas' },
   ];
 
   const finalAllowedModules = hasAccessToAnyLab && !allowedModules.includes('Lab')
@@ -163,59 +176,75 @@ export const MainLayout: React.FC = () => {
     </svg>
   );
 
-  const SidebarContent = () => (
-    <>
-      <div className="flex h-20 shrink-0 items-center px-6 border-b border-gray-100 bg-white">
-        <FamilyLogo className="h-11 w-11 text-primary-600 mr-3" />
-        <span className="text-2xl font-bold text-gray-900 tracking-tight">Igreja<span className="text-blue-600">Pro</span></span>
-      </div>
-      <nav className="flex flex-1 flex-col px-4 py-4 overflow-y-auto">
-        <ul className="space-y-1">
-          {authorizedNavItems.map((item) => {
-            const isLabItem = item.id === 'Lab';
-            return (
-              <li key={item.name}>
-                {isLabItem ? (
-                  <button
-                    onClick={() => {
-                      setIsMobileMenuOpen(false);
-                      setIsLabOpen(true);
-                    }}
-                    className="w-full text-left text-gray-600 hover:bg-gray-50 hover:text-gray-900 group flex gap-x-3 rounded-md p-2 text-sm leading-6 transition-all duration-200"
-                  >
-                    <item.icon className="h-5 w-5 shrink-0" aria-hidden="true" />
-                    {item.name}
-                  </button>
-                ) : (
-                  <NavLink
-                    to={item.path}
-                    end={item.path === '/'}
-                    className={({ isActive }) => clsx(
-                      isActive ? 'bg-primary-50 text-primary-700 font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
-                      'group flex gap-x-3 rounded-md p-2 text-sm leading-6 transition-all duration-200'
-                    )}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    <item.icon className="h-5 w-5 shrink-0" aria-hidden="true" />
-                    {item.name}
-                  </NavLink>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
+  const SidebarContent = () => {
+    const groupsMap = GROUPS.map(group => {
+      const items = authorizedNavItems.filter(item => item.group === group.id);
+      return { ...group, items };
+    }).filter(group => group.items.length > 0);
 
-      <div className="border-t border-gray-100 p-4">
-        <div className="text-sm font-semibold text-gray-900 truncate">{user?.name}</div>
-        <div className="text-xs text-primary-600 font-medium capitalize">{user?.role}</div>
-        <button onClick={handleLogout}
-          className="mt-4 flex w-full items-center gap-x-3 rounded-md p-2 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors">
-          <LogOut className="h-5 w-5 shrink-0" /> Sair
-        </button>
-      </div>
-    </>
-  );
+    return (
+      <>
+        <div className="flex h-20 shrink-0 items-center px-6 border-b border-gray-100 bg-white">
+          <FamilyLogo className="h-11 w-11 text-primary-600 mr-3" />
+          <span className="text-2xl font-bold text-gray-900 tracking-tight">Igreja<span className="text-blue-600">Pro</span></span>
+        </div>
+        <nav className="flex flex-1 flex-col px-4 py-4 overflow-y-auto">
+          <div className="space-y-6">
+            {groupsMap.map((group) => (
+              <div key={group.id} className="space-y-1">
+                <h3 className="text-[9px] font-black text-slate-400/80 uppercase tracking-widest px-3 pt-3 pb-0.5 select-none">
+                  {group.name}
+                </h3>
+                <ul className="space-y-1">
+                  {group.items.map((item) => {
+                    const isLabItem = item.id === 'Lab';
+                    return (
+                      <li key={item.name}>
+                        {isLabItem ? (
+                          <button
+                            onClick={() => {
+                              setIsMobileMenuOpen(false);
+                              setIsLabOpen(true);
+                            }}
+                            className="w-full text-left text-gray-600 hover:bg-gray-50 hover:text-gray-900 group flex gap-x-3 rounded-md p-2 text-sm leading-6 transition-all duration-200"
+                          >
+                            <item.icon className="h-5 w-5 shrink-0" aria-hidden="true" />
+                            {item.name}
+                          </button>
+                        ) : (
+                          <NavLink
+                            to={item.path}
+                            end={item.path === '/'}
+                            className={({ isActive }) => clsx(
+                              isActive ? 'bg-primary-50 text-primary-700 font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
+                              'group flex gap-x-3 rounded-md p-2 text-sm leading-6 transition-all duration-200'
+                            )}
+                            onClick={() => setIsMobileMenuOpen(false)}
+                          >
+                            <item.icon className="h-5 w-5 shrink-0" aria-hidden="true" />
+                            {item.name}
+                          </NavLink>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </nav>
+
+        <div className="border-t border-gray-100 p-4">
+          <div className="text-sm font-semibold text-gray-900 truncate">{user?.name}</div>
+          <div className="text-xs text-primary-600 font-medium capitalize">{user?.role}</div>
+          <button onClick={handleLogout}
+            className="mt-4 flex w-full items-center gap-x-3 rounded-md p-2 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors">
+            <LogOut className="h-5 w-5 shrink-0" /> Sair
+          </button>
+        </div>
+      </>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gray-50/50">
@@ -244,6 +273,11 @@ export const MainLayout: React.FC = () => {
         <main className="flex-1 py-10 px-4 sm:px-6 lg:px-8">
           <Outlet />
         </main>
+      </div>
+
+      {/* Discreet watermark signature */}
+      <div className="fixed bottom-2 right-4 text-[10px] text-slate-300/80 select-none pointer-events-none tracking-widest z-50 font-serif">
+        רוּמָה
       </div>
     </div>
   );

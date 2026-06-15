@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, supabaseReader } from '../lib/supabase';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, Loader2, ChevronDown, ChevronRight, ShieldCheck, Activity, FileWarning, Download } from 'lucide-react';
 import clsx from 'clsx';
@@ -97,8 +97,8 @@ export const QA: React.FC = () => {
         }
 
         const [celulasRes, discRes] = await Promise.all([
-          supabase.from('celulas').select('grupo_caseiro, lider, setor, limite_de_pessoas'),
-          supabase.from('discipulado').select('discipulador, discipulo, status')
+          supabaseReader.from('celulas').select('grupo_caseiro, lider, setor, limite_de_pessoas'),
+          supabaseReader.from('discipulado').select('discipulador, discipulo, status')
         ]);
 
         const membros = allMembros;
@@ -650,7 +650,7 @@ export const QA: React.FC = () => {
                             {report.columns.map((col, idx) => (
                               <td key={col.key} className={clsx('whitespace-nowrap py-2 text-sm text-gray-700', idx === 0 ? 'pl-6 pr-3 font-medium text-gray-900' : 'px-3')}>
                                 {col.key === 'nome' && row[col.key] ? (
-                                  <Link to={`/crm/${encodeURIComponent(row[col.key])}`} className="text-primary-600 hover:text-primary-800 hover:underline">
+                                  <Link to={`/membro/${encodeURIComponent(row[col.key])}`} className="text-primary-600 hover:text-primary-800 hover:underline">
                                     {row[col.key]}
                                   </Link>
                                 ) : (row[col.key] ?? '-')}

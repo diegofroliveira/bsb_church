@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../lib/supabase';
+import { supabaseReader } from '../lib/supabase';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, Legend, PieChart, Pie, Cell
 } from 'recharts';
-import { Users, UserPlus, Home, TrendingUp, Loader2, X, Search, Layers, UserCheck, MapPin } from 'lucide-react';
+import { Users, UserPlus, Home, TrendingUp, Loader2, X, Search, Layers, UserCheck, MapPin, SlidersHorizontal } from 'lucide-react';
 import clsx from 'clsx';
 import { getSectorByResidence } from '../lib/geoUtils';
 
@@ -31,6 +31,7 @@ export const Dashboard: React.FC = () => {
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [isTypesOpen, setIsTypesOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [isAdvancedFiltersOpen, setIsAdvancedFiltersOpen] = useState(false);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -50,8 +51,8 @@ export const Dashboard: React.FC = () => {
     const fetchDashboardData = async () => {
       setIsLoading(true);
       try {
-        let membrosQuery = supabase.from('membros').select('nome, status, tipo_cadastro, nascimento, grupos_caseiros, sexo, bairro, cidade, estado, tipo_de_pessoa, data_de_cadastro, data_atualizacao, estado_civil, setor_eclesiastico, setor_residencial');
-        let celulasQuery = supabase.from('celulas').select('grupo_caseiro, lider, auxiliar, setor');
+        let membrosQuery = supabaseReader.from('membros').select('nome, status, tipo_cadastro, nascimento, grupos_caseiros, sexo, bairro, cidade, estado, tipo_de_pessoa, data_de_cadastro, data_atualizacao, estado_civil, setor_eclesiastico, setor_residencial');
+        let celulasQuery = supabaseReader.from('celulas').select('grupo_caseiro, lider, auxiliar, setor');
 
         if (user?.assigned_gc) {
           membrosQuery = membrosQuery.ilike('grupos_caseiros', `%${user.assigned_gc}%`);
@@ -61,7 +62,7 @@ export const Dashboard: React.FC = () => {
         const [membrosRes, celulasRes, discRes] = await Promise.all([
           membrosQuery,
           celulasQuery,
-          supabase.from('discipulado').select('discipulador, discipulo, status')
+          supabaseReader.from('discipulado').select('discipulador, discipulo, status')
         ]);
 
         setRawMembros(membrosRes.data || []);
@@ -295,7 +296,7 @@ export const Dashboard: React.FC = () => {
       let dataResp: any[] = [];
       const discSet = new Set(rawDiscipulado.map(d => d.discipulador?.trim().toUpperCase()));
       if (type === 'grupo') {
-        const { data } = await supabase.from('membros').select('nome, sexo, nascimento, tipo_cadastro').eq('grupos_caseiros', title);
+        const { data } = await supabaseReader.from('membros').select('nome, sexo, nascimento, tipo_cadastro').eq('grupos_caseiros', title);
         const cell = rawCelulas.find(c => c.grupo_caseiro === title);
         dataResp = (data || []).map(d => {
           const age = d.nascimento ? new Date().getFullYear() - new Date(d.nascimento).getFullYear() : '-';
@@ -316,7 +317,7 @@ export const Dashboard: React.FC = () => {
         const sectorCells = rawCelulas.filter(c => getNormalizedSectorName(c.setor) === title);
         dataResp = sectorCells.map(d => ({ col1: d.grupo_caseiro, col2: d.lider || 'Sem Líder', col3: 'Grupo Caseiro', col4: 'Detalhar', isAction: true }));
       } else if (type === 'discipulador') {
-        const { data } = await supabase.from('discipulado').select('discipulo, status, tipo').eq('discipulador', title);
+        const { data } = await supabaseReader.from('discipulado').select('discipulo, status, tipo').eq('discipulador', title);
         dataResp = (data || []).map(d => ({ col1: d.discipulo, col2: d.status || 'Ativo', col3: d.tipo || '-', col4: '-', col5: '-' }));
       }
       setModalItems(dataResp);
@@ -361,129 +362,203 @@ export const Dashboard: React.FC = () => {
         </div>
       </header>
 
-      <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-wrap gap-4 items-center mb-6">
-        <div className="flex items-center gap-2 text-gray-400 mr-2"><Search className="w-4 h-4" /><span className="text-xs font-bold uppercase tracking-wider">Filtros Rápidos:</span></div>
-        <select value={filterSector} onChange={e => setFilterSector(e.target.value)} className="text-sm border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50">
-          <option value="Todos">Setor de Residência (Todos)</option>
-          <option value="Setor Norte">Setor Norte</option>
-          <option value="Setor Central">Setor Central</option>
-          <option value="Setor Águas Claras">Setor Águas Claras</option>
-          <option value="Setor Sul">Setor Sul</option>
-          <option value="Sem Setor">Sem Setor</option>
-        </select>
-        <select value={filterSectorEcl} onChange={e => setFilterSectorEcl(e.target.value)} className="text-sm border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50">
-          <option value="Todos">Setor do GC (Todos)</option>
-          <option value="Setor Norte">Setor Norte</option>
-          <option value="Setor Central">Setor Central</option>
-          <option value="Setor Águas Claras">Setor Águas Claras</option>
-          <option value="Setor Sul">Setor Sul</option>
-          <option value="Sem Setor">Sem Setor</option>
-        </select>
-        <select value={filterGender} onChange={e => setFilterGender(e.target.value)} className="text-sm border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50"><option value="Todos">Todos os Sexos</option><option value="Masculino">Masculino</option><option value="Feminino">Feminino</option></select>
-        <select value={filterGroup} onChange={e => setFilterGroup(e.target.value)} className="text-sm border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50 max-w-[200px]"><option value="Todos">Todos os Grupos</option>{rawCelulas.map(c => <option key={c.grupo_caseiro} value={c.grupo_caseiro}>{c.grupo_caseiro}</option>)}</select>
-        <select value={filterDisc} onChange={e => setFilterDisc(e.target.value)} className="text-sm border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50 max-w-[200px]"><option value="Todos">Todos os Discipuladores</option>{Array.from(new Set(rawDiscipulado.map(d => d.discipulador))).sort().map(d => <option key={d} value={d}>{d}</option>)}</select>
-        <select value={filterMaritalStatus} onChange={e => setFilterMaritalStatus(e.target.value)} className="text-sm border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50 max-w-[150px]"><option value="Todos">Estado Civil</option>{Array.from(new Set(rawMembros.map(m => m.estado_civil).filter(Boolean))).sort().map(s => <option key={s} value={s}>{s}</option>)}</select>
-        
-        {/* Status Filter (Ativo/Inativo) */}
-        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="text-sm border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50"><option value="Todos">Todos os Status</option><option value="Ativo">Ativo</option><option value="Inativo">Inativo</option></select>
-
-        {/* Types of Person Filter (Checkbox Multiselect Dropdown) */}
-        <div className="relative" ref={dropdownRef}>
-          <button
-            type="button"
-            onClick={() => setIsTypesOpen(!isTypesOpen)}
-            className="flex items-center justify-between gap-2 text-sm border border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50 px-3 py-2 text-gray-700 hover:bg-gray-100 transition-colors"
-          >
-            <span>{selectedTypes.length === 0 ? 'Todos os Tipos' : `${selectedTypes.length} Tipo(s)`}</span>
-            <span className="text-xs text-gray-400">▼</span>
-          </button>
-
-          {isTypesOpen && (
-            <div className="absolute left-0 mt-2 w-64 bg-white border border-gray-100 rounded-xl shadow-xl z-50 p-3 space-y-2 animate-in fade-in slide-in-from-top-1 duration-150">
-              <div className="flex justify-between items-center pb-2 border-b border-gray-100">
-                <span className="text-[10px] font-bold text-gray-400 uppercase">Tipos de Pessoa</span>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedTypes([])}
-                    className="text-[10px] text-red-500 hover:underline font-bold"
-                  >
-                    Limpar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedTypes(uniqueTypes)}
-                    className="text-[10px] text-primary-600 hover:underline font-bold"
-                  >
-                    Todos
-                  </button>
-                </div>
-              </div>
-              <div className="max-h-48 overflow-y-auto space-y-2 py-1 pr-1 scrollbar-thin">
-                {uniqueTypes.length === 0 ? (
-                  <span className="text-xs text-gray-400 block text-center">Nenhum tipo disponível</span>
-                ) : (
-                  uniqueTypes.map(type => (
-                    <label key={type} className="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors text-xs text-gray-700">
-                      <input
-                        type="checkbox"
-                        checked={selectedTypes.includes(type)}
-                        onChange={() => {
-                          setSelectedTypes(prev =>
-                            prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
-                          );
-                        }}
-                        className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 w-3.5 h-3.5"
-                      />
-                      <span className="font-medium truncate">{type}</span>
-                    </label>
-                  ))
-                )}
-              </div>
+      <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 mb-6 space-y-4">
+        {/* Basic Filters (Always Visible) */}
+        <div className="flex flex-wrap gap-4 items-center justify-between">
+          <div className="flex flex-wrap gap-4 items-center">
+            <div className="flex items-center gap-2 text-gray-400 mr-2">
+              <Search className="w-4 h-4" />
+              <span className="text-xs font-bold uppercase tracking-wider">Filtros:</span>
             </div>
-          )}
+            
+            {/* Primary Filter 1: Resident Sector */}
+            <select 
+              value={filterSector} 
+              onChange={e => setFilterSector(e.target.value)} 
+              className="text-sm border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50"
+            >
+              <option value="Todos">Setor de Residência (Todos)</option>
+              <option value="Setor Norte">Setor Norte</option>
+              <option value="Setor Central">Setor Central</option>
+              <option value="Setor Águas Claras">Setor Águas Claras</option>
+              <option value="Setor Sul">Setor Sul</option>
+              <option value="Sem Setor">Sem Setor</option>
+            </select>
+
+            {/* Primary Filter 2: Member Status */}
+            <select 
+              value={filterStatus} 
+              onChange={e => setFilterStatus(e.target.value)} 
+              className="text-sm border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50"
+            >
+              <option value="Todos">Todos os Status</option>
+              <option value="Ativo">Ativo</option>
+              <option value="Inativo">Inativo</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {/* Toggle Button for Advanced Filters */}
+            <button
+              type="button"
+              onClick={() => setIsAdvancedFiltersOpen(!isAdvancedFiltersOpen)}
+              className={clsx(
+                "flex items-center gap-2 text-xs font-bold uppercase tracking-wider px-3 py-2 rounded-xl border transition-all cursor-pointer",
+                isAdvancedFiltersOpen 
+                  ? "bg-primary-50 border-primary-200 text-primary-700 shadow-sm"
+                  : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+              )}
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              Filtros Avançados
+              {(filterSectorEcl !== 'Todos' || filterGender !== 'Todos' || filterGroup !== 'Todos' || filterDisc !== 'Todos' || filterMaritalStatus !== 'Todos' || selectedTypes.length > 0 || filterMinAge !== 0 || filterMaxAge !== 120) && (
+                <span className="ml-1 px-1.5 py-0.2 bg-primary-600 text-white rounded-full text-[9px] font-black animate-pulse">
+                  !
+                </span>
+              )}
+            </button>
+
+            {/* Clear All Filters Button */}
+            {(filterGender !== 'Todos' || filterGroup !== 'Todos' || filterDisc !== 'Todos' || filterSector !== 'Todos' || filterSectorEcl !== 'Todos' || filterMinAge !== 0 || filterMaxAge !== 120 || filterMaritalStatus !== 'Todos' || filterStatus !== 'Todos' || selectedTypes.length > 0) && (
+              <button 
+                onClick={() => { 
+                  setFilterGender('Todos'); 
+                  setFilterGroup('Todos'); 
+                  setFilterDisc('Todos'); 
+                  setFilterSector('Todos');
+                  setFilterSectorEcl('Todos');
+                  setFilterMinAge(0); 
+                  setFilterMaxAge(120); 
+                  setFilterMaritalStatus('Todos'); 
+                  setFilterStatus('Todos'); 
+                  setSelectedTypes([]); 
+                }} 
+                className="text-xs text-red-600 font-bold hover:underline cursor-pointer"
+              >
+                Limpar
+              </button>
+            )}
+          </div>
         </div>
 
-        <div className="flex items-center gap-2 bg-gray-50/50 border border-gray-200 rounded-lg px-3 py-1">
-           <span className="text-[10px] font-bold text-gray-400 uppercase">Idade:</span>
-           <input type="number" value={filterMinAge} onChange={e => setFilterMinAge(parseInt(e.target.value) || 0)} className="w-12 bg-transparent text-sm font-semibold outline-none border-b border-transparent focus:border-primary-500" placeholder="Min" />
-           <span className="text-gray-300">/</span>
-           <input type="number" value={filterMaxAge} onChange={e => setFilterMaxAge(parseInt(e.target.value) || 120)} className="w-12 bg-transparent text-sm font-semibold outline-none border-b border-transparent focus:border-primary-500" placeholder="Max" />
-        </div>
+        {/* Advanced Filters (Collapsible Section) */}
+        {isAdvancedFiltersOpen && (
+          <div className="pt-4 border-t border-gray-50 flex flex-wrap gap-4 items-center animate-in fade-in slide-in-from-top-2 duration-200">
+            {/* Sector of GC */}
+            <select value={filterSectorEcl} onChange={e => setFilterSectorEcl(e.target.value)} className="text-sm border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50">
+              <option value="Todos">Setor do GC (Todos)</option>
+              <option value="Setor Norte">Setor Norte</option>
+              <option value="Setor Central">Setor Central</option>
+              <option value="Setor Águas Claras">Setor Águas Claras</option>
+              <option value="Setor Sul">Setor Sul</option>
+              <option value="Sem Setor">Sem Setor</option>
+            </select>
 
-        {(filterGender !== 'Todos' || filterGroup !== 'Todos' || filterDisc !== 'Todos' || filterSector !== 'Todos' || filterSectorEcl !== 'Todos' || filterMinAge !== 0 || filterMaxAge !== 120 || filterMaritalStatus !== 'Todos' || filterStatus !== 'Todos' || selectedTypes.length > 0) && (
-          <button 
-            onClick={() => { 
-              setFilterGender('Todos'); 
-              setFilterGroup('Todos'); 
-              setFilterDisc('Todos'); 
-              setFilterSector('Todos');
-              setFilterSectorEcl('Todos');
-              setFilterMinAge(0); 
-              setFilterMaxAge(120); 
-              setFilterMaritalStatus('Todos'); 
-              setFilterStatus('Todos'); 
-              setSelectedTypes([]); 
-            }} 
-            className="text-xs text-red-600 font-medium hover:underline"
-          >
-            Limpar Filtros
-          </button>
+            {/* Gender */}
+            <select value={filterGender} onChange={e => setFilterGender(e.target.value)} className="text-sm border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50">
+              <option value="Todos">Todos os Sexos</option>
+              <option value="Masculino">Masculino</option>
+              <option value="Feminino">Feminino</option>
+            </select>
+
+            {/* GC Group */}
+            <select value={filterGroup} onChange={e => setFilterGroup(e.target.value)} className="text-sm border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50 max-w-[200px]">
+              <option value="Todos">Todos os GCs</option>
+              {rawCelulas.map(c => <option key={c.grupo_caseiro} value={c.grupo_caseiro}>{c.grupo_caseiro}</option>)}
+            </select>
+
+            {/* Discipler */}
+            <select value={filterDisc} onChange={e => setFilterDisc(e.target.value)} className="text-sm border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50 max-w-[200px]">
+              <option value="Todos">Todos os Discipuladores</option>
+              {Array.from(new Set(rawDiscipulado.map(d => d.discipulador))).sort().map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
+
+            {/* Marital Status */}
+            <select value={filterMaritalStatus} onChange={e => setFilterMaritalStatus(e.target.value)} className="text-sm border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50 max-w-[150px]">
+              <option value="Todos">Estado Civil</option>
+              {Array.from(new Set(rawMembros.map(m => m.estado_civil).filter(Boolean))).sort().map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+            
+            {/* Checkbox Multiselect Dropdown for Types */}
+            <div className="relative" ref={dropdownRef}>
+              <button
+                type="button"
+                onClick={() => setIsTypesOpen(!isTypesOpen)}
+                className="flex items-center justify-between gap-2 text-sm border border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50 px-3 py-2 text-gray-700 hover:bg-gray-150 transition-colors cursor-pointer"
+              >
+                <span>{selectedTypes.length === 0 ? 'Todos os Tipos' : `${selectedTypes.length} Tipo(s)`}</span>
+                <span className="text-xs text-gray-400">▼</span>
+              </button>
+
+              {isTypesOpen && (
+                <div className="absolute left-0 mt-2 w-64 bg-white border border-gray-100 rounded-xl shadow-xl z-50 p-3 space-y-2 animate-in fade-in slide-in-from-top-1 duration-150">
+                  <div className="flex justify-between items-center pb-2 border-b border-gray-100">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase">Tipos de Pessoa</span>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedTypes([])}
+                        className="text-[10px] text-red-500 hover:underline font-bold"
+                      >
+                        Limpar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedTypes(uniqueTypes)}
+                        className="text-[10px] text-primary-600 hover:underline font-bold"
+                      >
+                        Todos
+                      </button>
+                    </div>
+                  </div>
+                  <div className="max-h-48 overflow-y-auto space-y-2 py-1 pr-1 scrollbar-thin">
+                    {uniqueTypes.length === 0 ? (
+                      <span className="text-xs text-gray-400 block text-center">Nenhum tipo disponível</span>
+                    ) : (
+                      uniqueTypes.map(type => (
+                        <label key={type} className="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors text-xs text-gray-700">
+                          <input
+                            type="checkbox"
+                            checked={selectedTypes.includes(type)}
+                            onChange={() => {
+                              setSelectedTypes(prev =>
+                                prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
+                              );
+                            }}
+                            className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 w-3.5 h-3.5"
+                          />
+                          <span className="font-medium truncate">{type}</span>
+                        </label>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Age Range */}
+            <div className="flex items-center gap-2 bg-gray-50/50 border border-gray-200 rounded-lg px-3 py-1">
+               <span className="text-[10px] font-bold text-gray-400 uppercase">Idade:</span>
+               <input type="number" value={filterMinAge} onChange={e => setFilterMinAge(parseInt(e.target.value) || 0)} className="w-12 bg-transparent text-sm font-semibold outline-none border-b border-transparent focus:border-primary-500" placeholder="Min" />
+               <span className="text-gray-300">/</span>
+               <input type="number" value={filterMaxAge} onChange={e => setFilterMaxAge(parseInt(e.target.value) || 120)} className="w-12 bg-transparent text-sm font-semibold outline-none border-b border-transparent focus:border-primary-500" placeholder="Max" />
+            </div>
+          </div>
         )}
       </div>
 
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {[
-          { label: 'Total de Cadastros', value: dashboardData?.stats.totalMembros, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
-          { label: 'Membros Ativos', value: dashboardData?.stats.ativos, sub: 'Status: Ativo', icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-          { label: 'Membros Localidade', value: dashboardData?.stats.membrosLocalidade, icon: MapPin, color: 'text-pink-600', bg: 'bg-pink-50' },
-          { label: 'Visitantes', value: dashboardData?.stats.visitantes, icon: UserPlus, color: 'text-orange-600', bg: 'bg-orange-50' },
-          { label: 'Grupos Caseiros', value: dashboardData?.stats.totalCelulas, icon: Home, color: 'text-purple-600', bg: 'bg-purple-50' },
-          { label: 'Discipuladores', value: dashboardData?.stats.totalDiscipuladores, icon: UserCheck, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+          { label: 'Total de Cadastros', value: dashboardData?.stats.totalMembros, icon: Users, color: 'text-slate-700', bg: 'bg-slate-100/70' },
+          { label: 'Membros Ativos', value: dashboardData?.stats.ativos, sub: 'Status: Ativo', icon: TrendingUp, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+          { label: 'Membros Localidade', value: dashboardData?.stats.membrosLocalidade, icon: MapPin, color: 'text-violet-600', bg: 'bg-violet-50' },
+          { label: 'Visitantes', value: dashboardData?.stats.visitantes, icon: UserPlus, color: 'text-amber-600', bg: 'bg-amber-50' },
+          { label: 'Grupos Caseiros', value: dashboardData?.stats.totalCelulas, icon: Home, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+          { label: 'Discipuladores', value: dashboardData?.stats.totalDiscipuladores, icon: UserCheck, color: 'text-teal-600', bg: 'bg-teal-50' },
         ].map((kpi, idx) => {
           const Icon = kpi.icon || Users;
           return (
-            <div key={idx} className="relative overflow-hidden rounded-2xl bg-white p-5 shadow-sm border border-gray-100 hover:shadow-md transition-shadow group">
+            <div key={idx} className="relative overflow-hidden rounded-2xl bg-white/70 backdrop-blur-md p-5 shadow-sm border border-gray-100 hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 group">
               <div className="flex flex-col gap-3">
                 <div className={clsx("flex h-10 w-10 items-center justify-center rounded-xl transition-transform group-hover:scale-110", kpi.bg)}><Icon className={clsx("h-5 w-5", kpi.color)} /></div>
                 <div><p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">{kpi.label}</p><div className="flex items-baseline gap-2 mt-1"><p className="text-2xl font-bold text-gray-900">{kpi.value}</p></div>{kpi.sub && <p className="text-[10px] text-gray-400 mt-0.5">{kpi.sub}</p>}</div>

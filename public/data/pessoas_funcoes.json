@@ -1,0 +1,1072 @@
+[
+  {
+    "id_pessoa": 750040,
+    "pessoa": "DIEGO DE FREITAS OLIVEIRA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2017-10-01",
+    "data_termino": "0000-00-00",
+    "situacao": "Ativo",
+    "celular_principal_sms": 61981741176,
+    "email": "diego.fjddf@gmail.com"
+  },
+  {
+    "id_pessoa": 750040,
+    "pessoa": "DIEGO DE FREITAS OLIVEIRA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2017-10-01",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61981741176,
+    "email": "diego.fjddf@gmail.com"
+  },
+  {
+    "id_pessoa": 756449,
+    "pessoa": "ALINE MENEZES BRAGA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2026-04-09",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61996836211,
+    "email": "alinemenezes_snt@hotmail.com"
+  },
+  {
+    "id_pessoa": 756457,
+    "pessoa": "FABRICIO MATOS BENJAMIM LEAL",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "1999-03-01",
+    "data_termino": "0000-00-00",
+    "situacao": "Ativo",
+    "celular_principal_sms": 61982948717,
+    "email": "fabrasdf@gmail.com"
+  },
+  {
+    "id_pessoa": 756471,
+    "pessoa": "THIAGO BRAGA GOMES",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2026-04-09",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61991056211,
+    "email": "tbraga.gomes@gmail.com"
+  },
+  {
+    "id_pessoa": 756474,
+    "pessoa": "ANNECY GLAIDY NASCIMENTO BARBOZA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2023-01-02",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61981257111,
+    "email": "annecymarykay@hotmail.com"
+  },
+  {
+    "id_pessoa": 756478,
+    "pessoa": "CARLOS DANIEL DO NASCIMENTO BARBOZA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2025-08-18",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61982539240,
+    "email": "danielbarboza942@gmail.com"
+  },
+  {
+    "id_pessoa": 756480,
+    "pessoa": "CLEMESON BARBOZA SILVA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2020-01-01",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61999614436,
+    "email": "clemeson1@hotmail.com"
+  },
+  {
+    "id_pessoa": 756483,
+    "pessoa": "ELIANE MARIA DE SOUZA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2012-10-01",
+    "data_termino": "0000-00-00",
+    "situacao": "Ativo",
+    "celular_principal_sms": 61984818079,
+    "email": "elianepsi.souza@gmail.com"
+  },
+  {
+    "id_pessoa": 756487,
+    "pessoa": "JÉSSICA DE ARAUJO SILVA OLIVEIRA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2016-10-01",
+    "data_termino": "0000-00-00",
+    "situacao": "Ativo",
+    "celular_principal_sms": 61992482828,
+    "email": "ajess.silva@hotmail.com"
+  },
+  {
+    "id_pessoa": 756487,
+    "pessoa": "JÉSSICA DE ARAUJO SILVA OLIVEIRA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2016-10-01",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61992482828,
+    "email": "ajess.silva@hotmail.com"
+  },
+  {
+    "id_pessoa": 756488,
+    "pessoa": "JOÃO LUIZ BORSOI FILHO",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2021-03-13",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61981578076,
+    "email": "jlbfbr@gmail.com"
+  },
+  {
+    "id_pessoa": 756489,
+    "pessoa": "JOSÉ ANTONIO DE SOUZA RIBEIRO",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2012-10-01",
+    "data_termino": "0000-00-00",
+    "situacao": "Ativo",
+    "celular_principal_sms": 61984407801,
+    "email": "joseantonio.projetos@gmail.com"
+  },
+  {
+    "id_pessoa": 756490,
+    "pessoa": "JUNIA MARIS SOARES VIANA BORSOI",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2019-10-01",
+    "data_termino": "0000-00-00",
+    "situacao": "Ativo",
+    "celular_principal_sms": 61982747275,
+    "email": "juniaborsoi@gmail.com"
+  },
+  {
+    "id_pessoa": 756490,
+    "pessoa": "JUNIA MARIS SOARES VIANA BORSOI",
+    "funcao": "SUPORTE DE MISSÕES",
+    "data_inicio": "2021-02-27",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61982747275,
+    "email": "juniaborsoi@gmail.com"
+  },
+  {
+    "id_pessoa": 756497,
+    "pessoa": "PEDRO HENRIQUE DE SOUZA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2021-11-14",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61998260022,
+    "email": "pedrohsouzadf@gmail.com"
+  },
+  {
+    "id_pessoa": 756497,
+    "pessoa": "PEDRO HENRIQUE DE SOUZA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2025-09-01",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61998260022,
+    "email": "pedrohsouzadf@gmail.com"
+  },
+  {
+    "id_pessoa": 756498,
+    "pessoa": "RAFAEL DE SOUZA RIBEIRO",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2024-03-01",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61983423870,
+    "email": "rafaelsouzar2003@gmail.com"
+  },
+  {
+    "id_pessoa": 756498,
+    "pessoa": "RAFAEL DE SOUZA RIBEIRO",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2024-04-15",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61983423870,
+    "email": "rafaelsouzar2003@gmail.com"
+  },
+  {
+    "id_pessoa": 756499,
+    "pessoa": "RAQUEL VIANA BORSOI DA SILVA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2017-10-01",
+    "data_termino": "0000-00-00",
+    "situacao": "Ativo",
+    "celular_principal_sms": 61981446814,
+    "email": "borsoiraquel@gmail.com"
+  },
+  {
+    "id_pessoa": 756506,
+    "pessoa": "GABRIEL DE ARAUJO SILVA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2024-11-10",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61991898986,
+    "email": "gabiru1296@gmail.com"
+  },
+  {
+    "id_pessoa": 756508,
+    "pessoa": "JULIETA ANGELA GONÇALVES DE MELLO CUNHA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2010-10-01",
+    "data_termino": "0000-00-00",
+    "situacao": "Ativo",
+    "celular_principal_sms": 61992280386,
+    "email": "mjmcunha@hotmail.com"
+  },
+  {
+    "id_pessoa": 756509,
+    "pessoa": "MARCELO SAMPAIO CUNHA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2010-10-01",
+    "data_termino": "0000-00-00",
+    "situacao": "Ativo",
+    "celular_principal_sms": 61991162478,
+    "email": "mjmcunha@hotmail.com"
+  },
+  {
+    "id_pessoa": 756511,
+    "pessoa": "MARTA LÚCIA DE QUEIRÓS DE FREITAS",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2005-10-01",
+    "data_termino": "0000-00-00",
+    "situacao": "Ativo",
+    "celular_principal_sms": 61999774625,
+    "email": "marta.freitas.df@gmail.com"
+  },
+  {
+    "id_pessoa": 756521,
+    "pessoa": "CAMILLA DOCO ROBERTI GIL OLIVEIRA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": null,
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61992948887,
+    "email": "camilladocco@gmail.com"
+  },
+  {
+    "id_pessoa": 756524,
+    "pessoa": "JANINE FERREIRA BORGES SOUZA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2009-10-01",
+    "data_termino": "0000-00-00",
+    "situacao": "Ativo",
+    "celular_principal_sms": 61982660666,
+    "email": "janes.borges@gmail.com"
+  },
+  {
+    "id_pessoa": 756524,
+    "pessoa": "JANINE FERREIRA BORGES SOUZA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2010-10-01",
+    "data_termino": "0000-00-00",
+    "situacao": "Ativo",
+    "celular_principal_sms": 61982660666,
+    "email": "janes.borges@gmail.com"
+  },
+  {
+    "id_pessoa": 756525,
+    "pessoa": "JULIO CESAR OLIVEIRA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2023-05-02",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61996492426,
+    "email": "juliosinagoga@gmail.com"
+  },
+  {
+    "id_pessoa": 756526,
+    "pessoa": "KATYA HELENA SASAKI FERRE",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2021-02-13",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61991072053,
+    "email": "katyasasaki@yahoo.com.br"
+  },
+  {
+    "id_pessoa": 756529,
+    "pessoa": "LEILA OLIVEIRA DOS SANTOS PEDROSA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2010-10-01",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61984384976,
+    "email": "leila.pedrosa49@gmail.com"
+  },
+  {
+    "id_pessoa": 756530,
+    "pessoa": "LOURIVAL ALVES PEDROSA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2010-10-01",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61996848259,
+    "email": "lourival.leila@gmail.com"
+  },
+  {
+    "id_pessoa": 756533,
+    "pessoa": "RICARDO FERRE LACERDA FERREIRA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2021-02-13",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61991312048,
+    "email": "ricoferre@yahoo.com.br"
+  },
+  {
+    "id_pessoa": 756538,
+    "pessoa": "WALMIR JOSÉ DE SOUZA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2010-10-01",
+    "data_termino": "0000-00-00",
+    "situacao": "Ativo",
+    "celular_principal_sms": 61983130605,
+    "email": "walmirsuk@gmail.com"
+  },
+  {
+    "id_pessoa": 756539,
+    "pessoa": "YAN JHANSEN DE OLIVEIRA VICTÓRIA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2018-10-01",
+    "data_termino": "0000-00-00",
+    "situacao": "Ativo",
+    "celular_principal_sms": 61983552475,
+    "email": "yanvictoria@live.com"
+  },
+  {
+    "id_pessoa": 756540,
+    "pessoa": "ADRIELLE DE MORAIS MOURA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2025-04-14",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61991986094,
+    "email": "drida_01@hotmail.com"
+  },
+  {
+    "id_pessoa": 756543,
+    "pessoa": "AUGUSTO JOSÉ DOS SANTOS",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2024-11-04",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61998400205,
+    "email": "suguto.santos@gmail.com"
+  },
+  {
+    "id_pessoa": 756544,
+    "pessoa": "CRISTIANE CONTAIFER BRAGANÇA DE SOUZA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2008-03-01",
+    "data_termino": "0000-00-00",
+    "situacao": "Ativo",
+    "celular_principal_sms": 61983297886,
+    "email": "cristianecontaifer@gmail.com"
+  },
+  {
+    "id_pessoa": 756544,
+    "pessoa": "CRISTIANE CONTAIFER BRAGANÇA DE SOUZA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": null,
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61983297886,
+    "email": "cristianecontaifer@gmail.com"
+  },
+  {
+    "id_pessoa": 756546,
+    "pessoa": "DAVI MARRA SAMPAIO DOS SANTOS",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2025-04-14",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61993018940,
+    "email": "davimarrasantos@hotmail.com"
+  },
+  {
+    "id_pessoa": 756560,
+    "pessoa": "SUELI MARIA SOUZA DOS SANTOS",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2024-11-04",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 6198330205,
+    "email": "suguto@aol.com"
+  },
+  {
+    "id_pessoa": 756562,
+    "pessoa": "ANDRESA ALVES DA SILVA CARLOS",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2005-10-01",
+    "data_termino": "0000-00-00",
+    "situacao": "Ativo",
+    "celular_principal_sms": 61981635531,
+    "email": "andresagps@gmail.com"
+  },
+  {
+    "id_pessoa": 756562,
+    "pessoa": "ANDRESA ALVES DA SILVA CARLOS",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": null,
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61981635531,
+    "email": "andresagps@gmail.com"
+  },
+  {
+    "id_pessoa": 756577,
+    "pessoa": "BARNEH PEREIRA DA SILVA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2015-10-01",
+    "data_termino": "0000-00-00",
+    "situacao": "Ativo",
+    "celular_principal_sms": 61998324445,
+    "email": "barneh_silva@hotmail.com"
+  },
+  {
+    "id_pessoa": 756578,
+    "pessoa": "CÉLIA BENTO DE ANDRADE",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2010-10-01",
+    "data_termino": "0000-00-00",
+    "situacao": "Ativo",
+    "celular_principal_sms": 61982372050,
+    "email": "xcelia@hotmail.com"
+  },
+  {
+    "id_pessoa": 756578,
+    "pessoa": "CÉLIA BENTO DE ANDRADE",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2017-01-01",
+    "data_termino": "0000-00-00",
+    "situacao": "Ativo",
+    "celular_principal_sms": 61982372050,
+    "email": "xcelia@hotmail.com"
+  },
+  {
+    "id_pessoa": 756579,
+    "pessoa": "DÉBORA GOULART GOMES",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2018-02-01",
+    "data_termino": "0000-00-00",
+    "situacao": "Ativo",
+    "celular_principal_sms": 61981993639,
+    "email": "deboraltgoulart@gmail.com"
+  },
+  {
+    "id_pessoa": 756583,
+    "pessoa": "FREDSON RODRIGUES DA SILVA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2010-10-01",
+    "data_termino": "0000-00-00",
+    "situacao": "Ativo",
+    "celular_principal_sms": 61992267671,
+    "email": "fredsonib@gmail.com"
+  },
+  {
+    "id_pessoa": 756586,
+    "pessoa": "GUILHERME BRAGA GOMES",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2022-11-01",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61981921167,
+    "email": "guilherme.bgomes7007@gmail.com"
+  },
+  {
+    "id_pessoa": 756587,
+    "pessoa": "IRAN PEREIRA DA SILVA JUNIOR",
+    "funcao": "SUPORTE DE MISSÕES",
+    "data_inicio": "2026-03-09",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61981924060,
+    "email": "sriranjunior@gmail.com"
+  },
+  {
+    "id_pessoa": 756598,
+    "pessoa": "FILIPE FREITAS DE OLIVEIRA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2022-03-13",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61991510642,
+    "email": "filipe1011@gmail.com"
+  },
+  {
+    "id_pessoa": 756599,
+    "pessoa": "HELOISA PEREIRA CARNEIRO DE OLIVEIRA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2023-11-04",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61999899999,
+    "email": "natura.helo@uol.com.br"
+  },
+  {
+    "id_pessoa": 756601,
+    "pessoa": "JÚLIA NASCIMENTO FREITAS DE OLIVEIRA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2022-03-13",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61981317334,
+    "email": "juliafreitas.n@gmail.com"
+  },
+  {
+    "id_pessoa": 756603,
+    "pessoa": "JULIO CESAR DE OLIVEIRA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2023-11-04",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61992985526,
+    "email": "juliocesar65@uol.com.br"
+  },
+  {
+    "id_pessoa": 756607,
+    "pessoa": "MILENA OLIVEIRA PAIVA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2022-06-01",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61981351214,
+    "email": "mileninha.oliveira.paiva@gmail.com"
+  },
+  {
+    "id_pessoa": 756608,
+    "pessoa": "NÁDIA FERNANDA FONSECA OLIVEIRA BORGES",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2006-08-01",
+    "data_termino": "0000-00-00",
+    "situacao": "Ativo",
+    "celular_principal_sms": 61983143635,
+    "email": "nadiadf@gmail.com"
+  },
+  {
+    "id_pessoa": 756608,
+    "pessoa": "NÁDIA FERNANDA FONSECA OLIVEIRA BORGES",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": null,
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61983143635,
+    "email": "nadiadf@gmail.com"
+  },
+  {
+    "id_pessoa": 756610,
+    "pessoa": "SOLANGE OLIVEIRA SILVA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2025-07-01",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61984324640,
+    "email": "solangepb@yahoo.com.br"
+  },
+  {
+    "id_pessoa": 756614,
+    "pessoa": "ANTONIO WÍTALO ALVES RODRIGUES",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2010-10-01",
+    "data_termino": "0000-00-00",
+    "situacao": "Ativo",
+    "celular_principal_sms": 61985196988,
+    "email": "witalo3836@gmail.com"
+  },
+  {
+    "id_pessoa": 756622,
+    "pessoa": "GABRIEL DE JESUS FILHO",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2011-10-01",
+    "data_termino": "0000-00-00",
+    "situacao": "Ativo",
+    "celular_principal_sms": 61983513131,
+    "email": "gabriel.jesus.filho@gmail.com"
+  },
+  {
+    "id_pessoa": 756624,
+    "pessoa": "GLEDSON DIAS RODRIGUES",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2020-01-02",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61996152183,
+    "email": "gledsondr@hotmail.com"
+  },
+  {
+    "id_pessoa": 756626,
+    "pessoa": "IVONETE ARAUJO ALVES RODRIGUES",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2010-10-01",
+    "data_termino": "0000-00-00",
+    "situacao": "Ativo",
+    "celular_principal_sms": 61982290972,
+    "email": "Iete.a@hotmail.com"
+  },
+  {
+    "id_pessoa": 756627,
+    "pessoa": "JÉSSICA ALVES DUTRA GOMES",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2017-10-01",
+    "data_termino": "0000-00-00",
+    "situacao": "Ativo",
+    "celular_principal_sms": 61982335091,
+    "email": "jessica.araujoalves@hotmail.com"
+  },
+  {
+    "id_pessoa": 756630,
+    "pessoa": "LUCIMAR SANTOS DE JESUS",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2011-10-01",
+    "data_termino": "0000-00-00",
+    "situacao": "Ativo",
+    "celular_principal_sms": 61982257353,
+    "email": "luci.jesus@gmail.com"
+  },
+  {
+    "id_pessoa": 756631,
+    "pessoa": "MARIA AUXILIADORA PINHEIRO RODRIGUES",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2018-01-01",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61982136734,
+    "email": "dorapinheirosantos@hotmail.com"
+  },
+  {
+    "id_pessoa": 756650,
+    "pessoa": "DAISY RODRIGUES BRAGA GOMES",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2000-10-01",
+    "data_termino": "0000-00-00",
+    "situacao": "Ativo",
+    "celular_principal_sms": 61982446103,
+    "email": "daisybraga.herbalife@gmail.com"
+  },
+  {
+    "id_pessoa": 756651,
+    "pessoa": "DERICK WILLER DE SOUSA SOARES",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2023-04-10",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61981541418,
+    "email": "derickwiller@gmail.com"
+  },
+  {
+    "id_pessoa": 756656,
+    "pessoa": "HÉRICA APARECIDA ARAUJO DA SILVA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2000-10-01",
+    "data_termino": "0000-00-00",
+    "situacao": "Ativo",
+    "celular_principal_sms": 61996336095,
+    "email": "hericaa.silva@hotmail.com"
+  },
+  {
+    "id_pessoa": 756657,
+    "pessoa": "IVANISE MARIA DE FREITAS OLIVEIRA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2005-10-01",
+    "data_termino": "0000-00-00",
+    "situacao": "Ativo",
+    "celular_principal_sms": 61981520712,
+    "email": "ivanisefo@gmail.com"
+  },
+  {
+    "id_pessoa": 756660,
+    "pessoa": "JOSUÉ GOMES PINTO JUNIOR",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2000-10-01",
+    "data_termino": "0000-00-00",
+    "situacao": "Ativo",
+    "celular_principal_sms": 61981666808,
+    "email": "juniorportoes20@gmail.com"
+  },
+  {
+    "id_pessoa": 756663,
+    "pessoa": "NATYELE CONCEIÇÃO DE CARVALHO SOARES",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2023-04-10",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61982890224,
+    "email": "carvalhonatayele@gmail.com"
+  },
+  {
+    "id_pessoa": 756674,
+    "pessoa": "CESARIO FERREIRA DA COSTA FILHO",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2010-03-01",
+    "data_termino": "0000-00-00",
+    "situacao": "Ativo",
+    "celular_principal_sms": 61999241435,
+    "email": "costadourodf@gmail.com"
+  },
+  {
+    "id_pessoa": 756675,
+    "pessoa": "CHAYENE MELO FARNESI GRINKO",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2018-04-01",
+    "data_termino": "0000-00-00",
+    "situacao": "Ativo",
+    "celular_principal_sms": 61998197981,
+    "email": null
+  },
+  {
+    "id_pessoa": 756685,
+    "pessoa": "LARISSA MARRA DOS SANTOS SILVA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2024-04-22",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61983021124,
+    "email": "marrinhalari@gmail.com"
+  },
+  {
+    "id_pessoa": 756687,
+    "pessoa": "LUCILENE MOREIRA DA SILVA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2015-10-01",
+    "data_termino": "0000-00-00",
+    "situacao": "Ativo",
+    "celular_principal_sms": 61985692256,
+    "email": "lucilene.msilva@hotmail.com"
+  },
+  {
+    "id_pessoa": 756688,
+    "pessoa": "LUDMILA EVELYN FARNESI GRINKO",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2021-01-08",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61983507306,
+    "email": "ludmilagrk@gmail.com"
+  },
+  {
+    "id_pessoa": 756691,
+    "pessoa": "MARCELO MARRA DOMINGOS",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2017-10-01",
+    "data_termino": "0000-00-00",
+    "situacao": "Ativo",
+    "celular_principal_sms": 61985223820,
+    "email": "marcelo.marra@gmail.com"
+  },
+  {
+    "id_pessoa": 756694,
+    "pessoa": "MICAELA DE ALMEIDA SOARES",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2024-04-01",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61984248098,
+    "email": "micaelaalmeida02@gmail.com"
+  },
+  {
+    "id_pessoa": 756695,
+    "pessoa": "MIRIAN MACEDO DO NASCIMENTO",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2005-10-01",
+    "data_termino": "0000-00-00",
+    "situacao": "Ativo",
+    "celular_principal_sms": 61981389522,
+    "email": "miriannascimentodf@gmail.com"
+  },
+  {
+    "id_pessoa": 756698,
+    "pessoa": "SONIA REGINA PLÍNIO DA COSTA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2015-03-01",
+    "data_termino": "0000-00-00",
+    "situacao": "Ativo",
+    "celular_principal_sms": 61981507155,
+    "email": "sonia.plinio@gmail.com"
+  },
+  {
+    "id_pessoa": 756721,
+    "pessoa": "KEILA RODRIGUES BRAGA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2021-10-04",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61986730270,
+    "email": "keilabra@gmail.com"
+  },
+  {
+    "id_pessoa": 756722,
+    "pessoa": "MARCELA BRAGA SILVA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2024-11-14",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61986750270,
+    "email": null
+  },
+  {
+    "id_pessoa": 756728,
+    "pessoa": "LAERTE ANTONIO ZORZETTI",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2023-10-23",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 62981640861,
+    "email": "laerte.zorzetti@gmail.com"
+  },
+  {
+    "id_pessoa": 756730,
+    "pessoa": "SOLANGE AMANCIO ZORZETTI",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2023-10-23",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 62981266190,
+    "email": "solangezorzetti@gmail.com"
+  },
+  {
+    "id_pessoa": 855712,
+    "pessoa": "JOÃO VICTOR DUTRA GOMES",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2023-02-01",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 27998881616,
+    "email": "dutra.joaovictor@gmail.com"
+  },
+  {
+    "id_pessoa": 872409,
+    "pessoa": "CARLOS VINICIUS BRITO REIS",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2023-03-03",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61992712505,
+    "email": "c.viniciusreis@gmail.com"
+  },
+  {
+    "id_pessoa": 872412,
+    "pessoa": "BARBRA SANTANA DE SOUZA REIS",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2023-03-03",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 6199990983,
+    "email": "barbrareis@gmail.com"
+  },
+  {
+    "id_pessoa": 872424,
+    "pessoa": "SAMUEL CARLOS DE SOUZA REIS",
+    "funcao": "SUPORTE DE MISSÕES",
+    "data_inicio": "2026-03-09",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61996416410,
+    "email": null
+  },
+  {
+    "id_pessoa": 1067357,
+    "pessoa": "HANNY KAROLINY QUEIROZ DE SOUZA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2025-09-01",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61983590508,
+    "email": "hannyqueirozg@gmail.com"
+  },
+  {
+    "id_pessoa": 1244610,
+    "pessoa": "LEANDRO FERREIRA BORGES",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2026-03-09",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61981456261,
+    "email": "leandro.feborges@gmail.com"
+  },
+  {
+    "id_pessoa": 1354522,
+    "pessoa": "HELDER NOGUEIRA AIRES",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2023-10-04",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61981825810,
+    "email": "heldernog@hotmail.com"
+  },
+  {
+    "id_pessoa": 1354522,
+    "pessoa": "HELDER NOGUEIRA AIRES",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2025-04-09",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61981825810,
+    "email": "heldernog@hotmail.com"
+  },
+  {
+    "id_pessoa": 1354523,
+    "pessoa": "MELINA ALVES MOREIRA AIRES",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2023-10-04",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61981521254,
+    "email": "dramelina@hotmail.com"
+  },
+  {
+    "id_pessoa": 1463380,
+    "pessoa": "EDUARDO ANTONIO MELLO FREITAS",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2023-03-01",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 963305436,
+    "email": "eduardo.mello.freitas@bol.com.br"
+  },
+  {
+    "id_pessoa": 1463388,
+    "pessoa": "ELAYNE FERREIRA FREITAS",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2023-03-01",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61984116695,
+    "email": null
+  },
+  {
+    "id_pessoa": 1463397,
+    "pessoa": "YASMIN FERREIRA FREITAS",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2023-11-04",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61991849712,
+    "email": null
+  },
+  {
+    "id_pessoa": 1463397,
+    "pessoa": "YASMIN FERREIRA FREITAS",
+    "funcao": "SUPORTE DE MISSÕES",
+    "data_inicio": "2026-03-09",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61991849712,
+    "email": null
+  },
+  {
+    "id_pessoa": 1733595,
+    "pessoa": "JÚLIA NOGUEIRA DIAS MARRA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2025-04-14",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 83986137326,
+    "email": "julianogueirad38@gmail.com"
+  },
+  {
+    "id_pessoa": 756516,
+    "pessoa": "WANDERLEY CLODOALDO LIMA DE FREITAS",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2016-01-01",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61999882647,
+    "email": "wand.freitas@gmail.com"
+  },
+  {
+    "id_pessoa": 756668,
+    "pessoa": "WAGNER DE LIMA OLIVEIRA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2016-01-01",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61981340020,
+    "email": "wagner.wloliveira@gmail.com"
+  },
+  {
+    "id_pessoa": 756672,
+    "pessoa": "CARLOS ALBERTO RIBEIRO DO NASCIMENTO",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2006-01-01",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61983535665,
+    "email": "betomiriandf@gmail.com"
+  },
+  {
+    "id_pessoa": 756723,
+    "pessoa": "MARCELO BRAGA SILVA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2021-10-04",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61984790270,
+    "email": "celobra@gmail.com"
+  },
+  {
+    "id_pessoa": 756559,
+    "pessoa": "PLÍNIO JOSÉ DE SOUZA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2016-01-01",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61981518074,
+    "email": "pliniodf@gmail.com"
+  },
+  {
+    "id_pessoa": 756559,
+    "pessoa": "PLÍNIO JOSÉ DE SOUZA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": null,
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61981518074,
+    "email": "pliniodf@gmail.com"
+  },
+  {
+    "id_pessoa": 756567,
+    "pessoa": "GISLEI PEREIRA DA SILVA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2006-01-01",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61992136000,
+    "email": "gisleips@gmail.com"
+  },
+  {
+    "id_pessoa": 756567,
+    "pessoa": "GISLEI PEREIRA DA SILVA",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": null,
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61992136000,
+    "email": "gisleips@gmail.com"
+  },
+  {
+    "id_pessoa": 756597,
+    "pessoa": "FABIANO FERREIRA BORGES",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": "2006-01-01",
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61983130660,
+    "email": "fabianob.df@gmail.com"
+  },
+  {
+    "id_pessoa": 756597,
+    "pessoa": "FABIANO FERREIRA BORGES",
+    "funcao": "DISCIPULADOR(A)",
+    "data_inicio": null,
+    "data_termino": null,
+    "situacao": "Ativo",
+    "celular_principal_sms": 61983130660,
+    "email": "fabianob.df@gmail.com"
+  }
+]

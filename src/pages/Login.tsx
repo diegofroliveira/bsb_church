@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Lock, Mail, ArrowRight, ArrowLeft, CheckCircle } from 'lucide-react';
@@ -16,6 +16,7 @@ export const Login: React.FC = () => {
 
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,7 +25,8 @@ export const Login: React.FC = () => {
     
     try {
       await login(email, password);
-      navigate('/');
+      const from = (location.state as any)?.from || '/';
+      navigate(from, { replace: true });
     } catch (err: any) {
       setError(err.message || 'Erro ao fazer login');
     } finally {

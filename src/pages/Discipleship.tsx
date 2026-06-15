@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Search, Loader2 } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { supabaseReader } from '../lib/supabase';
 
 export const Discipleship: React.FC = () => {
   const [data, setData] = useState<any[]>([]);
@@ -11,7 +11,7 @@ export const Discipleship: React.FC = () => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        let query = supabase.from('discipulado').select('*');
+        let query = supabaseReader.from('discipulado').select('*');
         
         if (searchTerm) {
           query = query.or(`discipulador.ilike.%${searchTerm}%,discipulo.ilike.%${searchTerm}%`);

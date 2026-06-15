@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabaseReader } from '../lib/supabase';
 import { Home, Users, MapPin, Search, Filter, Loader2, Shield } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -40,8 +40,8 @@ export const Cells: React.FC = () => {
       setIsLoading(true);
       try {
         const [celulasRes, membrosRes] = await Promise.all([
-          supabase.from('celulas').select('*'),
-          supabase.from('membros').select('grupos_caseiros, latitude, longitude').eq('status', 'Ativo')
+          supabaseReader.from('celulas').select('*'),
+          supabaseReader.from('membros').select('grupos_caseiros, latitude, longitude').eq('status', 'Ativo')
         ]);
 
         const celulas = celulasRes.data || [];

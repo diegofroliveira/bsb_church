@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../lib/supabase';
+import { supabaseReader } from '../lib/supabase';
 import { Users, CalendarCheck2, MessageCircleHeart, Loader2 } from 'lucide-react';
 
 export const MyGroup: React.FC = () => {
