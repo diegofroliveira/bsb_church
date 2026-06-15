@@ -145,6 +145,16 @@ export const Simulations: React.FC = () => {
   // Expandable UI for territorial insights residents
   const [expandedInsightIndex, setExpandedInsightIndex] = useState<number | null>(null);
 
+  // Expandable UI for territorial insights descriptions
+  const [expandedDescriptions, setExpandedDescriptions] = useState<Record<string, boolean>>({});
+
+  const toggleDescription = (key: string) => {
+    setExpandedDescriptions(prev => ({
+      ...prev,
+      [key]: !prev[key]
+    }));
+  };
+
   // Expandable state for Territorial Insights panel
   const [isTerritorialInsightsExpanded, setIsTerritorialInsightsExpanded] = useState(true);
   const [isDiscipleshipInsightsExpanded, setIsDiscipleshipInsightsExpanded] = useState(true);
@@ -1265,15 +1275,20 @@ export const Simulations: React.FC = () => {
       
       // Territorial suggested GCs based on tens rule:
       // 10 members -> 1 GC, 20 members -> 2 GCs, 30 members -> 3 GCs
+      // Suggest starting a GC only if there are at least 12 countable members (Bezos Rule)
       const suggestedGCs = Math.floor(countableCount / 10);
       
-      if (suggestedGCs > actualGCs && suggestedGCs >= 1) {
+      const shouldSuggestExpansion = actualGCs === 0 
+        ? countableCount >= 12 
+        : (suggestedGCs > actualGCs && suggestedGCs >= 1);
+
+      if (shouldSuggestExpansion) {
         if (actualGCs === 0) {
           insights.push({
             type: 'expansion',
             ra: ra,
             title: `Alerta de Expansão: ${ra}`,
-            description: `Localidade ${ra} possui quórum de ${countableCount} membros ativos (tipo = MEMBRO) e ${totalCount} residentes totais. Pela regra territorial de dezenas (10 membros por GC), sugere-se a criação de ${suggestedGCs} grupo(s) local(is) no bairro para acolher e pastorear estes moradores locais.`,
+            description: `Localidade ${ra} possui quórum de ${countableCount} membros ativos (tipo = MEMBRO) e ${totalCount} residentes totais. Pela regra de dezenas (mínimo de 12 membros para primeiro GC), sugere-se a criação de um grupo local no bairro para acolher e pastorear estes moradores locais.`,
             action: 'Ação sugerida: Avaliar criação de GC local ou reorganização regional',
             memberNames: countableMembersList.map(m => m.nome).sort()
           });
@@ -1312,28 +1327,53 @@ export const Simulations: React.FC = () => {
         return false;
       };
 
-      const scatteredResidents = residents.filter(m => {
-        if (!m.grupos_caseiros) return false;
-        if (m.grupos_caseiros === 'COBERTURA - VIX') return false;
-        if (isLeaderOrFamily(m.id.toString(), m.nome)) return false;
+      // Group scattered residents by their external GC to find clusters of >= 4 (Bezos Rule)
+      const scatteredByGC: Record<string, Member[]> = {};
+      residents.forEach(m => {
+        if (!m.grupos_caseiros) return;
+        if (m.grupos_caseiros === 'COBERTURA - VIX') return;
+        if (isLeaderOrFamily(m.id.toString(), m.nome)) return;
         
         const gcRA = getGCRegion(m.grupos_caseiros);
         const isLocalGC = (gcRA === ra) || 
                           (gcRA === 'GUARÁ-NB' && (ra === 'GUARÁ' || ra === 'NÚCLEO BANDEIRANTE'));
-        return !isLocalGC;
+        if (!isLocalGC) {
+          if (!scatteredByGC[m.grupos_caseiros]) scatteredByGC[m.grupos_caseiros] = [];
+          scatteredByGC[m.grupos_caseiros].push(m);
+        }
+      });
+
+      const scatteredResidents: Member[] = [];
+      Object.entries(scatteredByGC).forEach(([_, members]) => {
+        if (members.length >= 4) {
+          scatteredResidents.push(...members);
+        }
       });
 
       const localGCNames = gcList.map(c => c.grupo_caseiro);
-      const externalParticipants = draftMembers.filter(m => {
-        if (!m.grupos_caseiros || m.status !== 'Ativo') return false;
-        if (!localGCNames.includes(m.grupos_caseiros)) return false;
-        if (isLeaderOrFamily(m.id.toString(), m.nome)) return false;
+      
+      // Group external participants by their residence RA to check clusters of >= 4 (Bezos Rule)
+      const externalByRA: Record<string, Member[]> = {};
+      draftMembers.forEach(m => {
+        if (!m.grupos_caseiros || m.status !== 'Ativo') return;
+        if (!localGCNames.includes(m.grupos_caseiros)) return;
+        if (isLeaderOrFamily(m.id.toString(), m.nome)) return;
         
         const mRA = getAdministrativeRegion(m.bairro);
         const isLocalResident = (mRA === ra) || 
                                 (ra === 'GUARÁ' && mRA === 'NÚCLEO BANDEIRANTE') || 
                                 (ra === 'NÚCLEO BANDEIRANTE' && mRA === 'GUARÁ');
-        return mRA !== 'NÃO INFORMADO' && !isLocalResident;
+        if (mRA !== 'NÃO INFORMADO' && !isLocalResident) {
+          if (!externalByRA[mRA]) externalByRA[mRA] = [];
+          externalByRA[mRA].push(m);
+        }
+      });
+
+      const externalParticipants: Member[] = [];
+      Object.entries(externalByRA).forEach(([_, members]) => {
+        if (members.length >= 4) {
+          externalParticipants.push(...members);
+        }
       });
 
       if (scatteredResidents.length > 0 || externalParticipants.length > 0) {
@@ -1493,25 +1533,35 @@ export const Simulations: React.FC = () => {
 
       const memberRA = getAdministrativeRegion(m.bairro);
       const gcName = m.grupos_caseiros!;
-      const gcRA = getGCRegion(gcName);
+      const assignedCell = draftCells.find(c => c.grupo_caseiro === gcName);
 
-      if (memberRA !== 'NÃO INFORMADO' && gcRA !== 'OUTRO') {
-        const rec = getRecommendedGCsForRegion(memberRA);
-        
-        // A mismatch exists if:
-        // They are in a region different from their own, AND they are NOT in their recommended fallback region!
-        const isCorrectAllocation = (gcRA === memberRA) || 
-                                    (gcRA === 'GUARÁ-NB' && (memberRA === 'GUARÁ' || memberRA === 'NÚCLEO BANDEIRANTE')) ||
-                                    (!rec.isLocal && gcRA === rec.recommendedRegion);
-        
+      if (memberRA !== 'NÃO INFORMADO' && assignedCell) {
+        let distance: number | null = null;
+        if (m.latitude && m.longitude && assignedCell.latitude && assignedCell.longitude) {
+          const distStr = calculateDistance(assignedCell.latitude, assignedCell.longitude, m.latitude, m.longitude);
+          if (distStr) distance = parseFloat(distStr);
+        }
+
+        const memberSector = getSectorByResidence(m.bairro, undefined, undefined);
+        const gcSector = assignedCell.setor || 'Sem Setor';
+
+        // Mismatch exists if:
+        // 1. Coordinates exist and distance is greater than 8 km.
+        // 2. Coordinates missing and member's residence sector is different from GC's sector.
+        const isCorrectAllocation = distance !== null 
+          ? distance <= 8.0 
+          : (memberSector === gcSector);
+
         if (!isCorrectAllocation) {
+          const rec = getRecommendedGCsForRegion(memberRA);
           allocationMismatches.push({
             memberId: m.id,
             memberName: m.nome,
             memberBairro: m.bairro || 'Não informado',
             memberRA: memberRA,
             currentGC: gcName,
-            currentGCRA: gcRA,
+            currentGCRA: getGCRegion(gcName),
+            distance: distance,
             hasLocalGCs: rec.gcs.length > 0,
             isLocalRecommendation: rec.isLocal,
             recommendedRegion: rec.recommendedRegion,
@@ -1528,9 +1578,9 @@ export const Simulations: React.FC = () => {
       return a.memberName.localeCompare(b.memberName);
     });
 
-    // 4. Overcrowded GCs (> 15 members)
+    // 4. Overcrowded GCs (> 20 members - Musk Rule)
     const overcrowdedGCs = Object.entries(membersCountByGC)
-      .filter(([gc, count]) => count > 15 && gc !== 'COBERTURA - VIX')
+      .filter(([gc, count]) => count > 20 && gc !== 'COBERTURA - VIX')
       .map(([gc, count]) => ({ gc, count }))
       .sort((a, b) => b.count - a.count);
 
@@ -1562,7 +1612,7 @@ export const Simulations: React.FC = () => {
 
   const discipleshipAudit = useMemo(() => {
     if (isLoading || draftMembers.length === 0) {
-      return { isolatedMembers: [], overloadedDisciplers: [], displacedDisciples: [] };
+      return { isolatedMembers: [], overloadedDisciplers: [], displacedDisciples: [], regularIsolatedCount: 0 };
     }
 
     const activeMembersByName = new Map<string, Member>();
@@ -1581,8 +1631,9 @@ export const Simulations: React.FC = () => {
       disciplesCountByDiscipler[dName].push(link.discipulo);
     });
 
+    // Overloaded threshold: > 6 (Musk Rule)
     const overloadedDisciplers = Object.entries(disciplesCountByDiscipler)
-      .filter(([_, disciples]) => disciples.length > 5)
+      .filter(([_, disciples]) => disciples.length > 6)
       .map(([discipler, disciples]) => ({
         name: discipler,
         count: disciples.length,
@@ -1590,42 +1641,33 @@ export const Simulations: React.FC = () => {
       }))
       .sort((a, b) => b.count - a.count);
 
+    // Displaced Disciples: Removed entirely to reduce geographical noise (Musk Rule)
     const displacedDisciples: any[] = [];
-    draftLinks.forEach(link => {
-      const disciple = activeMembersByName.get(link.discipulo);
-      const discipler = activeMembersByName.get(link.discipulador);
-      if (disciple && discipler && disciple.latitude && disciple.longitude && discipler.latitude && discipler.longitude) {
-        const distStr = calculateDistance(discipler.latitude, discipler.longitude, disciple.latitude, disciple.longitude);
-        if (distStr) {
-          const distNum = parseFloat(distStr);
-          if (distNum > 15) {
-            displacedDisciples.push({
-              discipleName: link.discipulo,
-              discipleId: disciple.id,
-              discipleRA: getAdministrativeRegion(disciple.bairro),
-              disciplerName: link.discipulador,
-              disciplerId: discipler.id,
-              disciplerRA: getAdministrativeRegion(discipler.bairro),
-              distance: distNum
-            });
-          }
-        }
-      }
-    });
-    displacedDisciples.sort((a, b) => b.distance - a.distance);
 
+    // Isolated Members: Filter to keep only leadership, count regular members (Jobs Rule)
+    let regularIsolatedCount = 0;
     const disciplesSet = new Set(draftLinks.map(l => l.discipulo));
     const isolatedMembers: any[] = [];
+    
     draftMembers.forEach(m => {
       if (m.status === 'Ativo' && !disciplesSet.has(m.nome)) {
-        const memberRA = getAdministrativeRegion(m.bairro);
+        const typeStr = (m.tipo_de_pessoa || '').trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const isLeadership = ['LIDER', 'DISCIPULADOR', 'DIACONO', 'PASTOR', 'PRESBITERO'].includes(typeStr) ||
+                             (m.nome || '').toUpperCase().includes('LIDER') ||
+                             (m.nome || '').toUpperCase().includes('CO-LIDER');
         
+        if (!isLeadership) {
+          regularIsolatedCount++;
+          return;
+        }
+
+        const memberRA = getAdministrativeRegion(m.bairro);
         const recommendations: { name: string; count: number; distance: number | null }[] = [];
         
         activeMembersByName.forEach((otherMem, otherName) => {
           if (otherName === m.nome) return;
           const currentDisciplesCount = disciplesCountByDiscipler[otherName]?.length || 0;
-          if (currentDisciplesCount >= 5) return;
+          if (currentDisciplesCount >= 6) return;
 
           const otherRA = getAdministrativeRegion(otherMem.bairro);
           if (otherRA === memberRA && memberRA !== 'NÃO INFORMADO') {
@@ -1661,7 +1703,7 @@ export const Simulations: React.FC = () => {
 
     isolatedMembers.sort((a, b) => a.name.localeCompare(b.name));
 
-    return { isolatedMembers, overloadedDisciplers, displacedDisciples };
+    return { isolatedMembers, overloadedDisciplers, displacedDisciples, regularIsolatedCount };
   }, [isLoading, draftMembers, draftLinks]);
 
   const activeIsolatedMembers = useMemo(() => {
@@ -2635,8 +2677,14 @@ export const Simulations: React.FC = () => {
                                     </button>
                                   </div>
                                 </div>
-                                <p className="text-xs text-gray-300 leading-relaxed mb-3">{insight.description}</p>
-                               <div 
+
+                                {expandedDescriptions[key] && (
+                                  <p className="text-xs text-gray-300 leading-relaxed mb-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                                    {insight.description}
+                                  </p>
+                                )}
+
+                                <div 
                                  className={clsx(
                                    "text-[10px] font-bold uppercase tracking-tighter px-2 py-1 rounded inline-block",
                                    isConsolidation
@@ -2646,9 +2694,21 @@ export const Simulations: React.FC = () => {
                                >
                                   {insight.action}
                                </div>
-                               
-                               {isConsolidation ? (
-                                 <div className="mt-3 pt-3 border-t border-white/10">
+
+                               <div className="mt-3 pt-3 border-t border-white/10 flex flex-wrap items-center gap-4">
+                                 <button 
+                                   onClick={(e) => {
+                                     e.stopPropagation();
+                                     toggleDescription(key);
+                                   }}
+                                   className="text-[10px] font-bold text-indigo-300 hover:text-indigo-200 flex items-center gap-1 cursor-pointer transition-all"
+                                 >
+                                   {expandedDescriptions[key] 
+                                     ? 'Ocultar Detalhes' 
+                                     : 'Detalhar'}
+                                 </button>
+
+                                 {isConsolidation ? (
                                    <button 
                                      onClick={(e) => {
                                        e.stopPropagation();
@@ -2657,16 +2717,34 @@ export const Simulations: React.FC = () => {
                                      className="text-[10px] font-bold text-amber-300 hover:text-amber-200 hover:underline flex items-center gap-1 cursor-pointer transition-all"
                                    >
                                      {expandedInsightIndex === i 
-                                       ? 'Ocultar Detalhes' 
+                                       ? 'Ocultar Integrantes' 
                                        : `Listar Integrantes / Desvios (${insight.scatteredResidents.length + insight.externalParticipants.length})`}
                                      <ChevronDown className={clsx("w-3.5 h-3.5 transition-transform", expandedInsightIndex === i && "rotate-180")} />
                                    </button>
-                                   {expandedInsightIndex === i && (
-                                     <div className="mt-2 p-2 bg-black/35 rounded-xl space-y-3 max-h-56 overflow-y-auto border border-white/5 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent text-[10px]">
+                                 ) : (
+                                   insight.memberNames && insight.memberNames.length > 0 && (
+                                     <button 
+                                       onClick={(e) => {
+                                         e.stopPropagation();
+                                         setExpandedInsightIndex(expandedInsightIndex === i ? null : i);
+                                       }}
+                                       className="text-[10px] font-bold text-indigo-300 hover:text-indigo-200 hover:underline flex items-center gap-1 cursor-pointer transition-all"
+                                     >
+                                       {expandedInsightIndex === i ? 'Ocultar Residentes' : `Listar Residentes (${insight.memberNames.length})`}
+                                       <ChevronDown className={clsx("w-3 h-3 transition-transform", expandedInsightIndex === i && "rotate-180")} />
+                                     </button>
+                                   )
+                                 )}
+                               </div>
+
+                               {expandedInsightIndex === i && (
+                                 <div className="mt-3">
+                                   {isConsolidation ? (
+                                     <div className="p-2 bg-black/35 rounded-xl space-y-3 max-h-56 overflow-y-auto border border-white/5 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent text-[10px]">
                                        {insight.scatteredResidents.length > 0 && (
                                          <div>
                                            <div className="font-extrabold text-amber-400 mb-1 border-b border-white/5 pb-0.5 uppercase tracking-wider">
-                                             📍 Moradores de ${insight.ra} em GCs Externos (${insight.scatteredResidents.length})
+                                             📍 Moradores de {insight.ra} em GCs Externos ({insight.scatteredResidents.length})
                                            </div>
                                            <div className="space-y-1">
                                              {insight.scatteredResidents.map((m: any) => (
@@ -2682,7 +2760,7 @@ export const Simulations: React.FC = () => {
                                        {insight.externalParticipants.length > 0 && (
                                          <div>
                                            <div className="font-extrabold text-indigo-400 mb-1 border-b border-white/5 pb-0.5 uppercase tracking-wider">
-                                             ⚠️ Membros Externos nos GCs de ${insight.ra} (${insight.externalParticipants.length})
+                                             ⚠️ Membros Externos nos GCs de {insight.ra} ({insight.externalParticipants.length})
                                            </div>
                                            <div className="space-y-1">
                                              {insight.externalParticipants.map((m: any) => (
@@ -2695,30 +2773,16 @@ export const Simulations: React.FC = () => {
                                          </div>
                                        )}
                                      </div>
-                                   )}
-                                 </div>
-                               ) : (
-                                 insight.memberNames && insight.memberNames.length > 0 && (
-                                   <div className="mt-3 pt-3 border-t border-white/10">
-                                     <button 
-                                       onClick={(e) => {
-                                         e.stopPropagation();
-                                         setExpandedInsightIndex(expandedInsightIndex === i ? null : i);
-                                       }}
-                                       className="text-[10px] font-bold text-indigo-300 hover:text-indigo-200 hover:underline flex items-center gap-1 cursor-pointer transition-all"
-                                     >
-                                       {expandedInsightIndex === i ? 'Ocultar Residentes' : `Listar Residentes (${insight.memberNames.length})`}
-                                       <ChevronDown className={clsx("w-3 h-3 transition-transform", expandedInsightIndex === i && "rotate-180")} />
-                                     </button>
-                                     {expandedInsightIndex === i && (
-                                       <div className="mt-2 p-2 bg-black/20 rounded-xl space-y-1 max-h-36 overflow-y-auto border border-white/5 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+                                   ) : (
+                                     insight.memberNames && insight.memberNames.length > 0 && (
+                                       <div className="p-2 bg-black/20 rounded-xl space-y-1 max-h-36 overflow-y-auto border border-white/5 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
                                          {insight.memberNames.map((name: string) => (
                                            <div key={name} className="text-[10px] text-gray-300 font-medium py-0.5 border-b border-white/5 last:border-0">{name}</div>
                                          ))}
                                        </div>
-                                     )}
-                                   </div>
-                                 )
+                                     )
+                                   )}
+                                 </div>
                                )}
                             </div>
                           );
@@ -2746,7 +2810,7 @@ export const Simulations: React.FC = () => {
                        <span className="flex items-center gap-2">
                           <Brain className="w-4 h-4 animate-bounce shrink-0" /> Alertas & Otimizações de Discipulado
                           <span className="text-[10px] bg-indigo-500/25 text-indigo-200 font-bold px-1.5 py-0.5 rounded-full border border-indigo-500/10">
-                            {activeIsolatedMembers.length + activeOverloadedDisciplers.length + activeDisplacedDisciples.length}
+                            {activeIsolatedMembers.length + activeOverloadedDisciplers.length}
                           </span>
                        </span>
                        <div className="flex items-center gap-2 shrink-0">
@@ -2779,7 +2843,7 @@ export const Simulations: React.FC = () => {
                             <span>{draftLinks.length} vínculos</span>
                           </div>
                           <p className="text-[9px] text-gray-400 mt-1 border-t border-white/5 pt-1">
-                            Análise em tempo real do ecossistema de discipulado: monitora membros sem acompanhamento espiritual (isolados), discipuladores sobrecarregados e deslocamentos excessivos.
+                            Análise em tempo real do ecossistema de discipulado: monitora líderes sem acompanhamento espiritual (isolados) e discipuladores sobrecarregados.
                           </p>
                         </div>
 
@@ -2793,7 +2857,7 @@ export const Simulations: React.FC = () => {
                                  <div className="rounded-2xl p-3 border transition-all cursor-default group flex items-center justify-between gap-3 animate-in fade-in duration-200 bg-white/5 border-white/5 hover:bg-white/10">
                                    <div className="flex items-center gap-2 min-w-0">
                                       <AlertTriangle className="w-3.5 h-3.5 text-amber-400/60 shrink-0" />
-                                      <span className="text-xs font-bold text-gray-300 truncate">Membros Ativos Isolados</span>
+                                      <span className="text-xs font-bold text-gray-300 truncate">Líderes de Rede Isolados</span>
                                       <span className="text-[8px] uppercase font-semibold text-gray-500 bg-white/5 px-1.5 py-0.2 rounded shrink-0">Minimizado</span>
                                    </div>
                                    <div className="flex items-center gap-1 shrink-0">
@@ -2812,7 +2876,7 @@ export const Simulations: React.FC = () => {
                                  <div className="flex justify-between items-start gap-2 mb-2">
                                    <h4 className="text-sm font-bold text-white flex items-center gap-2">
                                       <AlertTriangle className="w-4 h-4 text-amber-400 animate-pulse" />
-                                      {activeIsolatedMembers.length} Membros Isolados
+                                      {activeIsolatedMembers.length} Líderes Isolados
                                    </h4>
                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                      <button 
@@ -2823,11 +2887,29 @@ export const Simulations: React.FC = () => {
                                      </button>
                                    </div>
                                  </div>
-                                 <p className="text-xs text-gray-300 leading-relaxed mb-3">
-                                   Existem {activeIsolatedMembers.length} membros ativos sem vínculo de discipulado. Sugere-se vinculá-los a discipuladores na mesma região administrativa para garantir o cuidado.
-                                 </p>
+
+                                 {expandedDescriptions[key] && (
+                                    <p className="text-xs text-gray-300 leading-relaxed mb-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                                      Existem {activeIsolatedMembers.length} líderes (Líderes, Co-líderes, Diáconos, Pastores ou Presbíteros) sem vínculo de discipulado. Corrigir esse gap é prioritário para a saúde da liderança.
+                                    </p>
+                                 )}
+
                                  <div className="text-[10px] font-bold uppercase tracking-tighter px-2 py-1 rounded inline-block text-amber-300 bg-amber-500/10">
                                    Ação: Vincular via Auditoria de Discipulado
+                                 </div>
+
+                                 <div className="mt-3 pt-3 border-t border-white/10 flex flex-wrap items-center gap-4">
+                                   <button 
+                                     onClick={(e) => {
+                                       e.stopPropagation();
+                                       toggleDescription(key);
+                                     }}
+                                     className="text-[10px] font-bold text-indigo-300 hover:text-indigo-200 flex items-center gap-1 cursor-pointer transition-all"
+                                   >
+                                     {expandedDescriptions[key] 
+                                       ? 'Ocultar Detalhes' 
+                                       : 'Detalhar'}
+                                   </button>
                                  </div>
                                </div>
                              );
@@ -2872,69 +2954,38 @@ export const Simulations: React.FC = () => {
                                      </button>
                                    </div>
                                  </div>
-                                 <p className="text-xs text-gray-300 leading-relaxed mb-3">
-                                   {activeOverloadedDisciplers.length} discipuladores possuem mais do que o limite recomendado de 5 discípulos ativos (Excesso de Cuidado).
-                                 </p>
+
+                                 {expandedDescriptions[key] && (
+                                   <p className="text-xs text-gray-300 leading-relaxed mb-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                                     {activeOverloadedDisciplers.length} discipuladores possuem mais do que o limite recomendado de 6 discípulos ativos (Excesso de Cuidado).
+                                   </p>
+                                 )}
+
                                  <div className="text-[10px] font-bold uppercase tracking-tighter px-2 py-1 rounded inline-block text-rose-300 bg-rose-500/10">
                                    Ação: Descentralizar Vínculos
                                  </div>
-                               </div>
-                             );
-                           })()}
 
-                           {/* 3. Vínculos Distantes Alert */}
-                           {activeDisplacedDisciples.length > 0 && (() => {
-                             const key = 'disc_displaced_summary';
-                             const isMinimized = minimizedAlerts.includes(key);
-                             if (isMinimized) {
-                               return (
-                                 <div className="rounded-2xl p-3 border transition-all cursor-default group flex items-center justify-between gap-3 animate-in fade-in duration-200 bg-white/5 border-white/5 hover:bg-white/10">
-                                   <div className="flex items-center gap-2 min-w-0">
-                                      <MapPin className="w-3.5 h-3.5 text-indigo-400/60 shrink-0" />
-                                      <span className="text-xs font-bold text-gray-300 truncate">Vínculos Distantes (&gt; 8 km)</span>
-                                      <span className="text-[8px] uppercase font-semibold text-gray-500 bg-white/5 px-1.5 py-0.2 rounded shrink-0">Minimizado</span>
-                                   </div>
-                                   <div className="flex items-center gap-1 shrink-0">
-                                     <button 
-                                       onClick={() => toggleMinimizeAlert(key)}
-                                       className="text-gray-400 hover:text-white p-1 hover:bg-white/5 rounded-lg transition-all cursor-pointer"
-                                     >
-                                       <ChevronDown className="w-3.5 h-3.5" />
-                                     </button>
-                                   </div>
-                                 </div>
-                               );
-                             }
-                             return (
-                               <div className="rounded-2xl p-4 border transition-all cursor-default group relative animate-in fade-in duration-200 bg-white/10 border-white/10 hover:bg-white/20">
-                                 <div className="flex justify-between items-start gap-2 mb-2">
-                                   <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                                      <MapPin className="w-4 h-4 text-indigo-400" />
-                                      {activeDisplacedDisciples.length} Vínculos Distantes
-                                   </h4>
-                                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                     <button 
-                                       onClick={() => toggleMinimizeAlert(key)}
-                                       className="text-gray-400 hover:text-white p-1 hover:bg-white/5 rounded-lg transition-all cursor-pointer"
-                                     >
-                                       <ChevronUp className="w-3.5 h-3.5" />
-                                     </button>
-                                   </div>
-                                 </div>
-                                 <p className="text-xs text-gray-300 leading-relaxed mb-3">
-                                   Detectamos {activeDisplacedDisciples.length} vínculos de discipulado onde a distância entre líder e discípulo supera 8 km, dificultando encontros presenciais recorrentes.
-                                 </p>
-                                 <div className="text-[10px] font-bold uppercase tracking-tighter px-2 py-1 rounded inline-block text-indigo-300 bg-indigo-500/10">
-                                   Ação: Reaproximar Espacialmente
+                                 <div className="mt-3 pt-3 border-t border-white/10 flex flex-wrap items-center gap-4">
+                                   <button 
+                                     onClick={(e) => {
+                                       e.stopPropagation();
+                                       toggleDescription(key);
+                                     }}
+                                     className="text-[10px] font-bold text-indigo-300 hover:text-indigo-200 flex items-center gap-1 cursor-pointer transition-all"
+                                   >
+                                     {expandedDescriptions[key] 
+                                       ? 'Ocultar Detalhes' 
+                                       : 'Detalhar'}
+                                   </button>
                                  </div>
                                </div>
                              );
                            })()}
 
-                           {activeIsolatedMembers.length === 0 && activeOverloadedDisciplers.length === 0 && activeDisplacedDisciples.length === 0 && (
+                           {activeIsolatedMembers.length === 0 && activeOverloadedDisciplers.length === 0 && (
                              <div className="text-center py-8 opacity-50">
                                 <CheckCircle2 className="w-10 h-10 mx-auto mb-2 text-emerald-400 animate-pulse" />
-                                <p className="text-xs font-semibold">Tudo verde! Rede de discipulado 100% equilibrada, cuidada e integrada espacialmente.</p>
+                                <p className="text-xs font-semibold">Tudo verde! Rede de discipulado de liderança 100% cuidada e integrada.</p>
                              </div>
                            )}
                         </div>
@@ -3096,7 +3147,7 @@ export const Simulations: React.FC = () => {
                   >
                     <div className="flex items-center gap-2">
                       <TrendingUp className="w-4 h-4 text-rose-500" />
-                      <span className="text-xs font-bold text-gray-700">GCs Superlotados (&gt; 15)</span>
+                      <span className="text-xs font-bold text-gray-700">GCs Superlotados (&gt; 20)</span>
                       <span className="text-[10px] bg-rose-100 text-rose-800 font-bold px-1.5 py-0.5 rounded-full">
                         {activeOvercrowdedGCs.length}
                       </span>
@@ -3303,19 +3354,19 @@ export const Simulations: React.FC = () => {
                 </div>
 
                 {/* 4. Collapsible: Strategic Suggestions */}
-                <div className="border border-indigo-100 rounded-2xl overflow-hidden bg-indigo-50/20">
+                <div className="border border-slate-100 rounded-2xl overflow-hidden bg-slate-50/50">
                   <button 
                     onClick={() => setIsAuditSuggestionsExpanded(!isAuditSuggestionsExpanded)}
-                    className="w-full flex items-center justify-between p-3.5 bg-indigo-50/40 hover:bg-indigo-50 text-left transition-all cursor-pointer"
+                    className="w-full flex items-center justify-between p-3.5 bg-slate-100/30 hover:bg-slate-100/50 text-left transition-all cursor-pointer"
                   >
                     <div className="flex items-center gap-2">
-                      <Lightbulb className="w-4 h-4 text-indigo-600 animate-pulse" />
-                      <span className="text-xs font-bold text-indigo-900">Recomendações e Nomenclatura</span>
-                      <span className="text-[10px] bg-indigo-100 text-indigo-800 font-bold px-1.5 py-0.5 rounded-full">
-                        💡 Diretrizes
+                      <Lightbulb className="w-4 h-4 text-slate-500" />
+                      <span className="text-xs font-bold text-slate-700">Diretrizes de Alocação e Convenções</span>
+                      <span className="text-[10px] bg-slate-150 text-slate-650 font-bold px-1.5 py-0.5 rounded-full">
+                        📖 Diretrizes
                       </span>
                     </div>
-                    <ChevronDown className={clsx("w-4 h-4 text-indigo-400 transition-transform", isAuditSuggestionsExpanded && "rotate-180")} />
+                    <ChevronDown className={clsx("w-4 h-4 text-slate-400 transition-transform", isAuditSuggestionsExpanded && "rotate-180")} />
                   </button>
                   
                   {isAuditSuggestionsExpanded && (
@@ -3503,7 +3554,7 @@ export const Simulations: React.FC = () => {
                     <UserCheck className="w-4 h-4 text-primary-500" /> Auditoria da Rede de Discipulado
                   </h4>
                   <span className="text-[10px] bg-primary-50 text-primary-700 font-extrabold px-2 py-0.5 rounded-full border border-primary-100 animate-pulse flex items-center gap-1.5">
-                    {activeIsolatedMembers.length + activeOverloadedDisciplers.length + activeDisplacedDisciples.length} pendências
+                    {activeIsolatedMembers.length + activeOverloadedDisciplers.length} pendências
                     {(ignoredAlerts.some(k => k.startsWith('disc_')) || minimizedAlerts.some(k => k.startsWith('disc_'))) && (
                       <button
                         onClick={() => {
@@ -3648,7 +3699,16 @@ export const Simulations: React.FC = () => {
                             );
                           })
                         ) : (
-                          <p className="text-[11px] text-gray-400 text-center py-2 animate-in fade-in duration-150">Nenhum membro ativo isolado detectado.</p>
+                          <p className="text-[11px] text-gray-400 text-center py-2 animate-in fade-in duration-150">Nenhum líder ativo isolado detectado.</p>
+                        )}
+                        
+                        {discipleshipAudit.regularIsolatedCount > 0 && (
+                          <div className="mt-2.5 p-3 bg-amber-50/40 border border-amber-100/40 rounded-2xl text-[10px] text-amber-900 flex items-start gap-2 animate-in fade-in duration-200">
+                            <Brain className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5 animate-pulse" />
+                            <div>
+                              <strong>Nota de Steve Jobs:</strong> Além dos líderes estratégicos acima, identificamos <strong>{discipleshipAudit.regularIsolatedCount} membros comuns</strong> sem discipulador cadastrado no sistema. O cuidado destes membros deve ser delegado localmente por seus respectivos líderes de GC.
+                            </div>
+                          </div>
                         )}
                       </div>
                     )}
@@ -3737,105 +3797,13 @@ export const Simulations: React.FC = () => {
                             );
                           })
                         ) : (
-                          <p className="text-[11px] text-gray-400 text-center py-2 animate-in fade-in duration-150">Nenhum discipulador sobrecarregado (&gt; 5 discípulos).</p>
+                          <p className="text-[11px] text-gray-400 text-center py-2 animate-in fade-in duration-150">Nenhum discipulador sobrecarregado (&gt; 6 discípulos).</p>
                         )}
                       </div>
                     )}
                   </div>
 
-                  {/* 3. Vínculos Distantes */}
-                  <div className="border border-gray-100 rounded-2xl overflow-hidden">
-                    <button 
-                      onClick={() => setIsDiscAuditDisplacedExpanded(!isDiscAuditDisplacedExpanded)}
-                      className="w-full flex items-center justify-between p-3.5 bg-gray-50/50 hover:bg-gray-50 text-left transition-all cursor-pointer"
-                    >
-                      <div className="flex items-center gap-2">
-                        <MapPin className="w-4 h-4 text-indigo-500" />
-                        <span className="text-xs font-bold text-gray-700">Vínculos Distantes (&gt; 8 km)</span>
-                        <span className="text-[10px] bg-indigo-100 text-indigo-800 font-bold px-1.5 py-0.5 rounded-full">
-                          {activeDisplacedDisciples.length}
-                        </span>
-                      </div>
-                      <ChevronDown className={clsx("w-4 h-4 text-gray-400 transition-transform", isDiscAuditDisplacedExpanded && "rotate-180")} />
-                    </button>
-                    
-                    {isDiscAuditDisplacedExpanded && (
-                      <div className="p-3 bg-white space-y-2 max-h-56 overflow-y-auto divide-y divide-gray-50 scrollbar-thin">
-                        {activeDisplacedDisciples.length > 0 ? (
-                          activeDisplacedDisciples.map((d: any) => {
-                            const key = `disc_displaced_${d.discipleId}`;
-                            const isMinimized = minimizedAlerts.includes(key);
-                            
-                            if (isMinimized) {
-                              return (
-                                <div key={key} className="pt-2 first:pt-0 flex items-center justify-between text-xs animate-in fade-in duration-150">
-                                  <div className="flex items-center gap-1.5 min-w-0">
-                                    <span className="font-semibold text-gray-700 truncate">{d.discipleName} ➔ {d.disciplerName}</span>
-                                    <span className="font-black text-indigo-655 shrink-0">{d.distance.toFixed(1)} km</span>
-                                    <span className="text-[8px] bg-gray-100 text-gray-500 px-1 py-0.2 rounded font-bold uppercase shrink-0">Minimizado</span>
-                                  </div>
-                                  <div className="flex items-center gap-1 shrink-0 opacity-60 hover:opacity-100 transition-opacity">
-                                    <button 
-                                      onClick={() => toggleMinimizeAlert(key)}
-                                      className="text-gray-400 hover:text-indigo-600 p-0.5 hover:bg-gray-100 rounded transition-all cursor-pointer"
-                                      title="Maximizar"
-                                    >
-                                      <ChevronDown className="w-3.5 h-3.5" />
-                                    </button>
-                                    <button 
-                                      onClick={() => toggleIgnoreAlert(key)}
-                                      className="text-gray-400 hover:text-rose-500 p-0.5 hover:bg-gray-100 rounded transition-all cursor-pointer"
-                                      title="Ignorar"
-                                    >
-                                      <EyeOff className="w-3.5 h-3.5" />
-                                    </button>
-                                  </div>
-                                </div>
-                              );
-                            }
-
-                            return (
-                              <div key={key} className="pt-2 first:pt-0 space-y-1 group relative animate-in fade-in duration-150 text-xs">
-                                <div className="flex justify-between items-start gap-2">
-                                  <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
-                                    <span className="font-bold text-gray-800 truncate">{d.discipleName}</span>
-                                    <span className="text-gray-400">➔</span>
-                                    <span className="font-semibold text-gray-650 truncate">{d.disciplerName}</span>
-                                  </div>
-                                  <div className="flex items-center gap-2 shrink-0">
-                                    <span className="text-[9px] bg-rose-50 text-rose-700 border border-rose-100 px-1.5 py-0.2 rounded font-extrabold uppercase animate-pulse">
-                                      {d.distance.toFixed(1)} km
-                                    </span>
-                                    <div className="flex items-center gap-0.5 opacity-60 hover:opacity-100 transition-opacity">
-                                      <button 
-                                        onClick={() => toggleMinimizeAlert(key)}
-                                        className="text-gray-400 hover:text-indigo-600 p-0.5 hover:bg-gray-100 rounded transition-all cursor-pointer"
-                                        title="Minimizar"
-                                      >
-                                        <ChevronUp className="w-3.5 h-3.5" />
-                                      </button>
-                                      <button 
-                                        onClick={() => toggleIgnoreAlert(key)}
-                                        className="text-gray-400 hover:text-rose-500 p-0.5 hover:bg-gray-100 rounded transition-all cursor-pointer"
-                                        title="Ignorar"
-                                      >
-                                        <EyeOff className="w-3.5 h-3.5" />
-                                      </button>
-                                    </div>
-                                  </div>
-                                </div>
-                                <p className="text-[10px] text-gray-500 leading-relaxed">
-                                  Deslocamento espacial crítico detectado. Discípulo em <span className="font-semibold text-gray-700">{d.discipleRA}</span> e Discipulador em <span className="font-semibold text-gray-700">{d.disciplerRA}</span>.
-                                </p>
-                              </div>
-                            );
-                          })
-                        ) : (
-                          <p className="text-[11px] text-gray-400 text-center py-2 animate-in fade-in duration-150">Nenhum vínculo com desvio de distância crítico (&gt; 8 km).</p>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                  {/* 3. Vínculos Distantes - Removed to prevent geographical noise (Musk Rule) */}
                 </div>
               </div>
             )}

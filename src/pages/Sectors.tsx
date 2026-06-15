@@ -138,11 +138,11 @@ export const Sectors: React.FC = () => {
     const fetchData = async () => {
       try {
         const [membersRes, cellsRes] = await Promise.all([
-          supabase
+          supabaseReader
             .from('membros')
             .select('id, nome, tipo_de_pessoa, grupos_caseiros, status, sexo, bairro, nascimento, estado_civil, e_dizimista, setor_eclesiastico, setor_residencial')
             .limit(10000),
-          supabase
+          supabaseReader
             .from('celulas')
             .select('grupo_caseiro, lider, auxiliar, setor')
             .limit(1000)
