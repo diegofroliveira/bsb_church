@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, Circle } from 'react-leaflet';
+import React, { useEffect, useState } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, Circle, Polygon, Tooltip } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { Home, Brain, Filter, EyeOff } from 'lucide-react';
@@ -51,6 +51,54 @@ const isolatedIcon = new L.Icon({
   shadowSize: [41, 41]
 });
 
+const SECTOR_POLYGONS = [
+  {
+    name: 'Setor Central',
+    color: '#3b82f6', // blue
+    points: [
+      [-15.790, -47.980],
+      [-15.790, -47.950],
+      [-15.870, -47.940],
+      [-15.880, -47.980],
+      [-15.830, -48.000]
+    ] as [number, number][]
+  },
+  {
+    name: 'Setor Águas Claras',
+    color: '#10b981', // emerald
+    points: [
+      [-15.830, -48.040],
+      [-15.830, -48.010],
+      [-15.870, -48.000],
+      [-15.870, -48.035]
+    ] as [number, number][]
+  },
+  {
+    name: 'Setor Norte',
+    color: '#8b5cf6', // purple
+    points: [
+      [-15.620, -47.820],
+      [-15.720, -47.840],
+      [-15.750, -47.860],
+      [-15.830, -47.890],
+      [-15.830, -47.930],
+      [-15.750, -47.960],
+      [-15.710, -47.810]
+    ] as [number, number][]
+  },
+  {
+    name: 'Setor Sul',
+    color: '#f59e0b', // amber
+    points: [
+      [-15.800, -48.050],
+      [-15.800, -48.140],
+      [-15.930, -48.100],
+      [-15.930, -48.050],
+      [-15.860, -48.030]
+    ] as [number, number][]
+  }
+];
+
 interface SimulationsMapProps {
   activeTab: 'gc' | 'discipleship';
   draftMembers: Member[];
@@ -86,6 +134,8 @@ export const SimulationsMap: React.FC<SimulationsMapProps> = ({
   setIsCreateCellOpen,
   handleLinkDiscipleship
 }) => {
+  const [showSectors, setShowSectors] = useState(true);
+
   return (
     <>
       <MapContainer 
@@ -98,6 +148,24 @@ export const SimulationsMap: React.FC<SimulationsMapProps> = ({
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
+
+        {showSectors && SECTOR_POLYGONS.map((sec) => (
+          <Polygon
+            key={sec.name}
+            positions={sec.points}
+            pathOptions={{
+              color: sec.color,
+              fillColor: sec.color,
+              fillOpacity: 0.03,
+              weight: 1.5,
+              dashArray: '4, 8'
+            }}
+          >
+            <Tooltip sticky direction="top" opacity={0.95}>
+              <span className="font-bold text-[10px] text-gray-800 uppercase tracking-wide">{sec.name}</span>
+            </Tooltip>
+          </Polygon>
+        ))}
         
         {/* GC Mode Layers */}
         {activeTab === 'gc' && (
@@ -509,6 +577,20 @@ export const SimulationsMap: React.FC<SimulationsMapProps> = ({
             </div>
           </div>
         )}
+
+        {/* Toggle to show/hide sector boundaries */}
+        <div className="flex items-center gap-2 pt-2.5 border-t border-gray-100 select-none">
+          <input 
+            type="checkbox" 
+            id="toggle_sectors" 
+            checked={showSectors} 
+            onChange={(e) => setShowSectors(e.target.checked)} 
+            className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5 cursor-pointer"
+          />
+          <label htmlFor="toggle_sectors" className="text-gray-700 font-bold text-[10px] uppercase cursor-pointer">
+            Limites dos Setores
+          </label>
+        </div>
       </div>
     </>
   );
