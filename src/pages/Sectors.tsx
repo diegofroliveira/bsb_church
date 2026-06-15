@@ -402,7 +402,7 @@ export const Sectors: React.FC = () => {
               Gestão & Divisão de Setores
             </h1>
             <p className="text-slate-300 text-sm max-w-2xl">
-              Compare e acompanhe a evolução geográfica dos setores eclesiásticos (localidade dos GCs) e setores residenciais (onde a igreja fisicamente reside em Brasília).
+              Compare e acompanhe a evolução geográfica dos setores de vínculos (localidade dos GCs) e setores residenciais (onde a igreja fisicamente reside em Brasília).
             </p>
           </div>
           
@@ -414,7 +414,7 @@ export const Sectors: React.FC = () => {
                 viewMode === 'eclesiastico' ? "bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-md shadow-blue-500/10" : "text-slate-400 hover:text-slate-200"
               )}
             >
-              Visão Eclesiástica (GCs)
+              Visão de Vínculos (GCs)
             </button>
             <button 
               onClick={() => setViewMode('residencial')}
