@@ -583,28 +583,35 @@ export const Companionship: React.FC = () => {
 
   const getRoleBadges = (m: Member): string[] => {
     const badges: string[] = [];
-    const role = getMemberRole(m);
-    if (role === 'DISCIPULADOR') {
-      badges.push('discipulador');
-      badges.push('líder');
-    } else if (role === 'LIDER') {
-      badges.push('líder');
-    } else if (role === 'AUXILIAR') {
-      badges.push('auxiliar');
-    } else {
-      badges.push('membro');
-    }
+    const nameUpper = m.nome.trim().toUpperCase();
+    const t = (m.tipo_de_pessoa || '').trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+    const isDisc = t === 'DISCIPULADOR' || activeDiscipuladores.has(nameUpper);
+    const isLid = m.gcRole === 'LIDER' || ['LIDER', 'DIACONO', 'PASTOR', 'PRESBITERO', 'APOSTOLO'].includes(t);
+    const isAux = m.gcRole === 'AUXILIAR';
+
+    if (isDisc) badges.push('discipulador');
+    if (isLid) badges.push('líder');
+    if (isAux) badges.push('auxiliar');
+    
+    if (badges.length === 0) badges.push('membro');
     return badges;
   };
 
   // Verifica se o par de membros satisfaz as flags de simulação ativadas no painel
   const meetsSimulatorConstraints = (m1: Member, m2: Member, dist: number | null): boolean => {
-    // Exclusão: Líder deve parear apenas com Líder
     const role1 = getMemberRole(m1);
     const role2 = getMemberRole(m2);
-    const isL1 = role1 === 'LIDER' || role1 === 'DISCIPULADOR';
-    const isL2 = role2 === 'LIDER' || role2 === 'DISCIPULADOR';
-    if (isL1 !== isL2) return false;
+
+    // Regras de Equivalência:
+    // 1. Discipulador com Discipulador apenas
+    if ((role1 === 'DISCIPULADOR' || role2 === 'DISCIPULADOR') && role1 !== role2) {
+      return false;
+    }
+    // 2. Líder de GC com Líder de GC apenas
+    if ((role1 === 'LIDER' || role2 === 'LIDER') && role1 !== role2) {
+      return false;
+    }
 
     // 1. Mesmo GC (ou mesmo discipulado em região com múltiplos GCs)
     if (simEnforceSameGC) {
@@ -1080,12 +1087,20 @@ export const Companionship: React.FC = () => {
   const calculateCompatibilityScore = (
     m1: Member, m2: Member, distKm: number | null
   ): SimulatedPair['scoreBreakdown'] & { total: number } => {
-    // --- EXCLUSÕES CRÍTICAS (Irmãos de sangue, Relações Verticais e Líder com Não-Líder) ---
+    // --- EXCLUSÕES CRÍTICAS (Irmãos de sangue, Relações Verticais e Regras de Equivalência de Função) ---
     const role1 = getMemberRole(m1);
     const role2 = getMemberRole(m2);
-    const isL1 = role1 === 'LIDER' || role1 === 'DISCIPULADOR';
-    const isL2 = role2 === 'LIDER' || role2 === 'DISCIPULADOR';
-    if (isSibling(m1, m2) || isVertical(m1, m2) || isL1 !== isL2) {
+
+    // 1. Discipulador com Discipulador apenas
+    if ((role1 === 'DISCIPULADOR' || role2 === 'DISCIPULADOR') && role1 !== role2) {
+      return { maturidade: 0, tempoIgreja: 0, estadoCivil: 0, redeDisc: 0, mesmaFuncao: 0, faixaEtaria: 0, momentoVida: 0, bairroRegiao: 0, distancia: 0, total: 0 };
+    }
+    // 2. Líder de GC com Líder de GC apenas
+    if ((role1 === 'LIDER' || role2 === 'LIDER') && role1 !== role2) {
+      return { maturidade: 0, tempoIgreja: 0, estadoCivil: 0, redeDisc: 0, mesmaFuncao: 0, faixaEtaria: 0, momentoVida: 0, bairroRegiao: 0, distancia: 0, total: 0 };
+    }
+
+    if (isSibling(m1, m2) || isVertical(m1, m2)) {
       return { maturidade: 0, tempoIgreja: 0, estadoCivil: 0, redeDisc: 0, mesmaFuncao: 0, faixaEtaria: 0, momentoVida: 0, bairroRegiao: 0, distancia: 0, total: 0 };
     }
 
