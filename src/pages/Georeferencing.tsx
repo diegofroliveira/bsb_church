@@ -6,6 +6,7 @@ import { supabaseReader, supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { Home, Users, Navigation, Search, Filter, X, ClipboardList } from 'lucide-react';
 import { differenceInYears, parseISO } from 'date-fns';
+import clsx from 'clsx';
 
 // Fix para ícones do Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
