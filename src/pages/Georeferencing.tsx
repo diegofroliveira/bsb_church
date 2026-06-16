@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { supabaseReader, supabase } from '../lib/supabase';
@@ -104,6 +104,16 @@ const calculateDistance = (lat1: number | null, lon1: number | null, lat2: numbe
   return d.toFixed(2);
 };
 
+const MapController: React.FC<{ selectedLocation: LocationData | null }> = ({ selectedLocation }) => {
+  const map = useMap();
+  useEffect(() => {
+    if (selectedLocation && selectedLocation.latitude !== null && selectedLocation.longitude !== null) {
+      map.setView([selectedLocation.latitude, selectedLocation.longitude], 14, { animate: true });
+    }
+  }, [selectedLocation, map]);
+  return null;
+};
+
 const Georeferencing: React.FC = () => {
   const { user } = useAuth();
   const [allLocations, setAllLocations] = useState<LocationData[]>([]);
@@ -152,16 +162,20 @@ const Georeferencing: React.FC = () => {
   }, [user?.assigned_gc]);
 
   const handleMarkerDragEnd = async (id: string, latLng: L.LatLng) => {
+    const loc = allLocations.find(l => l.id === id);
+    if (!loc) return;
+
     try {
+      const table = loc.tipo === 'grupo' ? 'celulas' : 'membros';
       const { error } = await supabase
-        .from('membros')
+        .from(table)
         .update({ latitude: latLng.lat, longitude: latLng.lng })
         .eq('id', id);
 
       if (error) throw error;
 
-      setAllLocations(prev => prev.map(loc => 
-        loc.id === id ? { ...loc, latitude: latLng.lat, longitude: latLng.lng } : loc
+      setAllLocations(prev => prev.map(item => 
+        item.id === id ? { ...item, latitude: latLng.lat, longitude: latLng.lng } : item
       ));
       
       console.log('Posição atualizada no banco:', latLng);
@@ -771,6 +785,7 @@ const Georeferencing: React.FC = () => {
           zoom={10} 
           className="h-full w-full"
         >
+          <MapController selectedLocation={selectedLocation} />
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -826,18 +841,22 @@ const Georeferencing: React.FC = () => {
                       {loc.tipo === 'grupo' ? <Home className="h-4 w-4 text-red-600" /> : <Users className="h-4 w-4 text-blue-600" />}
                       <span className="font-bold text-gray-900">{loc.nome}</span>
                     </div>
-                    {loc.tipo === 'membro' && (
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingId(editingId === loc.id ? null : loc.id);
-                        }}
-                        className={`text-[10px] px-2 py-1 rounded font-bold transition-colors ${editingId === loc.id ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-                      >
-                        {editingId === loc.id ? 'SALVAR POSIÇÃO' : 'CORRIGIR LOCAL'}
-                      </button>
-                    )}
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingId(editingId === loc.id ? null : loc.id);
+                      }}
+                      className={`text-[10px] px-2 py-1 rounded font-bold transition-colors ${editingId === loc.id ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                    >
+                      {editingId === loc.id ? 'SALVAR POSIÇÃO' : 'CORRIGIR LOCAL'}
+                    </button>
                   </div>
+
+                  {editingId === loc.id && (
+                    <div className="p-2 mb-2 bg-yellow-50 border border-yellow-200 rounded text-[10px] text-yellow-700 font-medium animate-pulse">
+                      📍 Arraste o pin para o local correto no mapa e clique em SALVAR.
+                    </div>
+                  )}
                   
                   {loc.tipo === 'membro' && (
                     <div className="space-y-2 text-sm text-gray-600">
@@ -855,11 +874,7 @@ const Georeferencing: React.FC = () => {
                           <span className="px-2 py-0.5 rounded-full bg-gray-50 text-gray-500 border border-gray-200 text-[9px] font-bold">Membro Comum</span>
                         )}
                       </div>
-                      {editingId === loc.id && (
-                        <div className="p-2 bg-yellow-50 border border-yellow-200 rounded text-[10px] text-yellow-700 font-medium animate-pulse">
-                          📍 Arraste o pin para o local correto no mapa e clique em SALVAR.
-                        </div>
-                      )}
+
                       <p><strong>Endereço:</strong> {loc.metadata.enderecoCompleto}</p>
                       <p><strong>Setor de Residência:</strong> {loc.metadata.setor}</p>
                       <p><strong>Grupo Caseiro (GC):</strong> {loc.metadata.grupo || 'Nenhum'} ({loc.metadata.setor_eclesiastico || 'Sem Setor'})</p>
