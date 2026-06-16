@@ -347,7 +347,7 @@ const Georeferencing: React.FC = () => {
 
           const nameUpper = m.nome?.trim().toUpperCase();
           const t = (m.tipo_de_pessoa || '').trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-          const isLider = lideresSet.has(nameUpper) || ['LIDER', 'DIACONO', 'PASTOR', 'PRESBITERO'].includes(t);
+          const isLider = lideresSet.has(nameUpper);
           const isAuxiliar = auxiliaresSet.has(nameUpper) && !isLider;
           const isDiscipulador = discipuladoresSet.has(nameUpper);
 

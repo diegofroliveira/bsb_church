@@ -567,12 +567,11 @@ export const Companionship: React.FC = () => {
   // Resolve a função eclesiástica primária do membro
   const getMemberRole = (m: Member): 'DISCIPULADOR' | 'LIDER' | 'AUXILIAR' | 'MEMBRO' => {
     const nameUpper = m.nome.trim().toUpperCase();
-    const t = (m.tipo_de_pessoa || '').trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     
-    if (t === 'DISCIPULADOR' || activeDiscipuladores.has(nameUpper)) {
+    if (activeDiscipuladores.has(nameUpper)) {
       return 'DISCIPULADOR';
     }
-    if (m.gcRole === 'LIDER' || ['LIDER', 'DIACONO', 'PASTOR', 'PRESBITERO', 'APOSTOLO'].includes(t)) {
+    if (m.gcRole === 'LIDER') {
       return 'LIDER';
     }
     if (m.gcRole === 'AUXILIAR') {
@@ -584,10 +583,9 @@ export const Companionship: React.FC = () => {
   const getRoleBadges = (m: Member): string[] => {
     const badges: string[] = [];
     const nameUpper = m.nome.trim().toUpperCase();
-    const t = (m.tipo_de_pessoa || '').trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
-    const isDisc = t === 'DISCIPULADOR' || activeDiscipuladores.has(nameUpper);
-    const isLid = m.gcRole === 'LIDER' || ['LIDER', 'DIACONO', 'PASTOR', 'PRESBITERO', 'APOSTOLO'].includes(t);
+    const isDisc = activeDiscipuladores.has(nameUpper);
+    const isLid = m.gcRole === 'LIDER';
     const isAux = m.gcRole === 'AUXILIAR';
 
     if (isDisc) badges.push('discipulador');

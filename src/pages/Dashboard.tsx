@@ -229,7 +229,7 @@ export const Dashboard: React.FC = () => {
 
         const nameUpper = m.nome?.trim().toUpperCase();
         const t = (m.tipo_de_pessoa || '').trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        const mIsLider = liderSet.has(nameUpper) || ['LIDER', 'DIACONO', 'PASTOR', 'PRESBITERO'].includes(t);
+        const mIsLider = liderSet.has(nameUpper);
         const mIsAuxiliar = auxiliarSet.has(nameUpper) && !mIsLider;
         const mIsDiscipulador = discSet.has(nameUpper);
 
