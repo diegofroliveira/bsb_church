@@ -106,6 +106,8 @@ export const Reports: React.FC = () => {
   const [filterPersonType, setFilterPersonType] = useState<string[]>([]);
   const [filterStatusPessoa, setFilterStatusPessoa] = useState<string[]>([]);
   const [filterNoChildren, setFilterNoChildren] = useState(false);
+  const [filterCellRoles, setFilterCellRoles] = useState<string[]>([]);
+  const [filterIsDiscipulador, setFilterIsDiscipulador] = useState(false);
   
   const [sortField, setSortField] = useState<string>('nome');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -120,16 +122,18 @@ export const Reports: React.FC = () => {
   };
   
   const [selectedColumns, setSelectedColumns] = useState<string[]>([
-    'nome', 'tipo_cadastro', 'grupos_caseiros', 'setor', 'setor_eclesiastico_display', 'discipulador', 'celular_principal_sms', 'email', 'nascimento', 'idade', 'sexo', 'estado_civil'
+    'nome', 'tipo_cadastro', 'grupos_caseiros', 'cargo_gc', 'setor', 'setor_eclesiastico_display', 'discipulador', 'is_discipulador_display', 'celular_principal_sms', 'email', 'nascimento', 'idade', 'sexo', 'estado_civil'
   ]);
 
   const columnOptions = [
     { key: 'nome', label: 'Nome' },
     { key: 'tipo_cadastro', label: 'Vínculo' },
     { key: 'grupos_caseiros', label: 'GC' },
+    { key: 'cargo_gc', label: 'Cargo no GC' },
     { key: 'setor', label: 'Setor de Residência' },
     { key: 'setor_eclesiastico_display', label: 'Setor do GC' },
     { key: 'discipulador', label: 'Discipulador' },
+    { key: 'is_discipulador_display', label: 'É Discipulador' },
     { key: 'celular_principal_sms', label: 'Telefone' },
     { key: 'email', label: 'E-mail' },
     { key: 'nascimento', label: 'Nascimento' },
@@ -154,7 +158,7 @@ export const Reports: React.FC = () => {
       try {
         const [membrosRes, celulasRes, discRes] = await Promise.all([
            supabaseReader.from('membros').select('*').limit(10000),
-           supabaseReader.from('celulas').select('grupo_caseiro, setor'),
+           supabaseReader.from('celulas').select('grupo_caseiro, setor, lider, auxiliar, auxiliar_1, auxiliar_2'),
            supabaseReader.from('discipulado').select('discipulo, discipulador, status')
         ]);
         
@@ -198,16 +202,36 @@ export const Reports: React.FC = () => {
 
         // Build mapping dictionaries for O(1) lookups
         const setorMap: Record<string, string> = {};
+        const lideresSet = new Set<string>();
+        const auxiliaresSet = new Set<string>();
+
         allCelulas.forEach((c: any) => {
            if (c.grupo_caseiro && c.setor) {
                setorMap[c.grupo_caseiro.toLowerCase()] = c.setor;
            }
+           if (c.lider) {
+             c.lider.split(',').forEach((l: string) => {
+               const cleaned = l.trim().toUpperCase();
+               if (cleaned) lideresSet.add(cleaned);
+             });
+           }
+           const auxiliares = [c.auxiliar, c.auxiliar_1, c.auxiliar_2].filter(Boolean).join(',');
+           if (auxiliares) {
+             auxiliares.split(',').forEach((aux: string) => {
+               const cleaned = aux.trim().toUpperCase();
+               if (cleaned) auxiliaresSet.add(cleaned);
+             });
+           }
         });
 
         const discipuladorMap: Record<string, string> = {};
+        const discipuladoresSet = new Set<string>();
         allDisc.forEach((d: any) => {
            if (d.discipulo && d.discipulador) {
                discipuladorMap[d.discipulo.trim().toLowerCase()] = d.discipulador;
+           }
+           if (d.discipulador) {
+               discipuladoresSet.add(d.discipulador.trim().toUpperCase());
            }
         });
 
@@ -329,9 +353,15 @@ export const Reports: React.FC = () => {
 
         // Enrich members with relational data
         const enrichedMembers = allMembros.map((m: any) => {
+            const nomeUpper = (m.nome || m.name || '').trim().toUpperCase();
             const nomeLower = (m.nome || m.name || '').trim().toLowerCase();
             const gcLower = (m.grupos_caseiros || '').trim().toLowerCase();
             
+            const isLider = lideresSet.has(nomeUpper);
+            const isAuxiliar = auxiliaresSet.has(nomeUpper) && !isLider;
+            const isDiscipulador = discipuladoresSet.has(nomeUpper);
+            const cargoGc = isLider ? 'Líder' : (isAuxiliar ? 'Auxiliar de Liderança' : 'Membro Comum');
+
             // Ecclesiastical Sector: database column with GC mapping fallback
             const rawEcl = m.setor_eclesiastico || setorMap[gcLower] || 'Sem Setor';
             const setorEcl = getNormalizedSectorName(rawEcl);
@@ -392,7 +422,12 @@ export const Reports: React.FC = () => {
                 titular_nome: titularNome,
                 titular_id: titularId,
                 parentesco: parentesco,
-                mesmo_domicilio: mesmoDomicilio
+                mesmo_domicilio: mesmoDomicilio,
+                isLider,
+                isAuxiliar,
+                isDiscipulador,
+                cargo_gc: cargoGc,
+                is_discipulador_display: isDiscipulador ? 'Sim' : 'Não'
             };
         });
 
@@ -405,6 +440,7 @@ export const Reports: React.FC = () => {
     };
     fetchAllData();
   }, []);
+
 
   // Compute Unique List of Filter Options
   const uniqueTypes = useMemo(() => Array.from(new Set(members.map(m => m.tipo_cadastro).filter(Boolean))).sort(), [members]);
@@ -481,6 +517,12 @@ export const Reports: React.FC = () => {
         const nomeNorm = normalizeStr(m.nome);
         if (allParentsNames.has(nomeNorm)) return false;
       }
+
+      // Cargo no GC Filter
+      if (filterCellRoles.length > 0 && !filterCellRoles.includes(m.cargo_gc)) return false;
+
+      // É Discipulador Filter
+      if (filterIsDiscipulador && !m.isDiscipulador) return false;
       
       return true;
     }).sort((a, b) => {
@@ -508,7 +550,7 @@ export const Reports: React.FC = () => {
       if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [members, filterQuery, filterType, filterGC, filterGender, filterAgeCategory, filterMinAge, filterMaxAge, filterMaritalStatus, filterState, filterSetor, filterSetorEcl, filterMestre, filterPersonType, filterStatusPessoa, filterNoChildren, allParentsNames, sortField, sortDirection]);
+  }, [members, filterQuery, filterType, filterGC, filterGender, filterAgeCategory, filterMinAge, filterMaxAge, filterMaritalStatus, filterState, filterSetor, filterSetorEcl, filterMestre, filterPersonType, filterStatusPessoa, filterNoChildren, filterCellRoles, filterIsDiscipulador, allParentsNames, sortField, sortDirection]);
 
   // Real-time mini dashboard calculations
   const chartsData = useMemo(() => {
@@ -862,6 +904,10 @@ export const Reports: React.FC = () => {
           </div>
 
           <div className="xl:col-span-1">
+             <MultiSelect label="Cargo no GC" options={['Líder', 'Auxiliar de Liderança', 'Membro Comum']} selected={filterCellRoles} onChange={setFilterCellRoles} />
+          </div>
+
+          <div className="xl:col-span-1">
              <label className="block text-xs font-medium text-gray-500 mb-1">Idade (Min / Max)</label>
              <div className="flex items-center gap-2">
                 <input type="number" value={filterMinAge} onChange={e => setFilterMinAge(parseInt(e.target.value) || 0)} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none" placeholder="Min" />
@@ -871,15 +917,26 @@ export const Reports: React.FC = () => {
           </div>
 
           <div className="xl:col-span-1 flex items-end pb-1">
-             <label className="flex items-center gap-2 cursor-pointer group p-2 rounded-lg hover:bg-gray-50 transition-colors border border-dashed border-gray-200 w-full">
-                <input 
-                  type="checkbox" 
-                  checked={filterNoChildren}
-                  onChange={e => setFilterNoChildren(e.target.checked)}
-                  className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                />
-                <span className="text-xs font-bold text-gray-700">Apenas sem filhos (Est.)</span>
-             </label>
+             <div className="grid grid-cols-2 gap-2 w-full">
+               <label className="flex items-center gap-2 cursor-pointer group p-2 rounded-lg hover:bg-gray-50 transition-colors border border-dashed border-gray-200 w-full h-[38px]">
+                  <input 
+                    type="checkbox" 
+                    checked={filterNoChildren}
+                    onChange={e => setFilterNoChildren(e.target.checked)}
+                    className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 shrink-0"
+                  />
+                  <span className="text-[10px] font-bold text-gray-700 truncate">Sem filhos (Est.)</span>
+               </label>
+               <label className="flex items-center gap-2 cursor-pointer group p-2 rounded-lg hover:bg-gray-50 transition-colors border border-dashed border-gray-200 w-full h-[38px]">
+                  <input 
+                    type="checkbox" 
+                    checked={filterIsDiscipulador}
+                    onChange={e => setFilterIsDiscipulador(e.target.checked)}
+                    className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 shrink-0"
+                  />
+                  <span className="text-[10px] font-bold text-gray-700 truncate">É Discipulador</span>
+               </label>
+             </div>
           </div>
 
         </div>
@@ -1084,6 +1141,11 @@ export const Reports: React.FC = () => {
                                   <span className={clsx("inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium", 
                                      m.tipo_cadastro === 'Visitante' ? 'bg-orange-50 text-orange-700' : 'bg-blue-50 text-blue-700'
                                   )}>{m.tipo_cadastro || 'Membro'}</span>
+                                  {m.isDiscipulador && (
+                                    <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-250">
+                                      Discipulador
+                                    </span>
+                                  )}
                                 </div>
                                 <span className="text-xs text-gray-500 mt-1">{age > 0 ? `${age} anos` : '-'} - {m.sexo||''}</span>
                              </div>
@@ -1091,6 +1153,14 @@ export const Reports: React.FC = () => {
                           <td className="whitespace-nowrap px-3 py-4">
                              <div className="flex flex-col min-w-0 max-w-[180px]">
                                 <span className="text-sm text-gray-900 truncate font-medium">{m.grupos_caseiros || 'Sem Grupo'}</span>
+                                {m.cargo_gc !== 'Membro Comum' && (
+                                  <span className={clsx(
+                                    "inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-bold mt-0.5 w-fit",
+                                    m.cargo_gc === 'Líder' ? "bg-amber-50 text-amber-700 border border-amber-200" : "bg-blue-50 text-blue-750 border border-blue-200"
+                                  )}>
+                                    {m.cargo_gc}
+                                  </span>
+                                )}
                                 <div className="flex flex-col gap-0.5 mt-1 shrink-0">
                                   <span className="text-[10px] text-indigo-600 font-semibold truncate">Res.: {m.setor}</span>
                                   <span className="text-[10px] text-teal-600 font-semibold truncate">GC: {m.setor_eclesiastico_display}</span>
