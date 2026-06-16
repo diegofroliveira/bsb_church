@@ -60,7 +60,7 @@ export const Dashboard: React.FC = () => {
       setIsLoading(true);
       try {
         let membrosQuery = supabaseReader.from('membros').select('nome, status, tipo_cadastro, nascimento, grupos_caseiros, sexo, bairro, cidade, estado, tipo_de_pessoa, data_de_cadastro, data_atualizacao, estado_civil, setor_eclesiastico, setor_residencial');
-        let celulasQuery = supabaseReader.from('celulas').select('grupo_caseiro, lider, auxiliar, setor');
+        let celulasQuery = supabaseReader.from('celulas').select('grupo_caseiro, lider, auxiliar, auxiliar_1, auxiliar_2, setor');
 
         if (user?.assigned_gc) {
           membrosQuery = membrosQuery.ilike('grupos_caseiros', `%${user.assigned_gc}%`);
@@ -118,8 +118,23 @@ export const Dashboard: React.FC = () => {
       });
     }
 
-    const liderSet = new Set(rawCelulas.map(c => c.lider?.trim().toUpperCase()).filter(Boolean));
-    const auxiliarSet = new Set(rawCelulas.map(c => c.auxiliar?.trim().toUpperCase()).filter(Boolean));
+    const liderSet = new Set<string>();
+    const auxiliarSet = new Set<string>();
+    rawCelulas.forEach(c => {
+      if (c.lider) {
+        c.lider.split(',').forEach((l: string) => {
+          const cleaned = l.trim().toUpperCase();
+          if (cleaned) liderSet.add(cleaned);
+        });
+      }
+      const auxiliares = [c.auxiliar, c.auxiliar_1, c.auxiliar_2].filter(Boolean).join(',');
+      if (auxiliares) {
+        auxiliares.split(',').forEach((aux: string) => {
+          const cleaned = aux.trim().toUpperCase();
+          if (cleaned) auxiliarSet.add(cleaned);
+        });
+      }
+    });
     const discipuladoMap = new Map();
     rawDiscipulado.forEach(d => {
       const disc = d.discipulo?.trim().toUpperCase();
@@ -144,10 +159,12 @@ export const Dashboard: React.FC = () => {
       }
 
       // Leader/Auxiliar Sector Override fallback
-      const matchingCell = rawCelulas.find(c => 
-        (c.lider && c.lider.trim().toUpperCase() === m.nome?.trim().toUpperCase()) ||
-        (c.auxiliar && c.auxiliar.trim().toUpperCase() === m.nome?.trim().toUpperCase())
-      );
+      const matchingCell = rawCelulas.find(c => {
+        const leaders = (c.lider || '').split(',').map((l: string) => l.trim().toUpperCase());
+        const auxiliaries = [c.auxiliar, c.auxiliar_1, c.auxiliar_2].filter(Boolean).join(',').split(',').map((a: string) => a.trim().toUpperCase());
+        const mName = m.nome?.trim().toUpperCase();
+        return leaders.includes(mName) || auxiliaries.includes(mName);
+      });
       if (matchingCell) {
         return getNormalizedSectorName(matchingCell.setor);
       }
@@ -377,7 +394,11 @@ export const Dashboard: React.FC = () => {
         dataResp = (data || []).map(d => {
           const age = d.nascimento ? new Date().getFullYear() - new Date(d.nascimento).getFullYear() : '-';
           let role = 'Participante';
-          if (cell?.lider === d.nome) role = 'Líder'; else if (cell?.auxiliar === d.nome) role = 'Auxiliar';
+          const nameUpper = d.nome?.trim().toUpperCase();
+          const leaders = (cell?.lider || '').split(',').map((l: string) => l.trim().toUpperCase());
+          const auxiliaries = [cell?.auxiliar, cell?.auxiliar_1, cell?.auxiliar_2].filter(Boolean).join(',').split(',').map((a: string) => a.trim().toUpperCase());
+          if (leaders.includes(nameUpper)) role = 'Líder';
+          else if (auxiliaries.includes(nameUpper)) role = 'Auxiliar';
           return { col1: d.nome, col2: d.sexo || '-', col3: age, col4: role, col5: localDiscSet.has(d.nome?.trim().toUpperCase()) ? 'Sim' : 'Não' };
         });
       } else if (type === 'setor') {

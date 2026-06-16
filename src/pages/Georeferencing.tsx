@@ -194,7 +194,7 @@ const Georeferencing: React.FC = () => {
     try {
       setLoading(true);
       
-      let celQuery = supabaseReader.from('celulas').select('id, grupo_caseiro, latitude, longitude, lider, auxiliar, setor');
+      let celQuery = supabaseReader.from('celulas').select('id, grupo_caseiro, latitude, longitude, lider, auxiliar, auxiliar_1, auxiliar_2, setor');
       let membQuery = supabaseReader.from('membros').select(`
         id, nome, latitude, longitude, grupos_caseiros, estado_civil, sexo, nascimento, tipo_de_pessoa,
         logradouro, bairro, cidade, estado, setor_eclesiastico, setor_residencial
@@ -282,8 +282,23 @@ const Georeferencing: React.FC = () => {
         return 'Sem Setor';
       };
 
-      const lideresSet = new Set((grupos || []).map(g => g.lider?.trim().toUpperCase()).filter(Boolean));
-      const auxiliaresSet = new Set((grupos || []).map(g => g.auxiliar?.trim().toUpperCase()).filter(Boolean));
+      const lideresSet = new Set<string>();
+      const auxiliaresSet = new Set<string>();
+      (grupos || []).forEach(g => {
+        if (g.lider) {
+          g.lider.split(',').forEach((l: string) => {
+            const cleaned = l.trim().toUpperCase();
+            if (cleaned) lideresSet.add(cleaned);
+          });
+        }
+        const auxiliares = [g.auxiliar, g.auxiliar_1, g.auxiliar_2].filter(Boolean).join(',');
+        if (auxiliares) {
+          auxiliares.split(',').forEach((aux: string) => {
+            const cleaned = aux.trim().toUpperCase();
+            if (cleaned) auxiliaresSet.add(cleaned);
+          });
+        }
+      });
       const discipuladoresSet = new Set<string>();
       if (funcoes && funcoes.length > 0) {
         funcoes.forEach((f: any) => {
