@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, CircleMarker, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { supabaseReader, supabase } from '../lib/supabase';
@@ -68,6 +68,9 @@ interface LocationData {
   latitude: number | null;
   longitude: number | null;
   tipo: 'membro' | 'grupo';
+  latitudeJittered?: number;
+  longitudeJittered?: number;
+  density?: number;
   metadata: {
     setor?: string;
     setor_eclesiastico?: string;
@@ -120,6 +123,7 @@ const Georeferencing: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [selectedLocation, setSelectedLocation] = useState<LocationData | null>(null);
   const [showGcPins, setShowGcPins] = useState(true);
+  const [mapMode, setMapMode] = useState<'pin' | 'density'>('pin');
   
   const [filters, setFilters] = useState({
     nome: '',
@@ -499,6 +503,130 @@ const Georeferencing: React.FC = () => {
     return filteredLocations.filter(loc => loc.tipo === 'membro');
   }, [filteredLocations]);
 
+  const locationsWithDensity = useMemo(() => {
+    const activeLocs = filteredLocations.filter(
+      loc => loc.latitude !== null && loc.longitude !== null
+    );
+
+    const getDistanceKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+      const R = 6371;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = 
+        Math.sin(dLat/2) * Math.sin(dLat/2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+        Math.sin(dLon/2) * Math.sin(dLon/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return R * c;
+    };
+
+    return activeLocs.map((loc, idx, arr) => {
+      let density = 0;
+      for (let i = 0; i < arr.length; i++) {
+        if (i === idx) continue;
+        const other = arr[i];
+        if (other.tipo === 'grupo') continue;
+        const dist = getDistanceKm(loc.latitude!, loc.longitude!, other.latitude!, other.longitude!);
+        if (dist <= 1.5) {
+          density += 1;
+        }
+      }
+      
+      let latJitter = 0;
+      let lngJitter = 0;
+      const exactMatches = arr.filter(other => other.latitude === loc.latitude && other.longitude === loc.longitude);
+      if (exactMatches.length > 1) {
+        const matchIdx = exactMatches.findIndex(other => other.id === loc.id);
+        if (matchIdx > 0) {
+          const angle = (matchIdx / exactMatches.length) * 2 * Math.PI;
+          const radius = 0.00015; // ~15 meters
+          latJitter = Math.sin(angle) * radius;
+          lngJitter = Math.cos(angle) * radius;
+        }
+      }
+
+      return {
+        ...loc,
+        density,
+        latitudeJittered: loc.latitude! + latJitter,
+        longitudeJittered: loc.longitude! + lngJitter
+      };
+    });
+  }, [filteredLocations]);
+
+  const renderPopupContent = (loc: LocationData) => {
+    return (
+      <div className="p-2 min-w-[220px]">
+        <div className="flex items-center justify-between mb-2 border-b pb-1">
+          <div className="flex items-center gap-2">
+            {loc.tipo === 'grupo' ? <Home className="h-4 w-4 text-red-600" /> : <Users className="h-4 w-4 text-blue-600" />}
+            <span className="font-bold text-gray-900">{loc.nome}</span>
+          </div>
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              setEditingId(editingId === loc.id ? null : loc.id);
+            }}
+            className={`text-[10px] px-2 py-1 rounded font-bold transition-colors ${editingId === loc.id ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+          >
+            {editingId === loc.id ? 'SALVAR POSIÇÃO' : 'CORRIGIR LOCAL'}
+          </button>
+        </div>
+
+        {editingId === loc.id && (
+          <div className="p-2 mb-2 bg-yellow-50 border border-yellow-200 rounded text-[10px] text-yellow-700 font-medium animate-pulse">
+            📍 Arraste o pin para o local correto no mapa e clique em SALVAR.
+          </div>
+        )}
+        
+        {loc.tipo === 'membro' && (
+          <div className="space-y-2 text-sm text-gray-600">
+            <div className="flex flex-wrap gap-1 pb-1">
+              {loc.metadata.isLider && (
+                <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[9px] font-bold">Líder</span>
+              )}
+              {loc.metadata.isAuxiliar && (
+                <span className="px-2 py-0.5 rounded-full bg-orange-50 text-orange-700 border border-orange-200 text-[9px] font-bold">Auxiliar</span>
+              )}
+              {loc.metadata.isDiscipulador && (
+                <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-bold">Discipulador</span>
+              )}
+              {!loc.metadata.isLider && !loc.metadata.isAuxiliar && !loc.metadata.isDiscipulador && (
+                <span className="px-2 py-0.5 rounded-full bg-gray-50 text-gray-500 border border-gray-200 text-[9px] font-bold">Membro Comum</span>
+              )}
+            </div>
+
+            <p><strong>Endereço:</strong> {loc.metadata.enderecoCompleto}</p>
+            <p><strong>Setor de Residência:</strong> {loc.metadata.setor}</p>
+            <p><strong>Grupo Caseiro (GC):</strong> {loc.metadata.grupo || 'Nenhum'} ({loc.metadata.setor_eclesiastico || 'Sem Setor'})</p>
+            <p><strong>Discipulador:</strong> {loc.metadata.discipuladorNome || 'Nenhum'}</p>
+            <div className="grid grid-cols-1 gap-1 mt-2">
+              {loc.metadata.distanciaAteGrupo && (
+                <div className="p-1.5 bg-blue-50 rounded text-blue-700 text-xs font-semibold flex items-center gap-1">
+                  <Navigation className="h-3 w-3" />
+                  <span>{loc.metadata.distanciaAteGrupo} km do grupo</span>
+                </div>
+              )}
+              {loc.metadata.distanciaAteDiscipulador && (
+                <div className="p-1.5 bg-emerald-50 rounded text-emerald-700 text-xs font-semibold flex items-center gap-1">
+                  <Users className="h-3 w-3" />
+                  <span>{loc.metadata.distanciaAteDiscipulador} km do discipulador</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {loc.tipo === 'grupo' && (
+          <div className="space-y-1 text-sm text-gray-600">
+            <p><strong>Líder:</strong> {loc.metadata.lider}</p>
+            <p><strong>Setor:</strong> {loc.metadata.setor}</p>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-700 max-w-7xl mx-auto pb-12 px-4 sm:px-6 lg:px-8 pt-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -757,6 +885,22 @@ const Georeferencing: React.FC = () => {
 
           {/* Map Legend */}
           <div className="bg-white/90 backdrop-blur-md p-3 rounded-lg shadow-lg border border-white/60 text-[10px] space-y-1.5 font-medium text-gray-700">
+            <div className="font-extrabold text-[9px] uppercase tracking-wider text-gray-400 border-b border-gray-100 pb-1 mb-1">Visualização</div>
+            <div className="flex bg-gray-100 p-0.5 rounded-lg mb-2">
+              <button
+                onClick={() => setMapMode('pin')}
+                className={`flex-1 text-[9px] py-1 rounded-md font-bold transition-all ${mapMode === 'pin' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                Pins
+              </button>
+              <button
+                onClick={() => setMapMode('density')}
+                className={`flex-1 text-[9px] py-1 rounded-md font-bold transition-all ${mapMode === 'density' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                Concentração
+              </button>
+            </div>
+
             <div className="font-extrabold text-[9px] uppercase tracking-wider text-gray-400 border-b border-gray-100 pb-1 mb-1">Legenda</div>
             <label className="flex items-center gap-2 cursor-pointer hover:bg-gray-50/50 p-0.5 rounded transition-colors select-none">
               <input 
@@ -798,7 +942,7 @@ const Georeferencing: React.FC = () => {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           
-          {showGcPins && filteredLocations.filter(l => l.tipo === 'membro' && l.latitude !== null && l.longitude !== null && l.metadata.coordsGrupo).map(m => (
+          {mapMode === 'pin' && showGcPins && filteredLocations.filter(l => l.tipo === 'membro' && l.latitude !== null && l.longitude !== null && l.metadata.coordsGrupo).map(m => (
             <Polyline 
               key={`line-group-${m.id}`}
               positions={[[m.latitude!, m.longitude!], m.metadata.coordsGrupo!]}
@@ -820,99 +964,68 @@ const Georeferencing: React.FC = () => {
             />
           ))}
 
-          {filteredLocations.filter(loc => loc.latitude !== null && loc.longitude !== null).filter(loc => showGcPins || loc.tipo !== 'grupo').map((loc) => (
-            <Marker 
-              key={loc.id} 
-              position={[loc.latitude!, loc.longitude!]}
-              icon={
-                loc.tipo === 'grupo'
-                  ? cellIcon
-                  : loc.metadata.isLider
-                  ? leaderIcon
-                  : loc.metadata.isAuxiliar
-                  ? auxiliarIcon
-                  : loc.metadata.isDiscipulador
-                  ? discipuladorIcon
-                  : memberIcon
-              }
-              draggable={editingId === loc.id}
-              eventHandlers={{
-                click: () => setSelectedLocation(loc),
-                dragend: (e: any) => handleMarkerDragEnd(loc.id, e.target.getLatLng()),
-              }}
-            >
-              <Popup>
-                <div className="p-2 min-w-[220px]">
-                  <div className="flex items-center justify-between mb-2 border-b pb-1">
-                    <div className="flex items-center gap-2">
-                      {loc.tipo === 'grupo' ? <Home className="h-4 w-4 text-red-600" /> : <Users className="h-4 w-4 text-blue-600" />}
-                      <span className="font-bold text-gray-900">{loc.nome}</span>
-                    </div>
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditingId(editingId === loc.id ? null : loc.id);
-                      }}
-                      className={`text-[10px] px-2 py-1 rounded font-bold transition-colors ${editingId === loc.id ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-                    >
-                      {editingId === loc.id ? 'SALVAR POSIÇÃO' : 'CORRIGIR LOCAL'}
-                    </button>
-                  </div>
+          {locationsWithDensity.filter(loc => showGcPins || loc.tipo !== 'grupo').map((loc) => {
+            const position: [number, number] = [loc.latitudeJittered!, loc.longitudeJittered!];
+            
+            if (mapMode === 'density') {
+              let color = '#3b82f6';
+              if (loc.tipo === 'grupo') color = '#ef4444';
+              else if (loc.metadata.isLider) color = '#D4AF37';
+              else if (loc.metadata.isAuxiliar) color = '#ff9800';
+              else if (loc.metadata.isDiscipulador) color = '#22c55e';
+              
+              const radius = loc.tipo === 'grupo' ? 6 : 6 + (loc.density || 0) * 1.5;
+              
+              return (
+                <CircleMarker
+                  key={`density-${loc.id}`}
+                  center={position}
+                  radius={radius}
+                  pathOptions={{
+                    color: color,
+                    fillColor: color,
+                    fillOpacity: 0.45,
+                    weight: 1.5,
+                    opacity: 0.8
+                  }}
+                  eventHandlers={{
+                    click: () => setSelectedLocation(loc),
+                  }}
+                >
+                  <Popup>
+                    {renderPopupContent(loc)}
+                  </Popup>
+                </CircleMarker>
+              );
+            }
 
-                  {editingId === loc.id && (
-                    <div className="p-2 mb-2 bg-yellow-50 border border-yellow-200 rounded text-[10px] text-yellow-700 font-medium animate-pulse">
-                      📍 Arraste o pin para o local correto no mapa e clique em SALVAR.
-                    </div>
-                  )}
-                  
-                  {loc.tipo === 'membro' && (
-                    <div className="space-y-2 text-sm text-gray-600">
-                      <div className="flex flex-wrap gap-1 pb-1">
-                        {loc.metadata.isLider && (
-                          <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[9px] font-bold">Líder</span>
-                        )}
-                        {loc.metadata.isAuxiliar && (
-                          <span className="px-2 py-0.5 rounded-full bg-orange-50 text-orange-700 border border-orange-200 text-[9px] font-bold">Auxiliar</span>
-                        )}
-                        {loc.metadata.isDiscipulador && (
-                          <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-bold">Discipulador</span>
-                        )}
-                        {!loc.metadata.isLider && !loc.metadata.isAuxiliar && !loc.metadata.isDiscipulador && (
-                          <span className="px-2 py-0.5 rounded-full bg-gray-50 text-gray-500 border border-gray-200 text-[9px] font-bold">Membro Comum</span>
-                        )}
-                      </div>
-
-                      <p><strong>Endereço:</strong> {loc.metadata.enderecoCompleto}</p>
-                      <p><strong>Setor de Residência:</strong> {loc.metadata.setor}</p>
-                      <p><strong>Grupo Caseiro (GC):</strong> {loc.metadata.grupo || 'Nenhum'} ({loc.metadata.setor_eclesiastico || 'Sem Setor'})</p>
-                      <p><strong>Discipulador:</strong> {loc.metadata.discipuladorNome || 'Nenhum'}</p>
-                      <div className="grid grid-cols-1 gap-1 mt-2">
-                        {loc.metadata.distanciaAteGrupo && (
-                          <div className="p-1.5 bg-blue-50 rounded text-blue-700 text-xs font-semibold flex items-center gap-1">
-                            <Navigation className="h-3 w-3" />
-                            <span>{loc.metadata.distanciaAteGrupo} km do grupo</span>
-                          </div>
-                        )}
-                        {loc.metadata.distanciaAteDiscipulador && (
-                          <div className="p-1.5 bg-emerald-50 rounded text-emerald-700 text-xs font-semibold flex items-center gap-1">
-                            <Users className="h-3 w-3" />
-                            <span>{loc.metadata.distanciaAteDiscipulador} km do discipulador</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {loc.tipo === 'grupo' && (
-                    <div className="space-y-1 text-sm text-gray-600">
-                      <p><strong>Líder:</strong> {loc.metadata.lider}</p>
-                      <p><strong>Setor:</strong> {loc.metadata.setor}</p>
-                    </div>
-                  )}
-                </div>
-              </Popup>
-            </Marker>
-          ))}
+            return (
+              <Marker 
+                key={loc.id} 
+                position={position}
+                icon={
+                  loc.tipo === 'grupo'
+                    ? cellIcon
+                    : loc.metadata.isLider
+                    ? leaderIcon
+                    : loc.metadata.isAuxiliar
+                    ? auxiliarIcon
+                    : loc.metadata.isDiscipulador
+                    ? discipuladorIcon
+                    : memberIcon
+                }
+                draggable={editingId === loc.id}
+                eventHandlers={{
+                  click: () => setSelectedLocation(loc),
+                  dragend: (e: any) => handleMarkerDragEnd(loc.id, e.target.getLatLng()),
+                }}
+              >
+                <Popup>
+                  {renderPopupContent(loc)}
+                </Popup>
+              </Marker>
+            );
+          })}
 
           {/* Linhas de Conexão (Raiozinhos) */}
           {filteredLocations.filter(l => l.tipo === 'membro' && l.latitude !== null && l.longitude !== null).map(m => {
