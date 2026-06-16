@@ -52,6 +52,7 @@ export const Dashboard: React.FC = () => {
   const [rawMembros, setRawMembros] = useState<any[]>([]);
   const [rawCelulas, setRawCelulas] = useState<any[]>([]);
   const [rawDiscipulado, setRawDiscipulado] = useState<any[]>([]);
+  const [rawFuncoes, setRawFuncoes] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -65,15 +66,17 @@ export const Dashboard: React.FC = () => {
           celulasQuery = celulasQuery.ilike('grupo_caseiro', `%${user.assigned_gc}%`);
         }
 
-        const [membrosRes, celulasRes, discRes] = await Promise.all([
+        const [membrosRes, celulasRes, discRes, funcoesRes] = await Promise.all([
           membrosQuery,
           celulasQuery,
-          supabaseReader.from('discipulado').select('discipulador, discipulo, status')
+          supabaseReader.from('discipulado').select('discipulador, discipulo, status'),
+          fetch('/data/pessoas_funcoes.json').then(r => r.ok ? r.json() : []).catch(() => [])
         ]);
 
         setRawMembros(membrosRes.data || []);
         setRawCelulas(celulasRes.data || []);
         setRawDiscipulado(discRes.data || []);
+        setRawFuncoes(funcoesRes);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
       } finally {
@@ -93,7 +96,27 @@ export const Dashboard: React.FC = () => {
   const dashboardData = useMemo(() => {
     if (isLoading || rawMembros.length === 0) return null;
 
-    const discSet = new Set(rawDiscipulado.map(d => d.discipulador?.trim().toUpperCase()).filter(Boolean));
+    const discSet = new Set<string>();
+    const discNameMap = new Map<string, string>();
+    if (rawFuncoes && rawFuncoes.length > 0) {
+      rawFuncoes.forEach(f => {
+        const func = (f.funcao || '').toUpperCase();
+        if (func.includes('DISCIPULADOR') && f.pessoa) {
+          const upper = f.pessoa.trim().toUpperCase();
+          discSet.add(upper);
+          discNameMap.set(upper, f.pessoa.trim());
+        }
+      });
+    } else {
+      rawDiscipulado.forEach(d => {
+        if (d.discipulador) {
+          const upper = d.discipulador.trim().toUpperCase();
+          discSet.add(upper);
+          discNameMap.set(upper, d.discipulador.trim());
+        }
+      });
+    }
+
     const liderSet = new Set(rawCelulas.map(c => c.lider?.trim().toUpperCase()).filter(Boolean));
     const auxiliarSet = new Set(rawCelulas.map(c => c.auxiliar?.trim().toUpperCase()).filter(Boolean));
     const discipuladoMap = new Map();
@@ -293,8 +316,23 @@ export const Dashboard: React.FC = () => {
     });
 
     const mestreCounts: any = {};
-    rawDiscipulado.forEach(d => { if (d.discipulador) mestreCounts[d.discipulador] = (mestreCounts[d.discipulador] || 0) + 1; });
-    const discList = Object.keys(mestreCounts).map(k => ({ nome: k, discipulos: mestreCounts[k] })).sort((a, b) => b.discipulos - a.discipulos);
+    discNameMap.forEach((originalName, upperName) => {
+      mestreCounts[originalName] = 0;
+    });
+
+    rawDiscipulado.forEach(d => {
+      if (d.discipulador) {
+        const upper = d.discipulador.trim().toUpperCase();
+        if (discSet.has(upper)) {
+          const original = discNameMap.get(upper) || d.discipulador.trim();
+          mestreCounts[original] = (mestreCounts[original] || 0) + 1;
+        }
+      }
+    });
+
+    const discList = Object.keys(mestreCounts)
+      .map(k => ({ nome: k, discipulos: mestreCounts[k] }))
+      .sort((a, b) => b.discipulos - a.discipulos);
 
     return {
         stats: { totalMembros, ativos, visitantes, totalCelulas, totalDiscipuladores, membrosLocalidade },
@@ -309,13 +347,25 @@ export const Dashboard: React.FC = () => {
             discipuladores: discList
         }
     };
-  }, [isLoading, rawMembros, rawCelulas, rawDiscipulado, filterGender, filterGroup, filterDisc, filterSector, filterSectorEcl, sectorViewMode, filterMinAge, filterMaxAge, filterMaritalStatus, filterStatus, selectedTypes, selectedRoles]);
+  }, [isLoading, rawMembros, rawCelulas, rawDiscipulado, rawFuncoes, filterGender, filterGroup, filterDisc, filterSector, filterSectorEcl, sectorViewMode, filterMinAge, filterMaxAge, filterMaritalStatus, filterStatus, selectedTypes, selectedRoles]);
 
   const handleOpenModal = async (type: 'grupo' | 'setor' | 'discipulador', title: string) => {
     setModalType(type); setModalTitle(title); setIsModalLoading(true);
     try {
       let dataResp: any[] = [];
-      const discSet = new Set(rawDiscipulado.map(d => d.discipulador?.trim().toUpperCase()));
+      const localDiscSet = new Set<string>();
+      if (rawFuncoes && rawFuncoes.length > 0) {
+        rawFuncoes.forEach(f => {
+          const func = (f.funcao || '').toUpperCase();
+          if (func.includes('DISCIPULADOR') && f.pessoa) {
+            localDiscSet.add(f.pessoa.trim().toUpperCase());
+          }
+        });
+      } else {
+        rawDiscipulado.forEach(d => {
+          if (d.discipulador) localDiscSet.add(d.discipulador.trim().toUpperCase());
+        });
+      }
       if (type === 'grupo') {
         const { data } = await supabaseReader.from('membros').select('nome, sexo, nascimento, tipo_cadastro').eq('grupos_caseiros', title);
         const cell = rawCelulas.find(c => c.grupo_caseiro === title);
@@ -323,7 +373,7 @@ export const Dashboard: React.FC = () => {
           const age = d.nascimento ? new Date().getFullYear() - new Date(d.nascimento).getFullYear() : '-';
           let role = 'Participante';
           if (cell?.lider === d.nome) role = 'Líder'; else if (cell?.auxiliar === d.nome) role = 'Auxiliar';
-          return { col1: d.nome, col2: d.sexo || '-', col3: age, col4: role, col5: discSet.has(d.nome?.trim().toUpperCase()) ? 'Sim' : 'Não' };
+          return { col1: d.nome, col2: d.sexo || '-', col3: age, col4: role, col5: localDiscSet.has(d.nome?.trim().toUpperCase()) ? 'Sim' : 'Não' };
         });
       } else if (type === 'setor') {
         const getNormalizedSectorName = (dbSector: string | null | undefined): string => {

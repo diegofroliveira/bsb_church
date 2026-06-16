@@ -218,6 +218,15 @@ const Georeferencing: React.FC = () => {
 
       if (dError) console.warn('Discipulado não disponível:', dError.message);
 
+      // Fetch pessoas_funcoes.json
+      let funcoes: any[] = [];
+      try {
+        const res = await fetch('/data/pessoas_funcoes.json');
+        if (res.ok) funcoes = await res.json();
+      } catch (err) {
+        console.warn('Erro ao buscar pessoas_funcoes.json:', err);
+      }
+
       // Processamento de Mapas Auxiliares
       const setorPorGrupo: Record<string, string> = {};
       const coordsPorGrupo: Record<string, [number, number]> = {};
@@ -253,7 +262,19 @@ const Georeferencing: React.FC = () => {
 
       const lideresSet = new Set((grupos || []).map(g => g.lider?.trim().toUpperCase()).filter(Boolean));
       const auxiliaresSet = new Set((grupos || []).map(g => g.auxiliar?.trim().toUpperCase()).filter(Boolean));
-      const discipuladoresSet = new Set((discipulados || []).map(d => d.discipulador?.trim().toUpperCase()).filter(Boolean));
+      const discipuladoresSet = new Set<string>();
+      if (funcoes && funcoes.length > 0) {
+        funcoes.forEach((f: any) => {
+          const func = (f.funcao || '').toUpperCase();
+          if (func.includes('DISCIPULADOR') && f.pessoa) {
+            discipuladoresSet.add(f.pessoa.trim().toUpperCase());
+          }
+        });
+      } else {
+        (discipulados || []).forEach(d => {
+          if (d.discipulador) discipuladoresSet.add(d.discipulador.trim().toUpperCase());
+        });
+      }
 
       const formattedLocations: LocationData[] = [
         ...geoMembros.map(m => {
