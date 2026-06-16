@@ -41,6 +41,7 @@ interface Member {
   nascimento?: string | null;
   discipuladorNome?: string | null;
   gcRole?: 'LIDER' | 'AUXILIAR' | null; // papel de liderança no GC
+  isDiscipulador?: boolean;
   mae?: string | null;
   pai?: string | null;
   batismo?: string | null;
@@ -169,9 +170,25 @@ export const Companionship: React.FC = () => {
           membrosData = membrosFullRes.data || [];
         }
 
-        // Pre-calcular discipuladores ativos
+        // Pre-calcular discipuladores ativos da base oficial
         const discNames = new Set<string>();
-        if (discipuladoData) {
+        try {
+          const res = await fetch('/data/pessoas_funcoes.json');
+          if (res.ok) {
+            const funcoes = await res.json();
+            funcoes.forEach((f: any) => {
+              const func = (f.funcao || '').toUpperCase();
+              if (func.includes('DISCIPULADOR') && f.pessoa) {
+                discNames.add(f.pessoa.trim().toUpperCase());
+              }
+            });
+          }
+        } catch (err) {
+          console.warn('Erro ao buscar pessoas_funcoes.json em Companionship:', err);
+        }
+
+        // Fallback para tabela de discipulado se base oficial vazia
+        if (discNames.size === 0 && discipuladoData) {
           for (const d of discipuladoData) {
             if (d.discipulador) {
               discNames.add(d.discipulador.trim().toUpperCase());
@@ -213,15 +230,19 @@ export const Companionship: React.FC = () => {
           }
         }
 
-        // Filtrar membros elegíveis e enriquecer com discipulador e papel no GC
+        // Filtrar membros elegíveis e enriquecer com discipulador, papel no GC e isDiscipulador
         const filteredMembers = membrosData.filter(m => {
           const type = (m.tipo_de_pessoa || '').toUpperCase().trim();
           return ELIGIBLE_TYPES.includes(type);
-        }).map(m => ({
-          ...m,
-          discipuladorNome: discipuladorDe[m.nome.trim().toUpperCase()] || null,
-          gcRole: gcRoleMap[m.nome.trim().toUpperCase()] || null,
-        }));
+        }).map(m => {
+          const nameUpper = m.nome.trim().toUpperCase();
+          return {
+            ...m,
+            discipuladorNome: discipuladorDe[nameUpper] || null,
+            gcRole: gcRoleMap[nameUpper] || null,
+            isDiscipulador: discNames.has(nameUpper),
+          };
+        });
         setRawMembers(membrosData);
         setMembers(filteredMembers);
 
@@ -622,11 +643,24 @@ export const Companionship: React.FC = () => {
       if (Math.abs(t1 - t2) > 3) return false;
     }
 
-    // 8. Mesma Função Ministerial
+    // 8. Mesma Função Ministerial (reformulada para dimensões independentes)
     if (simEnforceSameRole) {
-      const role1 = getMemberRole(m1);
-      const role2 = getMemberRole(m2);
-      if (role1 !== role2) return false;
+      const getGCRole = (m: Member) => {
+        if (m.gcRole === 'LIDER' || (m.tipo_de_pessoa || '').toUpperCase().trim() === 'LIDER' || (m.tipo_de_pessoa || '').toUpperCase().trim() === 'LÍDER') return 'LIDER';
+        if (m.gcRole === 'AUXILIAR') return 'AUXILIAR';
+        return 'MEMBRO';
+      };
+      const simGc1 = getGCRole(m1);
+      const simGc2 = getGCRole(m2);
+      const simIsDisc1 = !!m1.isDiscipulador;
+      const simIsDisc2 = !!m2.isDiscipulador;
+
+      const shareRole = 
+        (simGc1 === simGc2 && simGc1 !== 'MEMBRO') || 
+        (simIsDisc1 && simIsDisc2) || 
+        (simGc1 === 'MEMBRO' && !simIsDisc1 && simGc2 === 'MEMBRO' && !simIsDisc2);
+
+      if (!shareRole) return false;
     }
     
     return true;
@@ -777,8 +811,20 @@ export const Companionship: React.FC = () => {
     if (bd.mesmaFuncao > 0) {
       let label = 'Função Ministerial';
       if (bd.mesmaFuncao === 5) {
-        const role = getMemberRole(candidate);
-        label = `Mesma Função (${role === 'DISCIPULADOR' ? 'Discipulador' : role === 'LIDER' ? 'Líder' : role === 'AUXILIAR' ? 'Auxiliar' : 'Membro'})`;
+        const getGCRole = (m: Member) => {
+          if (m.gcRole === 'LIDER' || (m.tipo_de_pessoa || '').toUpperCase().trim() === 'LIDER' || (m.tipo_de_pessoa || '').toUpperCase().trim() === 'LÍDER') return 'LIDER';
+          if (m.gcRole === 'AUXILIAR') return 'AUXILIAR';
+          return 'MEMBRO';
+        };
+        const reasonGc1 = getGCRole(member);
+        const reasonGc2 = getGCRole(candidate);
+        const reasonIsDisc1 = !!member.isDiscipulador;
+        const reasonIsDisc2 = !!candidate.isDiscipulador;
+
+        if (reasonIsDisc1 && reasonIsDisc2) label = 'Mesma Função (Discipulador)';
+        else if (reasonGc1 === 'LIDER' && reasonGc2 === 'LIDER') label = 'Mesma Função (Líder)';
+        else if (reasonGc1 === 'AUXILIAR' && reasonGc2 === 'AUXILIAR') label = 'Mesma Função (Auxiliar)';
+        else label = 'Mesma Função (Membro)';
       }
       else if (bd.mesmaFuncao === 3) label = 'Líder & Auxiliar (GC)';
       else if (bd.mesmaFuncao === 1) label = 'Sinergia de Liderança';
@@ -1021,20 +1067,26 @@ export const Companionship: React.FC = () => {
     const rankDiff = Math.abs(r1 - r2);
     const maturidade = rankDiff === 0 ? 10 : rankDiff === 1 ? 6 : rankDiff === 2 ? 2 : 0;
 
-    // --- ALINHAMENTO DE FUNÇÃO MINISTERIAL (0-5 pts) ---
+    // --- ALINHAMENTO DE FUNÇÃO MINISTERIAL (0-5 pts) (reformulada para dimensões independentes) ---
+    const getGCRole = (m: Member) => {
+      if (m.gcRole === 'LIDER' || (m.tipo_de_pessoa || '').toUpperCase().trim() === 'LIDER' || (m.tipo_de_pessoa || '').toUpperCase().trim() === 'LÍDER') return 'LIDER';
+      if (m.gcRole === 'AUXILIAR') return 'AUXILIAR';
+      return 'MEMBRO';
+    };
+    const scoreGc1 = getGCRole(m1);
+    const scoreGc2 = getGCRole(m2);
+    const scoreIsDisc1 = !!m1.isDiscipulador;
+    const scoreIsDisc2 = !!m2.isDiscipulador;
+
     let mesmaFuncao = 0;
-    if (role1 === role2) {
+    if ((scoreGc1 === scoreGc2 && scoreGc1 !== 'MEMBRO') || (scoreIsDisc1 && scoreIsDisc2)) {
       mesmaFuncao = 5;
-    } else if (
-      (role1 === 'LIDER' && role2 === 'AUXILIAR') ||
-      (role1 === 'AUXILIAR' && role2 === 'LIDER')
-    ) {
+    } else if ((scoreGc1 === 'LIDER' && scoreGc2 === 'AUXILIAR') || (scoreGc1 === 'AUXILIAR' && scoreGc2 === 'LIDER')) {
       mesmaFuncao = 3;
-    } else if (
-      (role1 === 'DISCIPULADOR' && (role2 === 'LIDER' || role2 === 'AUXILIAR')) ||
-      (role2 === 'DISCIPULADOR' && (role1 === 'LIDER' || role1 === 'AUXILIAR'))
-    ) {
+    } else if ((scoreIsDisc1 && (scoreGc2 === 'LIDER' || scoreGc2 === 'AUXILIAR')) || (scoreIsDisc2 && (scoreGc1 === 'LIDER' || scoreGc1 === 'AUXILIAR'))) {
       mesmaFuncao = 1;
+    } else if (scoreGc1 === 'MEMBRO' && !scoreIsDisc1 && scoreGc2 === 'MEMBRO' && !scoreIsDisc2) {
+      mesmaFuncao = 5; // ambos são membros comuns sem função de discipulado
     } else {
       mesmaFuncao = 0;
     }
@@ -2173,8 +2225,17 @@ export const Companionship: React.FC = () => {
                                             return <span className="text-[9px] text-teal-700 bg-teal-50 px-1 rounded font-bold">⏳ {tenure}a de igreja</span>;
                                           })()}
                                           {(() => {
-                                            const role = getMemberRole(candidate);
-                                            return <span className="text-[9px] text-indigo-700 bg-indigo-50 px-1 rounded font-bold">💼 {role.toLowerCase()}</span>;
+                                            const badges: string[] = [];
+                                            if (candidate.isDiscipulador) badges.push('discipulador');
+                                            if (candidate.gcRole === 'LIDER' || (candidate.tipo_de_pessoa || '').toUpperCase().trim() === 'LIDER' || (candidate.tipo_de_pessoa || '').toUpperCase().trim() === 'LÍDER') {
+                                              badges.push('líder');
+                                            } else if (candidate.gcRole === 'AUXILIAR') {
+                                              badges.push('auxiliar');
+                                            }
+                                            if (badges.length === 0) badges.push('membro');
+                                            return badges.map(b => (
+                                              <span key={b} className="text-[9px] text-indigo-700 bg-indigo-50 px-1 rounded font-bold mr-1">💼 {b}</span>
+                                            ));
                                           })()}
                                           {(() => {
                                             const sameGC = candidate.grupos_caseiros && candidate.grupos_caseiros.trim().toUpperCase() === (selectedMember.grupos_caseiros || '').trim().toUpperCase();

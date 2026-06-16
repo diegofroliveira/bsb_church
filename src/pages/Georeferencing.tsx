@@ -121,7 +121,8 @@ const Georeferencing: React.FC = () => {
     distanciaMinima: 0
   });
 
-  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
+  const [selectedCellRoles, setSelectedCellRoles] = useState<string[]>([]);
+  const [filterIsDiscipulador, setFilterIsDiscipulador] = useState<string>('Todos');
   const [isRolesOpen, setIsRolesOpen] = useState(false);
   const [isAdvancedFiltersOpen, setIsAdvancedFiltersOpen] = useState(false);
   const rolesDropdownRef = useRef<HTMLDivElement>(null);
@@ -402,15 +403,18 @@ const Georeferencing: React.FC = () => {
       const mIsAuxiliar = loc.metadata.isAuxiliar;
       const mIsDiscipulador = loc.metadata.isDiscipulador;
 
-      const matchRoles = selectedRoles.length === 0 || selectedRoles.some(role => {
+      const matchCellRole = selectedCellRoles.length === 0 || selectedCellRoles.some(role => {
         if (role === 'Líder') return mIsLider;
         if (role === 'Auxiliar de Liderança') return mIsAuxiliar;
-        if (role === 'Discipulador') return mIsDiscipulador;
-        if (role === 'Membro Comum') return !mIsLider && !mIsAuxiliar && !mIsDiscipulador;
+        if (role === 'Membro Comum') return !mIsLider && !mIsAuxiliar;
         return false;
       });
 
-      if (!matchRoles) return false;
+      const matchIsDiscipulador = filterIsDiscipulador === 'Todos' || (
+        filterIsDiscipulador === 'Sim' ? mIsDiscipulador : !mIsDiscipulador
+      );
+
+      if (!matchCellRole || !matchIsDiscipulador) return false;
 
       if (filters.distanciaMinima > 0) {
         const distGrupo = parseFloat(loc.metadata.distanciaAteGrupo || '0');
@@ -446,7 +450,7 @@ const Georeferencing: React.FC = () => {
     });
 
     return [...filteredMembros, ...gruposParaMostrar];
-  }, [allLocations, filters, selectedLocation, selectedRoles]);
+  }, [allLocations, filters, selectedLocation, selectedCellRoles, filterIsDiscipulador]);
 
   const clearFilters = () => {
     setFilters({
@@ -459,7 +463,8 @@ const Georeferencing: React.FC = () => {
       discipulador: 'Todos',
       distanciaMinima: 0
     });
-    setSelectedRoles([]);
+    setSelectedCellRoles([]);
+    setFilterIsDiscipulador('Todos');
   };
 
   const tableData = useMemo(() => {
@@ -493,7 +498,7 @@ const Georeferencing: React.FC = () => {
               )}
             >
               Filtros Avançados
-              {(filters.tipoVinculo !== 'Todos' || filters.sexo !== 'Todos' || filters.faixaEtaria !== 'Todas' || selectedRoles.length > 0) && (
+              {(filters.tipoVinculo !== 'Todos' || filters.sexo !== 'Todos' || filters.faixaEtaria !== 'Todas' || selectedCellRoles.length > 0 || filterIsDiscipulador !== 'Todos') && (
                 <span className="ml-1 px-1.5 py-0.2 bg-primary-600 text-white rounded-full text-[9px] font-black animate-pulse">
                   !
                 </span>
@@ -620,48 +625,48 @@ const Georeferencing: React.FC = () => {
               </select>
             </div>
 
-            {/* Checkbox Multiselect Dropdown for Roles */}
+            {/* Checkbox Multiselect Dropdown for GC Roles */}
             <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">Função / Cargo</label>
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">Cargo no GC</label>
               <div className="relative" ref={rolesDropdownRef}>
                 <button
                   type="button"
                   onClick={() => setIsRolesOpen(!isRolesOpen)}
                   className="flex items-center justify-between gap-2 text-sm border border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50 px-3 py-2 text-gray-700 hover:bg-gray-150 transition-colors cursor-pointer min-w-[180px]"
                 >
-                  <span>{selectedRoles.length === 0 ? 'Todas as Funções' : `${selectedRoles.length} Função(ões)`}</span>
+                  <span>{selectedCellRoles.length === 0 ? 'Todos os Cargos no GC' : `${selectedCellRoles.length} Cargo(s) no GC`}</span>
                   <span className="text-xs text-gray-400">▼</span>
                 </button>
 
                 {isRolesOpen && (
                   <div className="absolute left-0 mt-2 w-64 bg-white border border-gray-100 rounded-xl shadow-xl z-50 p-3 space-y-2 animate-in fade-in slide-in-from-top-1 duration-150">
                     <div className="flex justify-between items-center pb-2 border-b border-gray-100">
-                      <span className="text-[10px] font-bold text-gray-400 uppercase font-sans">Funções</span>
+                      <span className="text-[10px] font-bold text-gray-400 uppercase font-sans">Cargos no GC</span>
                       <div className="flex gap-2">
                         <button
                           type="button"
-                          onClick={() => setSelectedRoles([])}
+                          onClick={() => setSelectedCellRoles([])}
                           className="text-[10px] text-red-500 hover:underline font-bold"
                         >
                           Limpar
                         </button>
                         <button
                           type="button"
-                          onClick={() => setSelectedRoles(['Líder', 'Auxiliar de Liderança', 'Discipulador', 'Membro Comum'])}
+                          onClick={() => setSelectedCellRoles(['Líder', 'Auxiliar de Liderança', 'Membro Comum'])}
                           className="text-[10px] text-primary-600 hover:underline font-bold"
                         >
-                          Todas
+                          Todos
                         </button>
                       </div>
                     </div>
                     <div className="max-h-48 overflow-y-auto space-y-2 py-1 pr-1 scrollbar-thin">
-                      {['Líder', 'Auxiliar de Liderança', 'Discipulador', 'Membro Comum'].map(role => (
+                      {['Líder', 'Auxiliar de Liderança', 'Membro Comum'].map(role => (
                         <label key={role} className="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors text-xs text-gray-700">
                           <input
                             type="checkbox"
-                            checked={selectedRoles.includes(role)}
+                            checked={selectedCellRoles.includes(role)}
                             onChange={() => {
-                              setSelectedRoles(prev =>
+                              setSelectedCellRoles(prev =>
                                 prev.includes(role) ? prev.filter(r => r !== role) : [...prev, role]
                               );
                             }}
@@ -674,6 +679,20 @@ const Georeferencing: React.FC = () => {
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* Discipulador Boolean Filter */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">É Discipulador?</label>
+              <select
+                className="text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-gray-50/50 px-3 py-2 text-gray-700 min-w-[150px]"
+                value={filterIsDiscipulador}
+                onChange={(e) => setFilterIsDiscipulador(e.target.value)}
+              >
+                <option value="Todos">Todos</option>
+                <option value="Sim">Sim (Apenas Discipulador)</option>
+                <option value="Não">Não (Não Discipulador)</option>
+              </select>
             </div>
           </div>
         )}

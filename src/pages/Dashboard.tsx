@@ -32,7 +32,8 @@ export const Dashboard: React.FC = () => {
   const [isTypesOpen, setIsTypesOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [isAdvancedFiltersOpen, setIsAdvancedFiltersOpen] = useState(false);
-  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
+  const [selectedCellRoles, setSelectedCellRoles] = useState<string[]>([]);
+  const [filterIsDiscipulador, setFilterIsDiscipulador] = useState<string>('Todos');
   const [isRolesOpen, setIsRolesOpen] = useState(false);
   const rolesDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -214,15 +215,18 @@ export const Dashboard: React.FC = () => {
         const mIsAuxiliar = auxiliarSet.has(nameUpper);
         const mIsDiscipulador = discSet.has(nameUpper);
 
-        const matchRoles = selectedRoles.length === 0 || selectedRoles.some(role => {
+        const matchCellRole = selectedCellRoles.length === 0 || selectedCellRoles.some(role => {
           if (role === 'Líder') return mIsLider;
           if (role === 'Auxiliar de Liderança') return mIsAuxiliar;
-          if (role === 'Discipulador') return mIsDiscipulador;
-          if (role === 'Membro Comum') return !mIsLider && !mIsAuxiliar && !mIsDiscipulador;
+          if (role === 'Membro Comum') return !mIsLider && !mIsAuxiliar;
           return false;
         });
+
+        const matchIsDiscipulador = filterIsDiscipulador === 'Todos' || (
+          filterIsDiscipulador === 'Sim' ? mIsDiscipulador : !mIsDiscipulador
+        );
         
-        return matchGender && matchGroup && matchDisc && matchAge && matchMarital && matchStatus && matchType && matchSector && matchSectorEcl && matchRoles;
+        return matchGender && matchGroup && matchDisc && matchAge && matchMarital && matchStatus && matchType && matchSector && matchSectorEcl && matchCellRole && matchIsDiscipulador;
     });
 
     const ativosOnly = filteredMembros.filter(m => m.status === 'Ativo');
@@ -347,7 +351,7 @@ export const Dashboard: React.FC = () => {
             discipuladores: discList
         }
     };
-  }, [isLoading, rawMembros, rawCelulas, rawDiscipulado, rawFuncoes, filterGender, filterGroup, filterDisc, filterSector, filterSectorEcl, sectorViewMode, filterMinAge, filterMaxAge, filterMaritalStatus, filterStatus, selectedTypes, selectedRoles]);
+  }, [isLoading, rawMembros, rawCelulas, rawDiscipulado, rawFuncoes, filterGender, filterGroup, filterDisc, filterSector, filterSectorEcl, sectorViewMode, filterMinAge, filterMaxAge, filterMaritalStatus, filterStatus, selectedTypes, selectedCellRoles, filterIsDiscipulador]);
 
   const handleOpenModal = async (type: 'grupo' | 'setor' | 'discipulador', title: string) => {
     setModalType(type); setModalTitle(title); setIsModalLoading(true);
@@ -482,7 +486,7 @@ export const Dashboard: React.FC = () => {
             >
               <SlidersHorizontal className="w-3.5 h-3.5" />
               Filtros Avançados
-              {(filterSectorEcl !== 'Todos' || filterGender !== 'Todos' || filterGroup !== 'Todos' || filterDisc !== 'Todos' || filterMaritalStatus !== 'Todos' || selectedTypes.length > 0 || selectedRoles.length > 0 || filterMinAge !== 0 || filterMaxAge !== 120) && (
+              {(filterSectorEcl !== 'Todos' || filterGender !== 'Todos' || filterGroup !== 'Todos' || filterDisc !== 'Todos' || filterMaritalStatus !== 'Todos' || selectedTypes.length > 0 || selectedCellRoles.length > 0 || filterIsDiscipulador !== 'Todos' || filterMinAge !== 0 || filterMaxAge !== 120) && (
                 <span className="ml-1 px-1.5 py-0.2 bg-primary-600 text-white rounded-full text-[9px] font-black animate-pulse">
                   !
                 </span>
@@ -490,7 +494,7 @@ export const Dashboard: React.FC = () => {
             </button>
 
             {/* Clear All Filters Button */}
-            {(filterGender !== 'Todos' || filterGroup !== 'Todos' || filterDisc !== 'Todos' || filterSector !== 'Todos' || filterSectorEcl !== 'Todos' || filterMinAge !== 0 || filterMaxAge !== 120 || filterMaritalStatus !== 'Todos' || filterStatus !== 'Todos' || selectedTypes.length > 0 || selectedRoles.length > 0) && (
+            {(filterGender !== 'Todos' || filterGroup !== 'Todos' || filterDisc !== 'Todos' || filterSector !== 'Todos' || filterSectorEcl !== 'Todos' || filterMinAge !== 0 || filterMaxAge !== 120 || filterMaritalStatus !== 'Todos' || filterStatus !== 'Todos' || selectedTypes.length > 0 || selectedCellRoles.length > 0 || filterIsDiscipulador !== 'Todos') && (
               <button 
                 onClick={() => { 
                   setFilterGender('Todos'); 
@@ -503,7 +507,8 @@ export const Dashboard: React.FC = () => {
                   setFilterMaritalStatus('Todos'); 
                   setFilterStatus('Todos'); 
                   setSelectedTypes([]); 
-                  setSelectedRoles([]);
+                  setSelectedCellRoles([]);
+                  setFilterIsDiscipulador('Todos');
                 }} 
                 className="text-xs text-red-600 font-bold hover:underline cursor-pointer"
               >
@@ -608,46 +613,46 @@ export const Dashboard: React.FC = () => {
               )}
             </div>
 
-            {/* Checkbox Multiselect Dropdown for Roles */}
+            {/* Checkbox Multiselect Dropdown for GC Roles */}
             <div className="relative" ref={rolesDropdownRef}>
               <button
                 type="button"
                 onClick={() => setIsRolesOpen(!isRolesOpen)}
                 className="flex items-center justify-between gap-2 text-sm border border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50 px-3 py-2 text-gray-700 hover:bg-gray-150 transition-colors cursor-pointer"
               >
-                <span>{selectedRoles.length === 0 ? 'Todas as Funções' : `${selectedRoles.length} Função(ões)`}</span>
+                <span>{selectedCellRoles.length === 0 ? 'Todos os Cargos no GC' : `${selectedCellRoles.length} Cargo(s) no GC`}</span>
                 <span className="text-xs text-gray-400">▼</span>
               </button>
 
               {isRolesOpen && (
                 <div className="absolute left-0 mt-2 w-64 bg-white border border-gray-100 rounded-xl shadow-xl z-50 p-3 space-y-2 animate-in fade-in slide-in-from-top-1 duration-150">
                   <div className="flex justify-between items-center pb-2 border-b border-gray-100">
-                    <span className="text-[10px] font-bold text-gray-400 uppercase">Funções</span>
+                    <span className="text-[10px] font-bold text-gray-400 uppercase">Cargos no GC</span>
                     <div className="flex gap-2">
                       <button
                         type="button"
-                        onClick={() => setSelectedRoles([])}
+                        onClick={() => setSelectedCellRoles([])}
                         className="text-[10px] text-red-500 hover:underline font-bold"
                       >
                         Limpar
                       </button>
                       <button
                         type="button"
-                        onClick={() => setSelectedRoles(['Líder', 'Auxiliar de Liderança', 'Discipulador', 'Membro Comum'])}
+                        onClick={() => setSelectedCellRoles(['Líder', 'Auxiliar de Liderança', 'Membro Comum'])}
                         className="text-[10px] text-primary-600 hover:underline font-bold"
                       >
-                        Todas
+                        Todos
                       </button>
                     </div>
                   </div>
                   <div className="max-h-48 overflow-y-auto space-y-2 py-1 pr-1 scrollbar-thin">
-                    {['Líder', 'Auxiliar de Liderança', 'Discipulador', 'Membro Comum'].map(role => (
+                    {['Líder', 'Auxiliar de Liderança', 'Membro Comum'].map(role => (
                       <label key={role} className="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors text-xs text-gray-700">
                         <input
                           type="checkbox"
-                          checked={selectedRoles.includes(role)}
+                          checked={selectedCellRoles.includes(role)}
                           onChange={() => {
-                            setSelectedRoles(prev =>
+                            setSelectedCellRoles(prev =>
                               prev.includes(role) ? prev.filter(r => r !== role) : [...prev, role]
                             );
                           }}
@@ -660,6 +665,17 @@ export const Dashboard: React.FC = () => {
                 </div>
               )}
             </div>
+
+            {/* Discipulador Boolean Filter */}
+            <select
+              value={filterIsDiscipulador}
+              onChange={e => setFilterIsDiscipulador(e.target.value)}
+              className="text-sm border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50"
+            >
+              <option value="Todos">É Discipulador (Todos)</option>
+              <option value="Sim">Sim (Apenas Discipulador)</option>
+              <option value="Não">Não (Não Discipulador)</option>
+            </select>
 
             {/* Age Range */}
             <div className="flex items-center gap-2 bg-gray-50/50 border border-gray-200 rounded-lg px-3 py-1">
