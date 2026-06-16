@@ -186,7 +186,7 @@ return m.status !== 'Ativo' && meses > 0 && meses < 24;`
     const fetchData = async () => {
       try {
         setLoading(true);
-        const { data, error } = await supabase
+        const { data, error } = await supabaseReader
           .from('membros')
           .select('id, nome, apelido, status, sexo, data_de_cadastro, data_de_vinculo, data_atualizacao, nascimento, grupos_caseiros, estado_civil, tipo_de_pessoa, tipo_cadastro, bairro, cidade, celular_principal_sms, telefone_fixo, email')
           .limit(10000);
@@ -488,12 +488,12 @@ return m.status === 'Ativo' && (!m.celular_principal_sms || m.celular_principal_
     if (schemaTables.length > 0) { setSchemaOpen(true); return; }
     setSchemaLoading(true);
     try {
-      const { data: tables } = await supabase.rpc('execute_lab_query', {
+      const { data: tables } = await supabaseReader.rpc('execute_lab_query', {
         sql_text: "SELECT table_name FROM information_schema.tables WHERE table_schema='public' ORDER BY table_name"
       });
       const tableList: {name:string; columns:{column_name:string;data_type:string}[]}[] = [];
       for (const t of (tables || [])) {
-        const { data: cols } = await supabase.rpc('execute_lab_query', {
+        const { data: cols } = await supabaseReader.rpc('execute_lab_query', {
           sql_text: `SELECT column_name, data_type FROM information_schema.columns WHERE table_schema='public' AND table_name='${t.table_name}' ORDER BY ordinal_position LIMIT 20`
         });
         tableList.push({ name: t.table_name, columns: cols || [] });
@@ -509,7 +509,7 @@ return m.status === 'Ativo' && (!m.celular_principal_sms || m.celular_principal_
     setSqlLoading(true); setSqlError(null); setSqlResults(null); setSqlColumns([]);
     try {
       const cleanSql = sqlQuery.trim().replace(/;+$/, '');
-      const { data, error } = await supabase.rpc('execute_lab_query', { sql_text: cleanSql });
+      const { data, error } = await supabaseReader.rpc('execute_lab_query', { sql_text: cleanSql });
       if (error) throw error;
       const rows: any[] = Array.isArray(data) ? data : (data ? [data] : []);
       setSqlResults(rows);

@@ -49,7 +49,7 @@ export const Finance: React.FC = () => {
         let from = 0;
         const batchSize = 1000;
         while (true) {
-          const { data, error } = await supabase
+          const { data, error } = await supabaseReader
             .from('financeiro')
             .select('id, tipo, valor, data, categoria, centro_custo, historico, pessoa_lancamento')
             .order('data', { ascending: false })

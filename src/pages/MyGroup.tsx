@@ -19,7 +19,7 @@ export const MyGroup: React.FC = () => {
 
       setIsLoading(true);
       try {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseReader
           .from('membros')
           .select('*')
           .ilike('grupos_caseiros', `%${user.groupId}%`);

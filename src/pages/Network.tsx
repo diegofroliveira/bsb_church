@@ -186,7 +186,7 @@ export const Network: React.FC = () => {
       try {
         let allowedNames: string[] = [];
         if (user?.assigned_gc) {
-          const { data: relatedMembros } = await supabase
+          const { data: relatedMembros } = await supabaseReader
             .from('membros')
             .select('nome')
             .ilike('grupos_caseiros', `%${user.assigned_gc}%`);

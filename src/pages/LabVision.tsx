@@ -357,7 +357,7 @@ export const LabVision: React.FC = () => {
   const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
-    supabase
+    supabaseReader
       .from('membros')
       .select('id, nome, tipo_de_pessoa, grupos_caseiros, status, sexo')
       .limit(10000)

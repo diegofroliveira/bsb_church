@@ -74,11 +74,11 @@ export const LabVisits: React.FC = () => {
       try {
         setIsLoadingData(true);
         const [membrosRes, celulasRes] = await Promise.all([
-          supabase
+          supabaseReader
             .from('membros')
             .select('id, nome, grupos_caseiros, status, sexo, bairro, pai, mae, logradouro, celular_principal_sms, telefone_fixo, estado_civil, nascimento, latitude, longitude, email, tipo_de_pessoa')
             .eq('status', 'Ativo'),
-          supabase
+          supabaseReader
             .from('celulas')
             .select('grupo_caseiro, lider, auxiliar, setor')
         ]);
@@ -99,7 +99,7 @@ export const LabVisits: React.FC = () => {
         let fromIndex = 0;
         const pageSize = 1000;
         while (true) {
-          const { data, error } = await supabase
+          const { data, error } = await supabaseReader
             .from('pessoas_familiares')
             .select('id_pessoa_a, pessoa_a, parentesco, id_pessoa_b, pessoa_b, mesmo_domicilio')
             .range(fromIndex, fromIndex + pageSize - 1);
