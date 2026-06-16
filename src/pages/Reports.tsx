@@ -917,26 +917,27 @@ export const Reports: React.FC = () => {
           </div>
 
           <div className="xl:col-span-1 flex items-end pb-1">
-             <div className="grid grid-cols-2 gap-2 w-full">
-               <label className="flex items-center gap-2 cursor-pointer group p-2 rounded-lg hover:bg-gray-50 transition-colors border border-dashed border-gray-200 w-full h-[38px]">
-                  <input 
-                    type="checkbox" 
-                    checked={filterNoChildren}
-                    onChange={e => setFilterNoChildren(e.target.checked)}
-                    className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 shrink-0"
-                  />
-                  <span className="text-[10px] font-bold text-gray-700 truncate">Sem filhos (Est.)</span>
-               </label>
-               <label className="flex items-center gap-2 cursor-pointer group p-2 rounded-lg hover:bg-gray-50 transition-colors border border-dashed border-gray-200 w-full h-[38px]">
-                  <input 
-                    type="checkbox" 
-                    checked={filterIsDiscipulador}
-                    onChange={e => setFilterIsDiscipulador(e.target.checked)}
-                    className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 shrink-0"
-                  />
-                  <span className="text-[10px] font-bold text-gray-700 truncate">É Discipulador</span>
-               </label>
-             </div>
+             <label className="flex items-center gap-2 cursor-pointer group p-2 rounded-lg hover:bg-gray-50 transition-colors border border-dashed border-gray-200 w-full h-[38px]">
+                <input 
+                  type="checkbox" 
+                  checked={filterNoChildren}
+                  onChange={e => setFilterNoChildren(e.target.checked)}
+                  className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 shrink-0"
+                />
+                <span className="text-xs font-bold text-gray-700 truncate">Apenas sem filhos (Est.)</span>
+             </label>
+          </div>
+
+          <div className="xl:col-span-1 flex items-end pb-1">
+             <label className="flex items-center gap-2 cursor-pointer group p-2 rounded-lg hover:bg-gray-50 transition-colors border border-dashed border-gray-200 w-full h-[38px]">
+                <input 
+                  type="checkbox" 
+                  checked={filterIsDiscipulador}
+                  onChange={e => setFilterIsDiscipulador(e.target.checked)}
+                  className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 shrink-0"
+                />
+                <span className="text-xs font-bold text-gray-700 truncate">Apenas Discipuladores</span>
+             </label>
           </div>
 
         </div>
