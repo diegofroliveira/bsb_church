@@ -119,6 +119,7 @@ const Georeferencing: React.FC = () => {
   const [allLocations, setAllLocations] = useState<LocationData[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedLocation, setSelectedLocation] = useState<LocationData | null>(null);
+  const [showGcPins, setShowGcPins] = useState(true);
   
   const [filters, setFilters] = useState({
     nome: '',
@@ -757,10 +758,16 @@ const Georeferencing: React.FC = () => {
           {/* Map Legend */}
           <div className="bg-white/90 backdrop-blur-md p-3 rounded-lg shadow-lg border border-white/60 text-[10px] space-y-1.5 font-medium text-gray-700">
             <div className="font-extrabold text-[9px] uppercase tracking-wider text-gray-400 border-b border-gray-100 pb-1 mb-1">Legenda</div>
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-red-505 inline-block" style={{ backgroundColor: '#ef4444' }}></span>
+            <label className="flex items-center gap-2 cursor-pointer hover:bg-gray-50/50 p-0.5 rounded transition-colors select-none">
+              <input 
+                type="checkbox" 
+                checked={showGcPins} 
+                onChange={(e) => setShowGcPins(e.target.checked)}
+                className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 w-3 h-3 cursor-pointer"
+              />
+              <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: '#ef4444' }}></span>
               <span>Célula / GC</span>
-            </div>
+            </label>
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: '#D4AF37' }}></span>
               <span>Líder de GC</span>
@@ -791,7 +798,7 @@ const Georeferencing: React.FC = () => {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           
-          {filteredLocations.filter(l => l.tipo === 'membro' && l.latitude !== null && l.longitude !== null && l.metadata.coordsGrupo).map(m => (
+          {showGcPins && filteredLocations.filter(l => l.tipo === 'membro' && l.latitude !== null && l.longitude !== null && l.metadata.coordsGrupo).map(m => (
             <Polyline 
               key={`line-group-${m.id}`}
               positions={[[m.latitude!, m.longitude!], m.metadata.coordsGrupo!]}
@@ -813,7 +820,7 @@ const Georeferencing: React.FC = () => {
             />
           ))}
 
-          {filteredLocations.filter(loc => loc.latitude !== null && loc.longitude !== null).map((loc) => (
+          {filteredLocations.filter(loc => loc.latitude !== null && loc.longitude !== null).filter(loc => showGcPins || loc.tipo !== 'grupo').map((loc) => (
             <Marker 
               key={loc.id} 
               position={[loc.latitude!, loc.longitude!]}
@@ -915,7 +922,7 @@ const Georeferencing: React.FC = () => {
             return (
               <React.Fragment key={`lines-${m.id}`}>
                 {/* Linha para o Grupo (Sempre que selecionado) */}
-                {isSelected && m.metadata.coordsGrupo && (
+                {showGcPins && isSelected && m.metadata.coordsGrupo && (
                   <Polyline 
                     positions={[[m.latitude!, m.longitude!], m.metadata.coordsGrupo]}
                     color="#2563eb"
