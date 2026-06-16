@@ -65,8 +65,8 @@ const discipuladorIcon = new L.Icon({
 interface LocationData {
   id: string;
   nome: string;
-  latitude: number;
-  longitude: number;
+  latitude: number | null;
+  longitude: number | null;
   tipo: 'membro' | 'grupo';
   metadata: {
     setor?: string;
@@ -90,8 +90,8 @@ interface LocationData {
 }
 
 // Função de Haversine para distância
-const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-  if (!lat1 || !lon1 || !lat2 || !lon2) return null;
+const calculateDistance = (lat1: number | null, lon1: number | null, lat2: number | null, lon2: number | null) => {
+  if (lat1 === null || lon1 === null || lat2 === null || lon2 === null || lat1 === undefined || lon1 === undefined || lat2 === undefined || lon2 === undefined) return null;
   const R = 6371; // Raio da Terra em km
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLon = (lon2 - lon1) * Math.PI / 180;
@@ -118,7 +118,8 @@ const Georeferencing: React.FC = () => {
     setor: 'Todos',
     grupoCaseiro: 'Todos',
     discipulador: 'Todos',
-    distanciaMinima: 0
+    distanciaMinima: 0,
+    localizacao: 'Todos'
   });
 
   const [selectedCellRoles, setSelectedCellRoles] = useState<string[]>([]);
@@ -249,7 +250,7 @@ const Georeferencing: React.FC = () => {
         if (m.latitude && m.longitude) coordsPorMembro[m.nome] = [m.latitude, m.longitude];
       });
 
-      const geoMembros = (membros || []).filter(m => m.latitude && m.longitude);
+      const geoMembros = membros || [];
       const geoGrupos = (grupos || []).filter(g => g.latitude && g.longitude);
 
       const getNormalizedSectorName = (dbSector: string | null | undefined): string => {
@@ -287,12 +288,14 @@ const Georeferencing: React.FC = () => {
             } catch (e) {}
           }
           
+          const hasPin = m.latitude !== null && m.latitude !== undefined && m.longitude !== null && m.longitude !== undefined;
+          
           const coordsGrupo = m.grupos_caseiros ? coordsPorGrupo[m.grupos_caseiros] : null;
-          const distGrupo = coordsGrupo ? calculateDistance(m.latitude, m.longitude, coordsGrupo[0], coordsGrupo[1]) : null;
+          const distGrupo = (hasPin && coordsGrupo) ? calculateDistance(m.latitude, m.longitude, coordsGrupo[0], coordsGrupo[1]) : null;
 
           const discNome = discipuladorDe[m.nome];
           const coordsDisc = discNome ? coordsPorMembro[discNome] : null;
-          const distDisc = coordsDisc ? calculateDistance(m.latitude, m.longitude, coordsDisc[0], coordsDisc[1]) : null;
+          const distDisc = (hasPin && coordsDisc) ? calculateDistance(m.latitude, m.longitude, coordsDisc[0], coordsDisc[1]) : null;
 
           // Formatação de endereço usando apenas colunas confirmadas (logradouro, bairro, cidade, estado)
           const endereco = [m.logradouro, m.bairro, m.cidade, m.estado]
@@ -300,9 +303,13 @@ const Georeferencing: React.FC = () => {
             .join(', ') || 'Endereço não disponível';
 
           // Adiciona um pequeno jitter (desvio) para evitar sobreposição exata de pins no mesmo endereço
-          const jitter = () => (Math.random() - 0.5) * 0.0001;
-          const finalLat = m.latitude + jitter();
-          const finalLng = m.longitude + jitter();
+          let finalLat = null;
+          let finalLng = null;
+          if (hasPin) {
+            const jitter = () => (Math.random() - 0.5) * 0.0001;
+            finalLat = m.latitude + jitter();
+            finalLng = m.longitude + jitter();
+          }
 
           const nameUpper = m.nome?.trim().toUpperCase();
           const isLider = lideresSet.has(nameUpper);
@@ -394,6 +401,10 @@ const Georeferencing: React.FC = () => {
       if (filters.setor !== 'Todos' && loc.metadata.setor !== filters.setor) return false;
       if (filters.grupoCaseiro !== 'Todos' && loc.metadata.grupo !== filters.grupoCaseiro) return false;
       if (filters.discipulador !== 'Todos' && loc.metadata.discipuladorNome !== filters.discipulador) return false;
+
+      const hasPin = loc.latitude !== null && loc.longitude !== null;
+      if (filters.localizacao === 'Mapeados' && !hasPin) return false;
+      if (filters.localizacao === 'Não Mapeados' && hasPin) return false;
       
       // Se filtrar por discipulador, o próprio discipulador deve aparecer como pin
       if (filters.discipulador !== 'Todos' && loc.nome === filters.discipulador) return true;
@@ -461,7 +472,8 @@ const Georeferencing: React.FC = () => {
       setor: 'Todos',
       grupoCaseiro: 'Todos',
       discipulador: 'Todos',
-      distanciaMinima: 0
+      distanciaMinima: 0,
+      localizacao: 'Todos'
     });
     setSelectedCellRoles([]);
     setFilterIsDiscipulador('Todos');
@@ -558,6 +570,19 @@ const Georeferencing: React.FC = () => {
             >
               <option value="Todos">Todos</option>
               {options.discipuladores.map(d => <option key={d}>{d}</option>)}
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">Pin no Mapa</label>
+            <select
+              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none appearance-none bg-white text-sm text-gray-700"
+              value={filters.localizacao}
+              onChange={(e) => setFilters({...filters, localizacao: e.target.value})}
+            >
+              <option value="Todos">Todos</option>
+              <option value="Mapeados">Com Pin (Mapeado)</option>
+              <option value="Não Mapeados">Sem Pin (Auditoria)</option>
             </select>
           </div>
 
@@ -750,10 +775,10 @@ const Georeferencing: React.FC = () => {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           
-          {filteredLocations.filter(l => l.tipo === 'membro' && l.metadata.coordsGrupo).map(m => (
+          {filteredLocations.filter(l => l.tipo === 'membro' && l.latitude !== null && l.longitude !== null && l.metadata.coordsGrupo).map(m => (
             <Polyline 
               key={`line-group-${m.id}`}
-              positions={[[m.latitude, m.longitude], m.metadata.coordsGrupo!]}
+              positions={[[m.latitude!, m.longitude!], m.metadata.coordsGrupo!]}
               color={selectedLocation?.id === m.id || filters.nome || filters.distanciaMinima > 0 ? "#3b82f6" : "transparent"}
               weight={2}
               dashArray="5, 10"
@@ -761,10 +786,10 @@ const Georeferencing: React.FC = () => {
             />
           ))}
 
-          {filteredLocations.filter(l => l.tipo === 'membro' && l.metadata.coordsDiscipulador).map(m => (
+          {filteredLocations.filter(l => l.tipo === 'membro' && l.latitude !== null && l.longitude !== null && l.metadata.coordsDiscipulador).map(m => (
             <Polyline 
               key={`line-disc-${m.id}`}
-              positions={[[m.latitude, m.longitude], m.metadata.coordsDiscipulador!]}
+              positions={[[m.latitude!, m.longitude!], m.metadata.coordsDiscipulador!]}
               color={selectedLocation?.id === m.id || filters.nome || filters.distanciaMinima > 0 ? "#10b981" : "transparent"}
               weight={2}
               dashArray="2, 6"
@@ -772,10 +797,10 @@ const Georeferencing: React.FC = () => {
             />
           ))}
 
-          {filteredLocations.map((loc) => (
+          {filteredLocations.filter(loc => loc.latitude !== null && loc.longitude !== null).map((loc) => (
             <Marker 
               key={loc.id} 
-              position={[loc.latitude, loc.longitude]}
+              position={[loc.latitude!, loc.longitude!]}
               icon={
                 loc.tipo === 'grupo'
                   ? cellIcon
@@ -867,7 +892,7 @@ const Georeferencing: React.FC = () => {
           ))}
 
           {/* Linhas de Conexão (Raiozinhos) */}
-          {filteredLocations.filter(l => l.tipo === 'membro').map(m => {
+          {filteredLocations.filter(l => l.tipo === 'membro' && l.latitude !== null && l.longitude !== null).map(m => {
             const isSelected = selectedLocation?.id === m.id;
             const isFilterActive = filters.discipulador !== 'Todos' && m.metadata.discipuladorNome === filters.discipulador;
             
@@ -876,7 +901,7 @@ const Georeferencing: React.FC = () => {
                 {/* Linha para o Grupo (Sempre que selecionado) */}
                 {isSelected && m.metadata.coordsGrupo && (
                   <Polyline 
-                    positions={[[m.latitude, m.longitude], m.metadata.coordsGrupo]}
+                    positions={[[m.latitude!, m.longitude!], m.metadata.coordsGrupo]}
                     color="#2563eb"
                     dashArray="10, 10"
                     weight={2}
@@ -887,7 +912,7 @@ const Georeferencing: React.FC = () => {
                 {/* Linha para o Discipulador (Selecionado OU Filtro Ativo) */}
                 {(isSelected || isFilterActive) && m.metadata.coordsDiscipulador && (
                   <Polyline 
-                    positions={[[m.latitude, m.longitude], m.metadata.coordsDiscipulador]}
+                    positions={[[m.latitude!, m.longitude!], m.metadata.coordsDiscipulador]}
                     color="#059669"
                     dashArray="5, 5"
                     weight={isFilterActive ? 1.5 : 2}
@@ -985,14 +1010,18 @@ const Georeferencing: React.FC = () => {
                         <div className="text-[10px] text-gray-400">Res.: {m.metadata.setor} | GC: {m.metadata.setor_eclesiastico}</div>
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <div className="flex flex-col gap-1 items-center">
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${distGrupoNum > 5 ? 'bg-red-100 text-red-600' : distGrupoNum > 2 ? 'bg-orange-100 text-orange-600' : 'bg-blue-50 text-blue-500'}`}>
-                            G: {m.metadata.distanciaAteGrupo}km
-                          </span>
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${distDiscNum > 5 ? 'bg-red-100 text-red-600' : 'bg-emerald-50 text-emerald-500'}`}>
-                            D: {m.metadata.distanciaAteDiscipulador}km
-                          </span>
-                        </div>
+                        {m.latitude === null || m.longitude === null ? (
+                          <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-red-100 text-red-700 border border-red-200">Sem Pin</span>
+                        ) : (
+                          <div className="flex flex-col gap-1 items-center">
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${distGrupoNum > 5 ? 'bg-red-100 text-red-600' : distGrupoNum > 2 ? 'bg-orange-100 text-orange-600' : 'bg-blue-50 text-blue-500'}`}>
+                              G: {m.metadata.distanciaAteGrupo || '-'}km
+                            </span>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${distDiscNum > 5 ? 'bg-red-100 text-red-600' : 'bg-emerald-50 text-emerald-500'}`}>
+                              D: {m.metadata.distanciaAteDiscipulador || '-'}km
+                            </span>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   );
