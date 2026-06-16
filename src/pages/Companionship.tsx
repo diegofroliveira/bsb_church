@@ -2264,7 +2264,6 @@ export const Companionship: React.FC = () => {
                                       <div className="min-w-0 flex-1">
                                         <div className="text-xs font-bold text-gray-900 truncate">{candidate.nome}</div>
                                         <div className="flex flex-wrap items-center gap-1 mt-0.5">
-                                          <span className="text-[9px] font-semibold text-gray-500 bg-gray-100 px-1 rounded">{candidate.tipo_de_pessoa}</span>
                                           {ec && <span className="text-[9px] font-semibold text-indigo-600 bg-indigo-50 px-1 rounded">{ec}</span>}
                                           {age !== null && <span className="text-[9px] text-blue-600 bg-blue-50 px-1 rounded">{age}a</span>}
                                           {candidate.distance !== null && <span className="text-[9px] text-gray-400">📍{candidate.distance}km</span>}
@@ -2572,7 +2571,16 @@ export const Companionship: React.FC = () => {
                             <div className="min-w-0 flex-1">
                               <div className="text-xs font-bold text-gray-900 truncate">{m.nome}</div>
                               <div className="text-[9px] text-gray-500 mt-0.5 flex flex-wrap gap-1">
-                                <span className="bg-gray-100 px-1 rounded">{m.tipo_de_pessoa}</span>
+                                {getRoleBadges(m).map(b => (
+                                  <span key={b} className={clsx(
+                                    b === 'líder' || b === 'discipulador' ? 'bg-amber-50 text-amber-700 font-bold border border-amber-100' :
+                                    b === 'auxiliar' ? 'bg-indigo-50 text-indigo-700 font-bold border border-indigo-100' :
+                                    'bg-gray-100 text-gray-500 border border-gray-200',
+                                    'px-1 rounded uppercase'
+                                  )}>
+                                    {b}
+                                  </span>
+                                ))}
                                 {m.estado_civil && <span className="bg-indigo-50 text-indigo-600 px-1 rounded">{m.estado_civil}</span>}
                                 {age !== null && <span className="bg-blue-50 text-blue-600 px-1 rounded">{age}a</span>}
                                 {!hasCoords && <span className="bg-red-50 text-red-600 px-1 rounded">📍 Sem coords</span>}
