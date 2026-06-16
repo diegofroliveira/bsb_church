@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabaseReader } from '../lib/supabase';
-import { Home, Users, MapPin, Search, Filter, Loader2, Shield } from 'lucide-react';
+import { Home, Users, MapPin, Search, Filter, Loader2, Shield, X, Phone, MessageSquare, ExternalLink } from 'lucide-react';
 import clsx from 'clsx';
 
 interface CellInfo {
@@ -23,6 +23,12 @@ export const Cells: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSetor, setSelectedSetor] = useState<string>('Todos');
 
+  const [selectedCell, setSelectedCell] = useState<CellInfo | null>(null);
+  const [cellMembers, setCellMembers] = useState<any[]>([]);
+  const [isMembersLoading, setIsMembersLoading] = useState(false);
+  const [memberSearchTerm, setMemberSearchTerm] = useState('');
+  const [activeDiscipuladores, setActiveDiscipuladores] = useState<Set<string>>(new Set());
+
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
     if (!lat1 || !lon1 || !lat2 || !lon2) return null;
     const R = 6371;
@@ -39,13 +45,21 @@ export const Cells: React.FC = () => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        const [celulasRes, membrosRes] = await Promise.all([
+        const [celulasRes, membrosRes, discipuladoRes] = await Promise.all([
           supabaseReader.from('celulas').select('*'),
-          supabaseReader.from('membros').select('grupos_caseiros, latitude, longitude').eq('status', 'Ativo')
+          supabaseReader.from('membros').select('grupos_caseiros, latitude, longitude').eq('status', 'Ativo'),
+          supabaseReader.from('discipulado').select('discipulador')
         ]);
 
         const celulas = celulasRes.data || [];
         const membros = membrosRes.data || [];
+        const discipuladoData = discipuladoRes.data || [];
+
+        const discNames = new Set<string>();
+        discipuladoData.forEach(d => {
+          if (d.discipulador) discNames.add(d.discipulador.trim().toUpperCase());
+        });
+        setActiveDiscipuladores(discNames);
 
         // Agrupar membros e coordenadas por grupo
         const groupMembers: Record<string, { lat: number, lng: number }[]> = {};
@@ -76,11 +90,16 @@ export const Cells: React.FC = () => {
             });
           }
 
+          // Combine auxiliaries and remove duplicates
+          const auxiliariesJoined = Array.from(
+            new Set([c.auxiliar, c.auxiliar_1, c.auxiliar_2].map(a => a?.trim()).filter(Boolean))
+          ).join(', ');
+
           return {
             id: c.id,
             grupo_caseiro: c.grupo_caseiro,
             lider: c.lider || 'Sem líder',
-            auxiliar: c.auxiliar || '',
+            auxiliar: auxiliariesJoined,
             setor: c.setor || 'Sem Setor',
             bairro: c.bairro || 'Não informado',
             cidade: c.cidade || '',
@@ -124,6 +143,89 @@ export const Cells: React.FC = () => {
   }, [cells, searchTerm, selectedSetor]);
 
   const totalMembersInCells = useMemo(() => filteredCells.reduce((acc, c) => acc + c.memberCount, 0), [filteredCells]);
+
+  const handleCellClick = async (cell: CellInfo) => {
+    setSelectedCell(cell);
+    setIsMembersLoading(true);
+    setMemberSearchTerm('');
+    try {
+      const { data, error } = await supabaseReader
+        .from('membros')
+        .select('id, nome, sexo, nascimento, celular_principal_sms, tipo_cadastro, tipo_de_pessoa')
+        .eq('status', 'Ativo')
+        .ilike('grupos_caseiros', `%${cell.grupo_caseiro}%`);
+
+      if (error) throw error;
+      setCellMembers(data || []);
+    } catch (err) {
+      console.error('Error fetching cell members:', err);
+    } finally {
+      setIsMembersLoading(false);
+    }
+  };
+
+  const filteredMembers = useMemo(() => {
+    if (!cellMembers) return [];
+    return cellMembers.filter(m => 
+      m.nome.toLowerCase().includes(memberSearchTerm.toLowerCase())
+    );
+  }, [cellMembers, memberSearchTerm]);
+
+  const getMemberRole = (mName: string, cell: CellInfo): 'Líder' | 'Auxiliar' | 'Discipulador' | 'Membro' => {
+    const nameUpper = mName.trim().toUpperCase();
+    
+    // Check leaders of this cell
+    const leaders = (cell.lider || '').split(',').map(l => l.trim().toUpperCase());
+    if (leaders.includes(nameUpper)) return 'Líder';
+
+    // Check discipuladores
+    if (activeDiscipuladores.has(nameUpper)) return 'Discipulador';
+
+    // Check auxiliaries of this cell
+    const auxiliaries = (cell.auxiliar || '').split(',').map(a => a.trim().toUpperCase());
+    if (auxiliaries.includes(nameUpper)) return 'Auxiliar';
+
+    return 'Membro';
+  };
+
+  const getAge = (birthDateStr: string | null | undefined): string => {
+    if (!birthDateStr) return '—';
+    try {
+      const birthDate = new Date(birthDateStr);
+      if (isNaN(birthDate.getTime())) return '—';
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const mDiff = today.getMonth() - birthDate.getMonth();
+      if (mDiff < 0 || (mDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      return `${age} anos`;
+    } catch (_) {
+      return '—';
+    }
+  };
+
+  const formatPhone = (phoneStr: string | null | undefined): string => {
+    if (!phoneStr) return '—';
+    const cleaned = phoneStr.replace(/\D/g, '');
+    if (cleaned.length === 11) {
+      return `(${cleaned.substring(0, 2)}) ${cleaned.substring(2, 7)}-${cleaned.substring(7)}`;
+    }
+    if (cleaned.length === 10) {
+      return `(${cleaned.substring(0, 2)}) ${cleaned.substring(2, 6)}-${cleaned.substring(6)}`;
+    }
+    return phoneStr;
+  };
+
+  const getWhatsAppLink = (phoneStr: string | null | undefined): string | null => {
+    if (!phoneStr) return null;
+    let cleaned = phoneStr.replace(/\D/g, '');
+    if (cleaned.length === 0) return null;
+    if (cleaned.length === 11 || cleaned.length === 10) {
+      cleaned = '55' + cleaned;
+    }
+    return `https://wa.me/${cleaned}`;
+  };
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-7xl mx-auto pb-12">
@@ -204,7 +306,11 @@ export const Cells: React.FC = () => {
                              'text-red-600 bg-red-50 border-red-100';
 
             return (
-              <div key={cell.id} className="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-all p-5 flex flex-col">
+              <div 
+                key={cell.id} 
+                onClick={() => handleCellClick(cell)}
+                className="bg-white rounded-xl shadow-sm border border-gray-200 hover:border-primary-300 hover:shadow-md transition-all p-5 flex flex-col cursor-pointer"
+              >
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex items-center gap-2">
                     <div className="p-2 bg-primary-50 text-primary-600 rounded-lg">
@@ -256,6 +362,181 @@ export const Cells: React.FC = () => {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {selectedCell && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center">
+          <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm transition-opacity animate-in fade-in duration-200" onClick={() => setSelectedCell(null)} />
+          
+          <div className="relative flex w-full max-w-4xl flex-col bg-white rounded-2xl shadow-2xl overflow-hidden m-4 animate-in zoom-in-95 duration-200 border border-gray-100 max-h-[85vh]">
+            
+            <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 bg-gray-50/50">
+              <div>
+                <h3 className="text-xl font-black text-gray-900 flex items-center gap-2">
+                  <Home className="w-5 h-5 text-primary-600 shrink-0" />
+                  {selectedCell.grupo_caseiro}
+                </h3>
+                <p className="text-xs text-gray-500 mt-1 font-medium">
+                  Setor: {selectedCell.setor} • {selectedCell.bairro}
+                </p>
+              </div>
+              <button 
+                onClick={() => setSelectedCell(null)} 
+                className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto flex-1 space-y-6">
+              
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="bg-gray-50/80 p-3.5 rounded-xl border border-gray-100">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Membros no GC</p>
+                  <p className="text-xl font-extrabold text-gray-900 mt-0.5">{selectedCell.memberCount}</p>
+                </div>
+                <div className="bg-gray-50/80 p-3.5 rounded-xl border border-gray-100">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Líder do GC</p>
+                  <p className="text-sm font-bold text-gray-900 mt-1 truncate" title={selectedCell.lider}>{selectedCell.lider}</p>
+                </div>
+                <div className="bg-gray-50/80 p-3.5 rounded-xl border border-gray-100">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Auxiliar(es)</p>
+                  <p className="text-sm font-bold text-gray-900 mt-1 truncate" title={selectedCell.auxiliar || 'Nenhum'}>
+                    {selectedCell.auxiliar || 'Nenhum'}
+                  </p>
+                </div>
+                <div className="bg-gray-50/80 p-3.5 rounded-xl border border-gray-100">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Distância Média</p>
+                  <p className="text-xl font-extrabold text-gray-900 mt-0.5">
+                    {selectedCell.avgDistance !== null ? `${selectedCell.avgDistance.toFixed(1)} km` : '—'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <h4 className="text-base font-bold text-gray-900">Membros Vinculados</h4>
+                  
+                  <div className="relative max-w-xs w-full">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Filtrar por nome..."
+                      value={memberSearchTerm}
+                      onChange={(e) => setMemberSearchTerm(e.target.value)}
+                      className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                    />
+                  </div>
+                </div>
+
+                {isMembersLoading ? (
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary-600 mb-2" />
+                    <p className="text-gray-500 text-xs font-medium">Carregando membros do grupo...</p>
+                  </div>
+                ) : filteredMembers.length === 0 ? (
+                  <div className="text-center py-12 border border-dashed border-gray-200 rounded-xl">
+                    <Users className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                    <p className="text-gray-500 text-sm font-medium">Nenhum membro encontrado</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-xl border border-gray-200">
+                    <table className="min-w-full divide-y divide-gray-200 text-left">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Nome</th>
+                          <th className="px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Função</th>
+                          <th className="px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Tipo</th>
+                          <th className="px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Idade</th>
+                          <th className="px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Sexo</th>
+                          <th className="px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider">Contato</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 bg-white">
+                        {filteredMembers.map((m: any) => {
+                          const role = getMemberRole(m.nome, selectedCell);
+                          const whatsLink = getWhatsAppLink(m.celular_principal_sms);
+                          
+                          const roleColors = 
+                            role === 'Líder' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' :
+                            role === 'Auxiliar' ? 'bg-orange-50 text-orange-700 border-orange-100' :
+                            role === 'Discipulador' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                            'bg-gray-50 text-gray-600 border-gray-100';
+
+                          return (
+                            <tr key={m.id} className="hover:bg-gray-50/50 transition-colors">
+                              <td className="px-4 py-3 text-sm font-semibold text-gray-900">
+                                <a 
+                                  href={`/membro/${encodeURIComponent(m.nome)}`}
+                                  className="text-primary-600 hover:text-primary-800 hover:underline flex items-center gap-1 shrink-0"
+                                >
+                                  {m.nome}
+                                  <ExternalLink className="w-3.5 h-3.5 opacity-55" />
+                                </a>
+                              </td>
+                              <td className="px-4 py-3 text-sm">
+                                <span className={clsx("px-2.5 py-0.5 rounded-full text-[11px] font-extrabold uppercase border", roleColors)}>
+                                  {role}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-sm">
+                                <span className="bg-purple-50 text-purple-700 border border-purple-100 px-2 py-0.5 rounded text-[10px] font-bold uppercase">
+                                  {m.tipo_cadastro || 'MEMBRO'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-sm font-medium text-gray-600">
+                                {getAge(m.nascimento)}
+                              </td>
+                              <td className="px-4 py-3 text-sm">
+                                <span className={clsx(
+                                  "px-2.5 py-0.5 rounded text-[10px] font-bold uppercase border", 
+                                  m.sexo === 'Masculino' ? 'bg-blue-50 text-blue-700 border-blue-100' : 
+                                  m.sexo === 'Feminino' ? 'bg-pink-50 text-pink-700 border-pink-100' : 
+                                  'bg-gray-50 text-gray-600 border-gray-100'
+                                )}>
+                                  {m.sexo === 'Masculino' ? 'Masc' : m.sexo === 'Feminino' ? 'Fem' : '—'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-sm">
+                                {m.celular_principal_sms ? (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-gray-700 font-medium text-xs font-mono">
+                                      {formatPhone(m.celular_principal_sms)}
+                                    </span>
+                                    {whatsLink && (
+                                      <a 
+                                        href={whatsLink} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="p-1 text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
+                                        title="Chamar no WhatsApp"
+                                      >
+                                        <MessageSquare className="w-4 h-4 shrink-0" />
+                                      </a>
+                                    )}
+                                    <a 
+                                      href={`tel:${m.celular_principal_sms}`}
+                                      className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                      title="Ligar"
+                                    >
+                                      <Phone className="w-4 h-4 shrink-0" />
+                                    </a>
+                                  </div>
+                                ) : (
+                                  <span className="text-gray-400 text-xs">—</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
