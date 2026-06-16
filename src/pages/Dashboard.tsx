@@ -32,11 +32,17 @@ export const Dashboard: React.FC = () => {
   const [isTypesOpen, setIsTypesOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [isAdvancedFiltersOpen, setIsAdvancedFiltersOpen] = useState(false);
+  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
+  const [isRolesOpen, setIsRolesOpen] = useState(false);
+  const rolesDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsTypesOpen(false);
+      }
+      if (rolesDropdownRef.current && !rolesDropdownRef.current.contains(event.target as Node)) {
+        setIsRolesOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -87,7 +93,9 @@ export const Dashboard: React.FC = () => {
   const dashboardData = useMemo(() => {
     if (isLoading || rawMembros.length === 0) return null;
 
-    const discSet = new Set(rawDiscipulado.map(d => d.discipulador));
+    const discSet = new Set(rawDiscipulado.map(d => d.discipulador?.trim().toUpperCase()).filter(Boolean));
+    const liderSet = new Set(rawCelulas.map(c => c.lider?.trim().toUpperCase()).filter(Boolean));
+    const auxiliarSet = new Set(rawCelulas.map(c => c.auxiliar?.trim().toUpperCase()).filter(Boolean));
     const discipuladoMap = new Map();
     rawDiscipulado.forEach(d => {
       const disc = d.discipulo?.trim().toUpperCase();
@@ -177,8 +185,21 @@ export const Dashboard: React.FC = () => {
         const rawEcl = m.setor_eclesiastico || (m.grupos_caseiros ? (rawCelulas.find(c => c.grupo_caseiro === m.grupos_caseiros)?.setor || '') : '');
         const eclSector = getNormalizedSectorName(rawEcl);
         const matchSectorEcl = filterSectorEcl === 'Todos' || eclSector === filterSectorEcl;
+
+        const nameUpper = m.nome?.trim().toUpperCase();
+        const mIsLider = liderSet.has(nameUpper);
+        const mIsAuxiliar = auxiliarSet.has(nameUpper);
+        const mIsDiscipulador = discSet.has(nameUpper);
+
+        const matchRoles = selectedRoles.length === 0 || selectedRoles.some(role => {
+          if (role === 'Líder') return mIsLider;
+          if (role === 'Auxiliar de Liderança') return mIsAuxiliar;
+          if (role === 'Discipulador') return mIsDiscipulador;
+          if (role === 'Membro Comum') return !mIsLider && !mIsAuxiliar && !mIsDiscipulador;
+          return false;
+        });
         
-        return matchGender && matchGroup && matchDisc && matchAge && matchMarital && matchStatus && matchType && matchSector && matchSectorEcl;
+        return matchGender && matchGroup && matchDisc && matchAge && matchMarital && matchStatus && matchType && matchSector && matchSectorEcl && matchRoles;
     });
 
     const ativosOnly = filteredMembros.filter(m => m.status === 'Ativo');
@@ -288,7 +309,7 @@ export const Dashboard: React.FC = () => {
             discipuladores: discList
         }
     };
-  }, [isLoading, rawMembros, rawCelulas, rawDiscipulado, filterGender, filterGroup, filterDisc, filterSector, filterSectorEcl, sectorViewMode, filterMinAge, filterMaxAge, filterMaritalStatus, filterStatus, selectedTypes]);
+  }, [isLoading, rawMembros, rawCelulas, rawDiscipulado, filterGender, filterGroup, filterDisc, filterSector, filterSectorEcl, sectorViewMode, filterMinAge, filterMaxAge, filterMaritalStatus, filterStatus, selectedTypes, selectedRoles]);
 
   const handleOpenModal = async (type: 'grupo' | 'setor' | 'discipulador', title: string) => {
     setModalType(type); setModalTitle(title); setIsModalLoading(true);
@@ -411,7 +432,7 @@ export const Dashboard: React.FC = () => {
             >
               <SlidersHorizontal className="w-3.5 h-3.5" />
               Filtros Avançados
-              {(filterSectorEcl !== 'Todos' || filterGender !== 'Todos' || filterGroup !== 'Todos' || filterDisc !== 'Todos' || filterMaritalStatus !== 'Todos' || selectedTypes.length > 0 || filterMinAge !== 0 || filterMaxAge !== 120) && (
+              {(filterSectorEcl !== 'Todos' || filterGender !== 'Todos' || filterGroup !== 'Todos' || filterDisc !== 'Todos' || filterMaritalStatus !== 'Todos' || selectedTypes.length > 0 || selectedRoles.length > 0 || filterMinAge !== 0 || filterMaxAge !== 120) && (
                 <span className="ml-1 px-1.5 py-0.2 bg-primary-600 text-white rounded-full text-[9px] font-black animate-pulse">
                   !
                 </span>
@@ -419,7 +440,7 @@ export const Dashboard: React.FC = () => {
             </button>
 
             {/* Clear All Filters Button */}
-            {(filterGender !== 'Todos' || filterGroup !== 'Todos' || filterDisc !== 'Todos' || filterSector !== 'Todos' || filterSectorEcl !== 'Todos' || filterMinAge !== 0 || filterMaxAge !== 120 || filterMaritalStatus !== 'Todos' || filterStatus !== 'Todos' || selectedTypes.length > 0) && (
+            {(filterGender !== 'Todos' || filterGroup !== 'Todos' || filterDisc !== 'Todos' || filterSector !== 'Todos' || filterSectorEcl !== 'Todos' || filterMinAge !== 0 || filterMaxAge !== 120 || filterMaritalStatus !== 'Todos' || filterStatus !== 'Todos' || selectedTypes.length > 0 || selectedRoles.length > 0) && (
               <button 
                 onClick={() => { 
                   setFilterGender('Todos'); 
@@ -432,6 +453,7 @@ export const Dashboard: React.FC = () => {
                   setFilterMaritalStatus('Todos'); 
                   setFilterStatus('Todos'); 
                   setSelectedTypes([]); 
+                  setSelectedRoles([]);
                 }} 
                 className="text-xs text-red-600 font-bold hover:underline cursor-pointer"
               >
@@ -531,6 +553,59 @@ export const Dashboard: React.FC = () => {
                         </label>
                       ))
                     )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Checkbox Multiselect Dropdown for Roles */}
+            <div className="relative" ref={rolesDropdownRef}>
+              <button
+                type="button"
+                onClick={() => setIsRolesOpen(!isRolesOpen)}
+                className="flex items-center justify-between gap-2 text-sm border border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50 px-3 py-2 text-gray-700 hover:bg-gray-150 transition-colors cursor-pointer"
+              >
+                <span>{selectedRoles.length === 0 ? 'Todas as Funções' : `${selectedRoles.length} Função(ões)`}</span>
+                <span className="text-xs text-gray-400">▼</span>
+              </button>
+
+              {isRolesOpen && (
+                <div className="absolute left-0 mt-2 w-64 bg-white border border-gray-100 rounded-xl shadow-xl z-50 p-3 space-y-2 animate-in fade-in slide-in-from-top-1 duration-150">
+                  <div className="flex justify-between items-center pb-2 border-b border-gray-100">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase">Funções</span>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedRoles([])}
+                        className="text-[10px] text-red-500 hover:underline font-bold"
+                      >
+                        Limpar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedRoles(['Líder', 'Auxiliar de Liderança', 'Discipulador', 'Membro Comum'])}
+                        className="text-[10px] text-primary-600 hover:underline font-bold"
+                      >
+                        Todas
+                      </button>
+                    </div>
+                  </div>
+                  <div className="max-h-48 overflow-y-auto space-y-2 py-1 pr-1 scrollbar-thin">
+                    {['Líder', 'Auxiliar de Liderança', 'Discipulador', 'Membro Comum'].map(role => (
+                      <label key={role} className="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors text-xs text-gray-700">
+                        <input
+                          type="checkbox"
+                          checked={selectedRoles.includes(role)}
+                          onChange={() => {
+                            setSelectedRoles(prev =>
+                              prev.includes(role) ? prev.filter(r => r !== role) : [...prev, role]
+                            );
+                          }}
+                          className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 w-3.5 h-3.5"
+                        />
+                        <span className="font-medium truncate">{role}</span>
+                      </label>
+                    ))}
                   </div>
                 </div>
               )}

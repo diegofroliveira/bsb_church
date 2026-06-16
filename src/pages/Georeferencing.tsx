@@ -33,6 +33,24 @@ const memberIcon = new L.Icon({
   shadowSize: [41, 41]
 });
 
+const leaderIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-gold.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+
+const auxiliarIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+
 const discipuladorIcon = new L.Icon({
   iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
@@ -41,6 +59,7 @@ const discipuladorIcon = new L.Icon({
   popupAnchor: [1, -34],
   shadowSize: [41, 41]
 });
+
 
 interface LocationData {
   id: string;
@@ -63,6 +82,9 @@ interface LocationData {
     coordsDiscipulador?: [number, number];
     discipuladorNome?: string;
     enderecoCompleto?: string;
+    isLider?: boolean;
+    isAuxiliar?: boolean;
+    isDiscipulador?: boolean;
   };
 }
 
@@ -97,6 +119,21 @@ const Georeferencing: React.FC = () => {
     discipulador: 'Todos',
     distanciaMinima: 0
   });
+
+  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
+  const [isRolesOpen, setIsRolesOpen] = useState(false);
+  const [isAdvancedFiltersOpen, setIsAdvancedFiltersOpen] = useState(false);
+  const rolesDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (rolesDropdownRef.current && !rolesDropdownRef.current.contains(event.target as Node)) {
+        setIsRolesOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const [options, setOptions] = useState({
     setores: [] as string[],
@@ -214,6 +251,10 @@ const Georeferencing: React.FC = () => {
         return 'Sem Setor';
       };
 
+      const lideresSet = new Set((grupos || []).map(g => g.lider?.trim().toUpperCase()).filter(Boolean));
+      const auxiliaresSet = new Set((grupos || []).map(g => g.auxiliar?.trim().toUpperCase()).filter(Boolean));
+      const discipuladoresSet = new Set((discipulados || []).map(d => d.discipulador?.trim().toUpperCase()).filter(Boolean));
+
       const formattedLocations: LocationData[] = [
         ...geoMembros.map(m => {
           let idade = 0;
@@ -240,6 +281,11 @@ const Georeferencing: React.FC = () => {
           const finalLat = m.latitude + jitter();
           const finalLng = m.longitude + jitter();
 
+          const nameUpper = m.nome?.trim().toUpperCase();
+          const isLider = lideresSet.has(nameUpper);
+          const isAuxiliar = auxiliaresSet.has(nameUpper);
+          const isDiscipulador = discipuladoresSet.has(nameUpper);
+
           return {
             id: m.id,
             nome: m.nome,
@@ -259,7 +305,10 @@ const Georeferencing: React.FC = () => {
               coordsGrupo: coordsGrupo || undefined,
               coordsDiscipulador: coordsDisc || undefined,
               discipuladorNome: discNome,
-              enderecoCompleto: endereco
+              enderecoCompleto: endereco,
+              isLider,
+              isAuxiliar,
+              isDiscipulador
             }
           };
         }),
@@ -326,6 +375,21 @@ const Georeferencing: React.FC = () => {
       // Se filtrar por discipulador, o próprio discipulador deve aparecer como pin
       if (filters.discipulador !== 'Todos' && loc.nome === filters.discipulador) return true;
 
+      // Check role filters
+      const mIsLider = loc.metadata.isLider;
+      const mIsAuxiliar = loc.metadata.isAuxiliar;
+      const mIsDiscipulador = loc.metadata.isDiscipulador;
+
+      const matchRoles = selectedRoles.length === 0 || selectedRoles.some(role => {
+        if (role === 'Líder') return mIsLider;
+        if (role === 'Auxiliar de Liderança') return mIsAuxiliar;
+        if (role === 'Discipulador') return mIsDiscipulador;
+        if (role === 'Membro Comum') return !mIsLider && !mIsAuxiliar && !mIsDiscipulador;
+        return false;
+      });
+
+      if (!matchRoles) return false;
+
       if (filters.distanciaMinima > 0) {
         const distGrupo = parseFloat(loc.metadata.distanciaAteGrupo || '0');
         const distDisc = parseFloat(loc.metadata.distanciaAteDiscipulador || '0');
@@ -360,7 +424,7 @@ const Georeferencing: React.FC = () => {
     });
 
     return [...filteredMembros, ...gruposParaMostrar];
-  }, [allLocations, filters]);
+  }, [allLocations, filters, selectedLocation, selectedRoles]);
 
   const clearFilters = () => {
     setFilters({
@@ -373,6 +437,7 @@ const Georeferencing: React.FC = () => {
       discipulador: 'Todos',
       distanciaMinima: 0
     });
+    setSelectedRoles([]);
   };
 
   const tableData = useMemo(() => {
@@ -394,9 +459,28 @@ const Georeferencing: React.FC = () => {
             <Filter className="h-5 w-5" />
             <span>Radar de Gestão</span>
           </div>
-          <button onClick={clearFilters} className="text-red-500 text-sm font-medium hover:text-red-600 flex items-center gap-1">
-            <X className="h-4 w-4" /> Limpar
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setIsAdvancedFiltersOpen(!isAdvancedFiltersOpen)}
+              className={clsx(
+                "flex items-center gap-2 text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-xl border transition-all cursor-pointer",
+                isAdvancedFiltersOpen 
+                  ? "bg-primary-50 border-primary-200 text-primary-700 shadow-sm"
+                  : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+              )}
+            >
+              Filtros Avançados
+              {(filters.tipoVinculo !== 'Todos' || filters.sexo !== 'Todos' || filters.faixaEtaria !== 'Todas' || selectedRoles.length > 0) && (
+                <span className="ml-1 px-1.5 py-0.2 bg-primary-600 text-white rounded-full text-[9px] font-black animate-pulse">
+                  !
+                </span>
+              )}
+            </button>
+            <button onClick={clearFilters} className="text-red-500 text-sm font-medium hover:text-red-600 flex items-center gap-1 cursor-pointer">
+              <X className="h-4 w-4" /> Limpar
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
@@ -466,6 +550,111 @@ const Georeferencing: React.FC = () => {
             />
           </div>
         </div>
+
+        {/* Collapsible Advanced Filters Section */}
+        {isAdvancedFiltersOpen && (
+          <div className="pt-4 border-t border-gray-100 flex flex-wrap gap-4 items-end animate-in fade-in slide-in-from-top-2 duration-200">
+            {/* Sexo */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">Sexo</label>
+              <select
+                className="text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-gray-50/50 px-3 py-2 text-gray-700 min-w-[130px]"
+                value={filters.sexo}
+                onChange={(e) => setFilters({...filters, sexo: e.target.value})}
+              >
+                <option value="Todos">Todos os Sexos</option>
+                <option value="Masculino">Masculino</option>
+                <option value="Feminino">Feminino</option>
+              </select>
+            </div>
+
+            {/* Faixa Etária */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">Faixa Etária</label>
+              <select
+                className="text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-gray-50/50 px-3 py-2 text-gray-700 min-w-[150px]"
+                value={filters.faixaEtaria}
+                onChange={(e) => setFilters({...filters, faixaEtaria: e.target.value})}
+              >
+                <option value="Todas">Todas as Idades</option>
+                <option value="0-12">Crianças (0-12)</option>
+                <option value="13-18">Adolescentes (13-18)</option>
+                <option value="19-30">Jovens (19-30)</option>
+                <option value="31-60">Adultos (31-60)</option>
+                <option value="60+">Idosos (60+)</option>
+              </select>
+            </div>
+
+            {/* Tipo de Vínculo */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">Tipo de Vínculo</label>
+              <select
+                className="text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-gray-50/50 px-3 py-2 text-gray-700 min-w-[150px]"
+                value={filters.tipoVinculo}
+                onChange={(e) => setFilters({...filters, tipoVinculo: e.target.value})}
+              >
+                <option value="Todos">Todos os Vínculos</option>
+                {options.vinculos.map(v => <option key={v} value={v}>{v}</option>)}
+              </select>
+            </div>
+
+            {/* Checkbox Multiselect Dropdown for Roles */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider block">Função / Cargo</label>
+              <div className="relative" ref={rolesDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsRolesOpen(!isRolesOpen)}
+                  className="flex items-center justify-between gap-2 text-sm border border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50 px-3 py-2 text-gray-700 hover:bg-gray-150 transition-colors cursor-pointer min-w-[180px]"
+                >
+                  <span>{selectedRoles.length === 0 ? 'Todas as Funções' : `${selectedRoles.length} Função(ões)`}</span>
+                  <span className="text-xs text-gray-400">▼</span>
+                </button>
+
+                {isRolesOpen && (
+                  <div className="absolute left-0 mt-2 w-64 bg-white border border-gray-100 rounded-xl shadow-xl z-50 p-3 space-y-2 animate-in fade-in slide-in-from-top-1 duration-150">
+                    <div className="flex justify-between items-center pb-2 border-b border-gray-100">
+                      <span className="text-[10px] font-bold text-gray-400 uppercase font-sans">Funções</span>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedRoles([])}
+                          className="text-[10px] text-red-500 hover:underline font-bold"
+                        >
+                          Limpar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedRoles(['Líder', 'Auxiliar de Liderança', 'Discipulador', 'Membro Comum'])}
+                          className="text-[10px] text-primary-600 hover:underline font-bold"
+                        >
+                          Todas
+                        </button>
+                      </div>
+                    </div>
+                    <div className="max-h-48 overflow-y-auto space-y-2 py-1 pr-1 scrollbar-thin">
+                      {['Líder', 'Auxiliar de Liderança', 'Discipulador', 'Membro Comum'].map(role => (
+                        <label key={role} className="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors text-xs text-gray-700">
+                          <input
+                            type="checkbox"
+                            checked={selectedRoles.includes(role)}
+                            onChange={() => {
+                              setSelectedRoles(prev =>
+                                prev.includes(role) ? prev.filter(r => r !== role) : [...prev, role]
+                              );
+                            }}
+                            className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 w-3.5 h-3.5"
+                          />
+                          <span className="font-medium truncate">{role}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="h-[600px] bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden relative">
@@ -482,6 +671,31 @@ const Georeferencing: React.FC = () => {
           <div className="bg-white/90 backdrop-blur-md px-4 py-2 rounded-lg shadow-lg border border-white flex items-center gap-2">
             <Users className="h-4 w-4 text-blue-600" />
             <span className="text-sm font-bold text-gray-700">{tableData.length} Membros</span>
+          </div>
+
+          {/* Map Legend */}
+          <div className="bg-white/90 backdrop-blur-md p-3 rounded-lg shadow-lg border border-white/60 text-[10px] space-y-1.5 font-medium text-gray-700">
+            <div className="font-extrabold text-[9px] uppercase tracking-wider text-gray-400 border-b border-gray-100 pb-1 mb-1">Legenda</div>
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-red-505 inline-block" style={{ backgroundColor: '#ef4444' }}></span>
+              <span>Célula / GC</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: '#D4AF37' }}></span>
+              <span>Líder de GC</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: '#ff9800' }}></span>
+              <span>Auxiliar de Liderança</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-green-505 inline-block" style={{ backgroundColor: '#22c55e' }}></span>
+              <span>Discipulador</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-blue-505 inline-block" style={{ backgroundColor: '#3b82f6' }}></span>
+              <span>Membro / Participante</span>
+            </div>
           </div>
         </div>
 
@@ -521,7 +735,17 @@ const Georeferencing: React.FC = () => {
             <Marker 
               key={loc.id} 
               position={[loc.latitude, loc.longitude]}
-              icon={loc.tipo === 'grupo' ? cellIcon : (filters.discipulador !== 'Todos' && loc.nome === filters.discipulador ? discipuladorIcon : memberIcon)}
+              icon={
+                loc.tipo === 'grupo'
+                  ? cellIcon
+                  : loc.metadata.isLider
+                  ? leaderIcon
+                  : loc.metadata.isAuxiliar
+                  ? auxiliarIcon
+                  : loc.metadata.isDiscipulador
+                  ? discipuladorIcon
+                  : memberIcon
+              }
               draggable={editingId === loc.id}
               eventHandlers={{
                 click: () => setSelectedLocation(loc),
