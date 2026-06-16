@@ -170,25 +170,9 @@ export const Companionship: React.FC = () => {
           membrosData = membrosFullRes.data || [];
         }
 
-        // Pre-calcular discipuladores ativos da base oficial
+        // Pre-calcular discipuladores ativos da base oficial de discipulado
         const discNames = new Set<string>();
-        try {
-          const res = await fetch('/data/pessoas_funcoes.json');
-          if (res.ok) {
-            const funcoes = await res.json();
-            funcoes.forEach((f: any) => {
-              const func = (f.funcao || '').toUpperCase();
-              if (func.includes('DISCIPULADOR') && f.pessoa) {
-                discNames.add(f.pessoa.trim().toUpperCase());
-              }
-            });
-          }
-        } catch (err) {
-          console.warn('Erro ao buscar pessoas_funcoes.json em Companionship:', err);
-        }
-
-        // Fallback para tabela de discipulado se base oficial vazia
-        if (discNames.size === 0 && discipuladoData) {
+        if (discipuladoData) {
           for (const d of discipuladoData) {
             if (d.discipulador) {
               discNames.add(d.discipulador.trim().toUpperCase());
@@ -568,11 +552,11 @@ export const Companionship: React.FC = () => {
   const getMemberRole = (m: Member): 'DISCIPULADOR' | 'LIDER' | 'AUXILIAR' | 'MEMBRO' => {
     const nameUpper = m.nome.trim().toUpperCase();
     
-    if (activeDiscipuladores.has(nameUpper)) {
-      return 'DISCIPULADOR';
-    }
     if (m.gcRole === 'LIDER') {
       return 'LIDER';
+    }
+    if (activeDiscipuladores.has(nameUpper)) {
+      return 'DISCIPULADOR';
     }
     if (m.gcRole === 'AUXILIAR') {
       return 'AUXILIAR';
@@ -581,19 +565,11 @@ export const Companionship: React.FC = () => {
   };
 
   const getRoleBadges = (m: Member): string[] => {
-    const badges: string[] = [];
-    const nameUpper = m.nome.trim().toUpperCase();
-
-    const isDisc = activeDiscipuladores.has(nameUpper);
-    const isLid = m.gcRole === 'LIDER';
-    const isAux = m.gcRole === 'AUXILIAR';
-
-    if (isDisc) badges.push('discipulador');
-    if (isLid) badges.push('líder');
-    if (isAux) badges.push('auxiliar');
-    
-    if (badges.length === 0) badges.push('membro');
-    return badges;
+    const role = getMemberRole(m);
+    if (role === 'LIDER') return ['líder'];
+    if (role === 'AUXILIAR') return ['auxiliar'];
+    if (role === 'DISCIPULADOR') return ['discipulador'];
+    return ['membro'];
   };
 
   // Verifica se o par de membros satisfaz as flags de simulação ativadas no painel
@@ -674,8 +650,7 @@ export const Companionship: React.FC = () => {
     // 8. Mesma Função Ministerial (reformulada para dimensões independentes)
     if (simEnforceSameRole) {
       const getGCRole = (m: Member) => {
-        const t = (m.tipo_de_pessoa || '').trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        if (m.gcRole === 'LIDER' || ['LIDER', 'DIACONO', 'PASTOR', 'PRESBITERO'].includes(t)) return 'LIDER';
+        if (m.gcRole === 'LIDER') return 'LIDER';
         if (m.gcRole === 'AUXILIAR') return 'AUXILIAR';
         return 'MEMBRO';
       };
@@ -843,8 +818,7 @@ export const Companionship: React.FC = () => {
       else if (bd.mesmaFuncao === 10) label = 'Parceria de Auxiliares';
       else if (bd.mesmaFuncao === 5) {
         const getGCRole = (m: Member) => {
-          const t = (m.tipo_de_pessoa || '').trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-          if (m.gcRole === 'LIDER' || ['LIDER', 'DIACONO', 'PASTOR', 'PRESBITERO', 'APOSTOLO'].includes(t)) return 'LIDER';
+          if (m.gcRole === 'LIDER') return 'LIDER';
           if (m.gcRole === 'AUXILIAR') return 'AUXILIAR';
           return 'MEMBRO';
         };
@@ -1112,8 +1086,7 @@ export const Companionship: React.FC = () => {
 
     // --- ALINHAMENTO DE FUNÇÃO MINISTERIAL (0-20 pts) (reformulada para dimensões independentes) ---
     const getGCRole = (m: Member) => {
-      const t = (m.tipo_de_pessoa || '').trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-      if (m.gcRole === 'LIDER' || ['LIDER', 'DIACONO', 'PASTOR', 'PRESBITERO', 'APOSTOLO'].includes(t)) return 'LIDER';
+      if (m.gcRole === 'LIDER') return 'LIDER';
       if (m.gcRole === 'AUXILIAR') return 'AUXILIAR';
       return 'MEMBRO';
     };

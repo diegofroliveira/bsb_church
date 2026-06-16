@@ -300,18 +300,9 @@ const Georeferencing: React.FC = () => {
         }
       });
       const discipuladoresSet = new Set<string>();
-      if (funcoes && funcoes.length > 0) {
-        funcoes.forEach((f: any) => {
-          const func = (f.funcao || '').toUpperCase();
-          if (func.includes('DISCIPULADOR') && f.pessoa) {
-            discipuladoresSet.add(f.pessoa.trim().toUpperCase());
-          }
-        });
-      } else {
-        (discipulados || []).forEach(d => {
-          if (d.discipulador) discipuladoresSet.add(d.discipulador.trim().toUpperCase());
-        });
-      }
+      (discipulados || []).forEach(d => {
+        if (d.discipulador) discipuladoresSet.add(d.discipulador.trim().toUpperCase());
+      });
 
       const formattedLocations: LocationData[] = [
         ...geoMembros.map(m => {

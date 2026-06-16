@@ -99,24 +99,13 @@ export const Dashboard: React.FC = () => {
 
     const discSet = new Set<string>();
     const discNameMap = new Map<string, string>();
-    if (rawFuncoes && rawFuncoes.length > 0) {
-      rawFuncoes.forEach(f => {
-        const func = (f.funcao || '').toUpperCase();
-        if (func.includes('DISCIPULADOR') && f.pessoa) {
-          const upper = f.pessoa.trim().toUpperCase();
-          discSet.add(upper);
-          discNameMap.set(upper, f.pessoa.trim());
-        }
-      });
-    } else {
-      rawDiscipulado.forEach(d => {
-        if (d.discipulador) {
-          const upper = d.discipulador.trim().toUpperCase();
-          discSet.add(upper);
-          discNameMap.set(upper, d.discipulador.trim());
-        }
-      });
-    }
+    rawDiscipulado.forEach(d => {
+      if (d.discipulador) {
+        const upper = d.discipulador.trim().toUpperCase();
+        discSet.add(upper);
+        discNameMap.set(upper, d.discipulador.trim());
+      }
+    });
 
     const liderSet = new Set<string>();
     const auxiliarSet = new Set<string>();
