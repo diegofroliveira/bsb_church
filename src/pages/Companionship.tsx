@@ -107,7 +107,7 @@ export const Companionship: React.FC = () => {
   const [newActivityType, setNewActivityType] = useState<Record<string, 'PALAVRA' | 'ORAÇÃO' | 'EVANGELISMO' | 'SERVIÇO'>>({});
 
   // Tipos elegíveis para companheirismo (exclui agregado, visitante, etc. - e presbíteros/diáconos já pareados)
-  const ELIGIBLE_TYPES = ['MEMBRO', 'LÍDER', 'LIDER', 'DISCIPULADOR', 'PASTOR', 'DIÁCONO', 'DIACONO', 'PRESBÍTERO', 'PRESBITERO', 'APÓSTOLO', 'APOSTOLO'];
+  const ELIGIBLE_TYPES = ['MEMBRO', 'LÍDER', 'LIDER', 'DISCIPULADOR', 'DIÁCONO', 'DIACONO'];
 
   // Fórmula de Haversine para calcular distância geográfica em KM
   const calculateDistance = (lat1: number | null, lon1: number | null, lat2: number | null, lon2: number | null): number | null => {
