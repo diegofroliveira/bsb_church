@@ -68,7 +68,8 @@ import {
   normalizeName, 
   getAdministrativeRegion, 
   getGCRegion,
-  getFallbackRegion
+  getFallbackRegion,
+  getSectorByResidence
 } from '../lib/geoUtils';
 import { useFamilyEngine } from '../hooks/useFamilyEngine';
 import type { Member, Cell, DiscipleshipLink, FamilyRelation } from '../hooks/useFamilyEngine';
