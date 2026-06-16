@@ -211,8 +211,9 @@ export const Dashboard: React.FC = () => {
         const matchSectorEcl = filterSectorEcl === 'Todos' || eclSector === filterSectorEcl;
 
         const nameUpper = m.nome?.trim().toUpperCase();
-        const mIsLider = liderSet.has(nameUpper);
-        const mIsAuxiliar = auxiliarSet.has(nameUpper);
+        const t = (m.tipo_de_pessoa || '').trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const mIsLider = liderSet.has(nameUpper) || ['LIDER', 'DIACONO', 'PASTOR', 'PRESBITERO'].includes(t);
+        const mIsAuxiliar = auxiliarSet.has(nameUpper) && !mIsLider;
         const mIsDiscipulador = discSet.has(nameUpper);
 
         const matchCellRole = selectedCellRoles.length === 0 || selectedCellRoles.some(role => {

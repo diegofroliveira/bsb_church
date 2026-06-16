@@ -567,12 +567,12 @@ export const Companionship: React.FC = () => {
   // Resolve a função eclesiástica primária do membro
   const getMemberRole = (m: Member): 'DISCIPULADOR' | 'LIDER' | 'AUXILIAR' | 'MEMBRO' => {
     const nameUpper = m.nome.trim().toUpperCase();
-    const typeUpper = (m.tipo_de_pessoa || '').trim().toUpperCase();
+    const t = (m.tipo_de_pessoa || '').trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     
-    if (typeUpper === 'DISCIPULADOR' || activeDiscipuladores.has(nameUpper)) {
+    if (t === 'DISCIPULADOR' || activeDiscipuladores.has(nameUpper)) {
       return 'DISCIPULADOR';
     }
-    if (m.gcRole === 'LIDER' || typeUpper === 'LÍDER' || typeUpper === 'LIDER') {
+    if (m.gcRole === 'LIDER' || ['LIDER', 'DIACONO', 'PASTOR', 'PRESBITERO'].includes(t)) {
       return 'LIDER';
     }
     if (m.gcRole === 'AUXILIAR') {
@@ -646,7 +646,8 @@ export const Companionship: React.FC = () => {
     // 8. Mesma Função Ministerial (reformulada para dimensões independentes)
     if (simEnforceSameRole) {
       const getGCRole = (m: Member) => {
-        if (m.gcRole === 'LIDER' || (m.tipo_de_pessoa || '').toUpperCase().trim() === 'LIDER' || (m.tipo_de_pessoa || '').toUpperCase().trim() === 'LÍDER') return 'LIDER';
+        const t = (m.tipo_de_pessoa || '').trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        if (m.gcRole === 'LIDER' || ['LIDER', 'DIACONO', 'PASTOR', 'PRESBITERO'].includes(t)) return 'LIDER';
         if (m.gcRole === 'AUXILIAR') return 'AUXILIAR';
         return 'MEMBRO';
       };
@@ -812,7 +813,8 @@ export const Companionship: React.FC = () => {
       let label = 'Função Ministerial';
       if (bd.mesmaFuncao === 5) {
         const getGCRole = (m: Member) => {
-          if (m.gcRole === 'LIDER' || (m.tipo_de_pessoa || '').toUpperCase().trim() === 'LIDER' || (m.tipo_de_pessoa || '').toUpperCase().trim() === 'LÍDER') return 'LIDER';
+          const t = (m.tipo_de_pessoa || '').trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+          if (m.gcRole === 'LIDER' || ['LIDER', 'DIACONO', 'PASTOR', 'PRESBITERO'].includes(t)) return 'LIDER';
           if (m.gcRole === 'AUXILIAR') return 'AUXILIAR';
           return 'MEMBRO';
         };
@@ -1069,7 +1071,8 @@ export const Companionship: React.FC = () => {
 
     // --- ALINHAMENTO DE FUNÇÃO MINISTERIAL (0-5 pts) (reformulada para dimensões independentes) ---
     const getGCRole = (m: Member) => {
-      if (m.gcRole === 'LIDER' || (m.tipo_de_pessoa || '').toUpperCase().trim() === 'LIDER' || (m.tipo_de_pessoa || '').toUpperCase().trim() === 'LÍDER') return 'LIDER';
+      const t = (m.tipo_de_pessoa || '').trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      if (m.gcRole === 'LIDER' || ['LIDER', 'DIACONO', 'PASTOR', 'PRESBITERO'].includes(t)) return 'LIDER';
       if (m.gcRole === 'AUXILIAR') return 'AUXILIAR';
       return 'MEMBRO';
     };
@@ -2227,7 +2230,8 @@ export const Companionship: React.FC = () => {
                                           {(() => {
                                             const badges: string[] = [];
                                             if (candidate.isDiscipulador) badges.push('discipulador');
-                                            if (candidate.gcRole === 'LIDER' || (candidate.tipo_de_pessoa || '').toUpperCase().trim() === 'LIDER' || (candidate.tipo_de_pessoa || '').toUpperCase().trim() === 'LÍDER') {
+                                            const candT = (candidate.tipo_de_pessoa || '').trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                                            if (candidate.gcRole === 'LIDER' || ['LIDER', 'DIACONO', 'PASTOR', 'PRESBITERO'].includes(candT)) {
                                               badges.push('líder');
                                             } else if (candidate.gcRole === 'AUXILIAR') {
                                               badges.push('auxiliar');
