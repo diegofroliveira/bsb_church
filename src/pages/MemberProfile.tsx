@@ -146,6 +146,7 @@ export const MemberProfile: React.FC = () => {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isPhotoUploading, setIsPhotoUploading] = useState(false);
+  const [isAvatarOpen, setIsAvatarOpen] = useState(false);
 
   // Expanded tabs list
   const [activeTab, setActiveTab] = useState<
@@ -671,14 +672,10 @@ export const MemberProfile: React.FC = () => {
         <div className="px-6 sm:px-10 pb-8">
            <div className="relative flex flex-col md:flex-row justify-between items-start md:items-end -mt-12 mb-6 gap-4">
               <div className="h-24 w-24 bg-white rounded-2xl p-1 shadow-md shrink-0 relative group">
-                 <label htmlFor="member-profile-photo-upload" className="h-full w-full bg-gray-100 rounded-xl flex items-center justify-center text-gray-400 overflow-hidden border border-gray-100 cursor-pointer relative block">
-                    <input 
-                      type="file" 
-                      id="member-profile-photo-upload" 
-                      accept="image/*" 
-                      className="hidden" 
-                      onChange={handlePhotoUpload} 
-                    />
+                 <div 
+                   onClick={() => setIsAvatarOpen(true)}
+                   className="h-full w-full bg-gray-100 rounded-xl flex items-center justify-center text-gray-400 overflow-hidden border border-gray-100 cursor-pointer relative block"
+                 >
                     <img 
                       src={member.foto || `https://vadufkgbluisdamgkbln.supabase.co/storage/v1/object/public/avatars/avatars/${member.id}.jpg`} 
                       alt="" 
@@ -692,9 +689,30 @@ export const MemberProfile: React.FC = () => {
                       <User className="w-10 h-10 text-gray-300" />
                     </div>
                     
-                    {/* Hover Overlay */}
-                    <div className="absolute inset-0 bg-primary-600/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <Upload className="w-6 h-6 text-white drop-shadow-md" />
+                    {/* Hover Overlay with options */}
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                      {/* Zoom Button */}
+                      <button 
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsAvatarOpen(true);
+                        }}
+                        className="p-1.5 bg-white/20 hover:bg-white/40 rounded-lg text-white transition-colors cursor-pointer"
+                        title="Visualizar foto"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+
+                      {/* Edit/Upload Button */}
+                      <label 
+                        htmlFor="member-profile-photo-upload" 
+                        onClick={(e) => e.stopPropagation()} 
+                        className="p-1.5 bg-white/20 hover:bg-white/40 rounded-lg text-white transition-colors cursor-pointer"
+                        title="Atualizar foto"
+                      >
+                        <Upload className="w-4 h-4" />
+                      </label>
                     </div>
 
                     {/* Loader */}
@@ -703,7 +721,15 @@ export const MemberProfile: React.FC = () => {
                         <Loader2 className="w-6 h-6 animate-spin text-primary-600" />
                       </div>
                     )}
-                 </label>
+                 </div>
+                 
+                 <input 
+                   type="file" 
+                   id="member-profile-photo-upload" 
+                   accept="image/*" 
+                   className="hidden" 
+                   onChange={handlePhotoUpload} 
+                 />
               </div>
               <div className="flex flex-wrap gap-2">
                  <span className={clsx("px-3 py-1 rounded-full text-xs font-bold border shadow-sm uppercase tracking-wide", 
@@ -2110,6 +2136,39 @@ export const MemberProfile: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* Modal Dialog: Zoomed Avatar Lightbox */}
+      {/* ============================================================== */}
+      {isAvatarOpen && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 transition-all duration-300"
+          onClick={() => setIsAvatarOpen(false)}
+        >
+          <div className="relative max-w-3xl max-h-[85vh] flex items-center justify-center animate-in zoom-in-95 duration-200">
+            <button 
+              onClick={() => setIsAvatarOpen(false)} 
+              className="absolute -top-12 right-0 bg-white/10 hover:bg-white/20 text-white rounded-full p-2.5 transition-colors cursor-pointer"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <img 
+              src={member.foto || `https://vadufkgbluisdamgkbln.supabase.co/storage/v1/object/public/avatars/avatars/${member.id}.jpg`} 
+              alt={member.nome} 
+              className="max-w-full max-h-[75vh] object-contain rounded-2xl shadow-2xl border-4 border-white/10 bg-gray-900" 
+              onClick={(e) => e.stopPropagation()}
+              onError={(e) => {
+                (e.target as HTMLImageElement).classList.add('hidden');
+                (e.target as HTMLImageElement).parentElement?.querySelector('.lightbox-fallback')?.classList.remove('hidden');
+              }}
+            />
+            <div className="lightbox-fallback hidden flex flex-col items-center justify-center bg-gray-950 border border-white/10 p-12 rounded-2xl text-gray-400">
+              <User className="w-24 h-24 text-gray-600 mb-4" />
+              <p className="text-sm font-bold text-gray-300">Nenhuma foto cadastrada para este membro.</p>
+            </div>
           </div>
         </div>
       )}
