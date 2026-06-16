@@ -475,7 +475,7 @@ const Georeferencing: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-6">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-6 relative z-20">
         <div className="flex items-center justify-between border-b pb-4">
           <div className="flex items-center gap-2 text-primary-600 font-semibold">
             <Filter className="h-5 w-5" />
