@@ -107,7 +107,7 @@ export const Companionship: React.FC = () => {
   const [newActivityType, setNewActivityType] = useState<Record<string, 'PALAVRA' | 'ORAÇÃO' | 'EVANGELISMO' | 'SERVIÇO'>>({});
 
   // Tipos elegíveis para companheirismo (exclui agregado, visitante, etc. - e presbíteros/diáconos já pareados)
-  const ELIGIBLE_TYPES = ['MEMBRO', 'LÍDER', 'LIDER', 'DISCIPULADOR', 'PASTOR'];
+  const ELIGIBLE_TYPES = ['MEMBRO', 'LÍDER', 'LIDER', 'DISCIPULADOR', 'PASTOR', 'DIÁCONO', 'DIACONO', 'PRESBÍTERO', 'PRESBITERO', 'APÓSTOLO', 'APOSTOLO'];
 
   // Fórmula de Haversine para calcular distância geográfica em KM
   const calculateDistance = (lat1: number | null, lon1: number | null, lat2: number | null, lon2: number | null): number | null => {
@@ -572,7 +572,7 @@ export const Companionship: React.FC = () => {
     if (t === 'DISCIPULADOR' || activeDiscipuladores.has(nameUpper)) {
       return 'DISCIPULADOR';
     }
-    if (m.gcRole === 'LIDER' || ['LIDER', 'DIACONO', 'PASTOR', 'PRESBITERO'].includes(t)) {
+    if (m.gcRole === 'LIDER' || ['LIDER', 'DIACONO', 'PASTOR', 'PRESBITERO', 'APOSTOLO'].includes(t)) {
       return 'LIDER';
     }
     if (m.gcRole === 'AUXILIAR') {
@@ -581,8 +581,31 @@ export const Companionship: React.FC = () => {
     return 'MEMBRO';
   };
 
+  const getRoleBadges = (m: Member): string[] => {
+    const badges: string[] = [];
+    const role = getMemberRole(m);
+    if (role === 'DISCIPULADOR') {
+      badges.push('discipulador');
+      badges.push('líder');
+    } else if (role === 'LIDER') {
+      badges.push('líder');
+    } else if (role === 'AUXILIAR') {
+      badges.push('auxiliar');
+    } else {
+      badges.push('membro');
+    }
+    return badges;
+  };
+
   // Verifica se o par de membros satisfaz as flags de simulação ativadas no painel
   const meetsSimulatorConstraints = (m1: Member, m2: Member, dist: number | null): boolean => {
+    // Exclusão: Líder deve parear apenas com Líder
+    const role1 = getMemberRole(m1);
+    const role2 = getMemberRole(m2);
+    const isL1 = role1 === 'LIDER' || role1 === 'DISCIPULADOR';
+    const isL2 = role2 === 'LIDER' || role2 === 'DISCIPULADOR';
+    if (isL1 !== isL2) return false;
+
     // 1. Mesmo GC (ou mesmo discipulado em região com múltiplos GCs)
     if (simEnforceSameGC) {
       const gc1 = (m1.grupos_caseiros || '').trim().toUpperCase();
@@ -808,13 +831,15 @@ export const Companionship: React.FC = () => {
       });
     }
 
-    // --- FUNÇÃO MINISTERIAL (0-5 pts) ---
+    // --- FUNÇÃO MINISTERIAL (0-20 pts) ---
     if (bd.mesmaFuncao > 0) {
       let label = 'Função Ministerial';
-      if (bd.mesmaFuncao === 5) {
+      if (bd.mesmaFuncao === 20) label = 'Parceria de Auxiliares Próximos';
+      else if (bd.mesmaFuncao === 10) label = 'Parceria de Auxiliares';
+      else if (bd.mesmaFuncao === 5) {
         const getGCRole = (m: Member) => {
           const t = (m.tipo_de_pessoa || '').trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-          if (m.gcRole === 'LIDER' || ['LIDER', 'DIACONO', 'PASTOR', 'PRESBITERO'].includes(t)) return 'LIDER';
+          if (m.gcRole === 'LIDER' || ['LIDER', 'DIACONO', 'PASTOR', 'PRESBITERO', 'APOSTOLO'].includes(t)) return 'LIDER';
           if (m.gcRole === 'AUXILIAR') return 'AUXILIAR';
           return 'MEMBRO';
         };
@@ -829,6 +854,7 @@ export const Companionship: React.FC = () => {
         else label = 'Mesma Função (Membro)';
       }
       else if (bd.mesmaFuncao === 3) label = 'Líder & Auxiliar (GC)';
+      else if (bd.mesmaFuncao === 1) label = 'Sinergia de Liderança';
       else if (bd.mesmaFuncao === 1) label = 'Sinergia de Liderança';
 
       reasons.push({
@@ -1054,14 +1080,16 @@ export const Companionship: React.FC = () => {
   const calculateCompatibilityScore = (
     m1: Member, m2: Member, distKm: number | null
   ): SimulatedPair['scoreBreakdown'] & { total: number } => {
-    // --- EXCLUSÕES CRÍTICAS (Irmãos de sangue e Relações Verticais) ---
-    if (isSibling(m1, m2) || isVertical(m1, m2)) {
+    // --- EXCLUSÕES CRÍTICAS (Irmãos de sangue, Relações Verticais e Líder com Não-Líder) ---
+    const role1 = getMemberRole(m1);
+    const role2 = getMemberRole(m2);
+    const isL1 = role1 === 'LIDER' || role1 === 'DISCIPULADOR';
+    const isL2 = role2 === 'LIDER' || role2 === 'DISCIPULADOR';
+    if (isSibling(m1, m2) || isVertical(m1, m2) || isL1 !== isL2) {
       return { maturidade: 0, tempoIgreja: 0, estadoCivil: 0, redeDisc: 0, mesmaFuncao: 0, faixaEtaria: 0, momentoVida: 0, bairroRegiao: 0, distancia: 0, total: 0 };
     }
 
     // --- MATURIDADE ESPIRITUAL (0-10 pts) ---
-    const role1 = getMemberRole(m1);
-    const role2 = getMemberRole(m2);
     const rawR1 = MATURITY_RANK[(m1.tipo_de_pessoa || '').toUpperCase().trim()] ?? 1;
     const rawR2 = MATURITY_RANK[(m2.tipo_de_pessoa || '').toUpperCase().trim()] ?? 1;
     const r1 = Math.max(rawR1, MATURITY_RANK[role1] ?? 1);
@@ -1069,10 +1097,10 @@ export const Companionship: React.FC = () => {
     const rankDiff = Math.abs(r1 - r2);
     const maturidade = rankDiff === 0 ? 10 : rankDiff === 1 ? 6 : rankDiff === 2 ? 2 : 0;
 
-    // --- ALINHAMENTO DE FUNÇÃO MINISTERIAL (0-5 pts) (reformulada para dimensões independentes) ---
+    // --- ALINHAMENTO DE FUNÇÃO MINISTERIAL (0-20 pts) (reformulada para dimensões independentes) ---
     const getGCRole = (m: Member) => {
       const t = (m.tipo_de_pessoa || '').trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-      if (m.gcRole === 'LIDER' || ['LIDER', 'DIACONO', 'PASTOR', 'PRESBITERO'].includes(t)) return 'LIDER';
+      if (m.gcRole === 'LIDER' || ['LIDER', 'DIACONO', 'PASTOR', 'PRESBITERO', 'APOSTOLO'].includes(t)) return 'LIDER';
       if (m.gcRole === 'AUXILIAR') return 'AUXILIAR';
       return 'MEMBRO';
     };
@@ -1082,7 +1110,14 @@ export const Companionship: React.FC = () => {
     const scoreIsDisc2 = !!m2.isDiscipulador;
 
     let mesmaFuncao = 0;
-    if ((scoreGc1 === scoreGc2 && scoreGc1 !== 'MEMBRO') || (scoreIsDisc1 && scoreIsDisc2)) {
+    if (scoreGc1 === 'AUXILIAR' && scoreGc2 === 'AUXILIAR') {
+      // Parceria de Auxiliares: peso considerável se morarem perto
+      if (distKm !== null && distKm <= 5) {
+        mesmaFuncao = 20; // Próximo
+      } else {
+        mesmaFuncao = 10; // Distante
+      }
+    } else if ((scoreGc1 === scoreGc2 && scoreGc1 !== 'MEMBRO') || (scoreIsDisc1 && scoreIsDisc2)) {
       mesmaFuncao = 5;
     } else if ((scoreGc1 === 'LIDER' && scoreGc2 === 'AUXILIAR') || (scoreGc1 === 'AUXILIAR' && scoreGc2 === 'LIDER')) {
       mesmaFuncao = 3;
@@ -2139,7 +2174,16 @@ export const Companionship: React.FC = () => {
                               )}>
                                 {m.sexo === 'Masculino' ? 'H' : 'M'}
                               </span>
-                              <span className="text-[9px] text-gray-400 font-semibold uppercase">{m.tipo_de_pessoa}</span>
+                              {getRoleBadges(m).map(b => (
+                                <span key={b} className={clsx(
+                                  b === 'líder' || b === 'discipulador' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                                  b === 'auxiliar' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' :
+                                  'bg-gray-100 text-gray-500 border border-gray-200',
+                                  'text-[9px] font-bold px-1.5 py-0.5 rounded uppercase'
+                                )}>
+                                  {b}
+                                </span>
+                              ))}
                             </div>
                             <span className="text-[9px] text-gray-500 font-medium truncate block mt-0.5">📍 Bairro: {m.bairro || 'Não informado'}</span>
                           </div>
@@ -2172,6 +2216,7 @@ export const Companionship: React.FC = () => {
                                 <span>Sexo: <strong>{selectedMember.sexo}</strong></span>
                                 <span>Bairro: <strong>{selectedMember.bairro || 'Sem Bairro'}</strong></span>
                                 <span>GC: <strong>{selectedMember.grupos_caseiros || 'Nenhum'}</strong></span>
+                                <span>Cargo: <strong className="text-indigo-600 uppercase">{getRoleBadges(selectedMember).join(' / ')}</strong></span>
                               </div>
                             </div>
                           </div>
@@ -2228,15 +2273,7 @@ export const Companionship: React.FC = () => {
                                             return <span className="text-[9px] text-teal-700 bg-teal-50 px-1 rounded font-bold">⏳ {tenure}a de igreja</span>;
                                           })()}
                                           {(() => {
-                                            const badges: string[] = [];
-                                            if (candidate.isDiscipulador) badges.push('discipulador');
-                                            const candT = (candidate.tipo_de_pessoa || '').trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-                                            if (candidate.gcRole === 'LIDER' || ['LIDER', 'DIACONO', 'PASTOR', 'PRESBITERO'].includes(candT)) {
-                                              badges.push('líder');
-                                            } else if (candidate.gcRole === 'AUXILIAR') {
-                                              badges.push('auxiliar');
-                                            }
-                                            if (badges.length === 0) badges.push('membro');
+                                            const badges = getRoleBadges(candidate);
                                             return badges.map(b => (
                                               <span key={b} className="text-[9px] text-indigo-700 bg-indigo-50 px-1 rounded font-bold mr-1">💼 {b}</span>
                                             ));
@@ -2398,7 +2435,19 @@ export const Companionship: React.FC = () => {
                                 {m.foto ? <img src={m.foto} alt={m.nome} className="h-9 w-9 rounded-full object-cover" /> : m.nome.charAt(0)}
                               </div>
                               <div className="text-[10px] font-bold text-gray-800 truncate">{formatName(m.nome)}</div>
-                              <div className="text-[8px] text-gray-500 truncate">{m.tipo_de_pessoa}</div>
+                              {(() => {
+                                const badges = getRoleBadges(m);
+                                return badges.map(b => (
+                                  <div key={b} className={clsx(
+                                    b === 'líder' || b === 'discipulador' ? 'text-amber-700 bg-amber-50 border-amber-100' :
+                                    b === 'auxiliar' ? 'text-indigo-700 bg-indigo-50 border-indigo-100' :
+                                    'text-gray-500 bg-gray-50 border-gray-150',
+                                    'text-[8px] font-bold px-1 rounded border inline-block truncate max-w-full uppercase mr-1 mt-0.5'
+                                  )}>
+                                    {b}
+                                  </div>
+                                ));
+                              })()}
                               {ec && <div className="text-[8px] font-medium text-indigo-600 bg-indigo-50 px-1 rounded-full inline-block">{ec}</div>}
                               {age !== null && <div className="text-[8px] text-gray-400">{age} anos</div>}
                             </div>
