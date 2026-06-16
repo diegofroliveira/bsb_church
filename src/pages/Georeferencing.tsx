@@ -796,6 +796,20 @@ const Georeferencing: React.FC = () => {
                   
                   {loc.tipo === 'membro' && (
                     <div className="space-y-2 text-sm text-gray-600">
+                      <div className="flex flex-wrap gap-1 pb-1">
+                        {loc.metadata.isLider && (
+                          <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[9px] font-bold">Líder</span>
+                        )}
+                        {loc.metadata.isAuxiliar && (
+                          <span className="px-2 py-0.5 rounded-full bg-orange-50 text-orange-700 border border-orange-200 text-[9px] font-bold">Auxiliar</span>
+                        )}
+                        {loc.metadata.isDiscipulador && (
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-bold">Discipulador</span>
+                        )}
+                        {!loc.metadata.isLider && !loc.metadata.isAuxiliar && !loc.metadata.isDiscipulador && (
+                          <span className="px-2 py-0.5 rounded-full bg-gray-50 text-gray-500 border border-gray-200 text-[9px] font-bold">Membro Comum</span>
+                        )}
+                      </div>
                       {editingId === loc.id && (
                         <div className="p-2 bg-yellow-50 border border-yellow-200 rounded text-[10px] text-yellow-700 font-medium animate-pulse">
                           📍 Arraste o pin para o local correto no mapa e clique em SALVAR.
