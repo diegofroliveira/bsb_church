@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { supabaseReader } from '../lib/supabase';
+import { supabaseReader, supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { Home, Users, Navigation, Search, Filter, X, ClipboardList } from 'lucide-react';
 import { differenceInYears, parseISO } from 'date-fns';
@@ -175,7 +175,7 @@ const Georeferencing: React.FC = () => {
       }
 
       // 3. Buscar Discipulado
-      const { data: discipulados, error: dError } = await supabase
+      const { data: discipulados, error: dError } = await supabaseReader
         .from('discipulado')
         .select('discipulador, discipulo');
 
