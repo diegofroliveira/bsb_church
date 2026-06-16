@@ -698,7 +698,7 @@ const Georeferencing: React.FC = () => {
         )}
       </div>
 
-      <div className="h-[600px] bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden relative">
+      <div className="h-[600px] bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden relative z-10">
         {loading && (
           <div className="absolute inset-0 z-[1000] bg-white/80 backdrop-blur-sm flex items-center justify-center">
             <div className="flex flex-col items-center gap-3">
