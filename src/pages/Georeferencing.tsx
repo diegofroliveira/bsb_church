@@ -194,7 +194,7 @@ const Georeferencing: React.FC = () => {
     try {
       setLoading(true);
       
-      let celQuery = supabaseReader.from('celulas').select('id, grupo_caseiro, latitude, longitude, lider, setor');
+      let celQuery = supabaseReader.from('celulas').select('id, grupo_caseiro, latitude, longitude, lider, auxiliar, setor');
       let membQuery = supabaseReader.from('membros').select(`
         id, nome, latitude, longitude, grupos_caseiros, estado_civil, sexo, nascimento, tipo_de_pessoa,
         logradouro, bairro, cidade, estado, setor_eclesiastico, setor_residencial
