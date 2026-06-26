@@ -34,6 +34,20 @@ jobs:
         run: |
           python run_sync.py
 
+      - name: Exibir diagnosticos da sincronizacao
+        if: always()
+        run: |
+          if [ -d sync_diagnostics ]; then
+            for file in sync_diagnostics/*.txt; do
+              [ -f "$file" ] || continue
+              echo "::group::$file"
+              cat "$file"
+              echo "::endgroup::"
+            done
+          else
+            echo "Nenhum diretorio sync_diagnostics encontrado."
+          fi
+
       - name: Publicar diagnosticos da sincronizacao
         if: always()
         uses: actions/upload-artifact@v4
