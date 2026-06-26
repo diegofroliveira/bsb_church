@@ -30,6 +30,8 @@ PROVER_BASE_URL = "https://sis.sistemaprover.com.br"
 # Pasta onde os CSVs serão salvos localmente
 OUTPUT_DIR = "dados_exportados"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
+DIAGNOSTICS_DIR = "sync_diagnostics"
+os.makedirs(DIAGNOSTICS_DIR, exist_ok=True)
 
 # URLs de Login e Exportação
 BASE_LOGIN = f"{PROVER_BASE_URL}/login/"
@@ -72,6 +74,29 @@ MODULOS_EXPORT = {
 #  FUNÇÕES AUXILIARES
 # ─────────────────────────────────────────────
 
+def salvar_diagnostico(page, label):
+    safe_label = "".join(c if c.isalnum() or c in "-_" else "_" for c in label)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    path = os.path.join(DIAGNOSTICS_DIR, f"{timestamp}_{safe_label}.txt")
+
+    try:
+        title = page.title()
+    except Exception as exc:
+        title = f"<erro ao ler title: {exc}>"
+
+    try:
+        body_text = page.locator("body").inner_text(timeout=3000)
+    except Exception as exc:
+        body_text = f"<erro ao ler body: {exc}>"
+
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(f"label: {label}\n")
+        f.write(f"url: {page.url}\n")
+        f.write(f"title: {title}\n\n")
+        f.write(body_text[:8000])
+
+    print(f"  [diagnostico] Snapshot textual salvo em: {path}")
+
 def fazer_login(page):
     print(f"🔐 Acessando página de login: {BASE_LOGIN}")
     page.goto(BASE_LOGIN, wait_until="networkidle")
@@ -112,6 +137,7 @@ def fazer_login(page):
         return True
     except PlaywrightTimeoutError:
         print("  ✗ Erro: O login demorou muito ou falhou. Verifique as credenciais.")
+        salvar_diagnostico(page, "falha_login")
         return False
 
 def baixar_modulo(page, nome_modulo, termos):
@@ -179,12 +205,14 @@ def baixar_modulo(page, nome_modulo, termos):
                     return pd.DataFrame()
             else:
                 print(f"  ✗ Erro no download (Status: {response.status})")
+                salvar_diagnostico(page, f"download_{nome_modulo}_status_{response.status}")
                 # Se falhou a URL direta, tenta procurar na página (caso não tenha tentado ainda)
                 if termos[0].startswith("/") and len(termos) > 1:
                     print("  🔄 Tentando buscar link alternativo na página...")
                     return baixar_modulo(page, nome_modulo, termos[1:])
         except Exception as e:
             print(f"  ✗ Erro ao processar: {e}")
+            salvar_diagnostico(page, f"erro_{nome_modulo}")
     
     return None
 
@@ -232,6 +260,7 @@ def main():
             else:
                 print("\n⚠ Nenhum dado foi baixado.")
         finally:
+            salvar_diagnostico(page, "estado_final")
             browser.close()
 
     print("\n" + "=" * 60)

@@ -28,8 +28,16 @@ jobs:
           pip install playwright pandas openpyxl supabase httpx beautifulsoup4
           
       - name: Instalar Navegador Chromium (Playwright)
-        run: playwright install chromium
+        run: playwright install --with-deps chromium
         
       - name: Executar Script de Sincronização
         run: |
           python run_sync.py
+
+      - name: Publicar diagnosticos da sincronizacao
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sync-diagnostics
+          path: sync_diagnostics/
+          if-no-files-found: ignore
