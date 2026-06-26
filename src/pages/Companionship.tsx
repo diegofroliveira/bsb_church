@@ -834,7 +834,6 @@ export const Companionship: React.FC = () => {
       }
       else if (bd.mesmaFuncao === 3) label = 'Líder & Auxiliar (GC)';
       else if (bd.mesmaFuncao === 1) label = 'Sinergia de Liderança';
-      else if (bd.mesmaFuncao === 1) label = 'Sinergia de Liderança';
 
       reasons.push({
         label,
