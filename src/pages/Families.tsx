@@ -295,26 +295,40 @@ export const Families: React.FC = () => {
 
     // Helper to check if two nuclear families are related by parentage
     const areFamiliesRelated = (famA: any, famB: any): boolean => {
-      const headA = members.find(m => m.id.toString() === famA.headId);
-      const headB = members.find(m => m.id.toString() === famB.headId);
-      if (!headA || !headB) return false;
+      // 1. Explicit database relation in pessoas_familiares
+      const hasDbRelation = relations.some(r => {
+        const idAStr = r.id_pessoa_a?.toString();
+        const idBStr = r.id_pessoa_b?.toString();
+        if (!idAStr || !idBStr) return false;
+        
+        const inA = famA.familyMembers.some((m: any) => m.id.toString() === idAStr);
+        const inB = famB.familyMembers.some((m: any) => m.id.toString() === idBStr);
+        const inA_rev = famA.familyMembers.some((m: any) => m.id.toString() === idBStr);
+        const inB_rev = famB.familyMembers.some((m: any) => m.id.toString() === idAStr);
+        
+        return (inA && inB) || (inA_rev && inB_rev);
+      });
+      if (hasDbRelation) return true;
 
-      const nameA = normName(headA.nome);
-      const nameB = normName(headB.nome);
-      const fatherA = headA.pai ? normName(headA.pai) : '';
-      const motherA = headA.mae ? normName(headA.mae) : '';
-      const fatherB = headB.pai ? normName(headB.pai) : '';
-      const motherB = headB.mae ? normName(headB.mae) : '';
-
-      // 1. Parent-child link (either way)
-      if (fatherA && (fatherA === nameB || nameB.includes(fatherA) || fatherA.includes(nameB))) return true;
-      if (motherA && (motherA === nameB || nameB.includes(motherA) || motherA.includes(nameB))) return true;
-      if (fatherB && (fatherB === nameA || nameA.includes(fatherB) || fatherB.includes(nameA))) return true;
-      if (motherB && (motherB === nameA || nameA.includes(motherB) || motherB.includes(nameA))) return true;
-
-      // 2. Sibling link (shared parents, ignoring placeholder/incomplete values)
-      if (isVal(fatherA) && isVal(fatherB) && fatherA === fatherB) return true;
-      if (isVal(motherA) && isVal(motherB) && motherA === motherB) return true;
+      // 2. Parent-child or sibling links
+      for (const mA of famA.familyMembers) {
+        const fatherA = mA.pai ? normName(mA.pai) : '';
+        const motherA = mA.mae ? normName(mA.mae) : '';
+        const nameA = normName(mA.nome);
+        
+        for (const mB of famB.familyMembers) {
+          const nameB = normName(mB.nome);
+          const fatherB = mB.pai ? normName(mB.pai) : '';
+          const motherB = mB.mae ? normName(mB.mae) : '';
+          
+          if (fatherA && fatherA === nameB) return true;
+          if (motherA && motherA === nameB) return true;
+          if (fatherB && fatherB === nameA) return true;
+          if (motherB && motherB === nameA) return true;
+          if (isVal(fatherA) && isVal(fatherB) && fatherA === fatherB) return true;
+          if (isVal(motherA) && isVal(motherB) && motherA === motherB) return true;
+        }
+      }
 
       return false;
     };

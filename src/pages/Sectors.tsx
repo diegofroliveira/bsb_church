@@ -22,12 +22,18 @@ interface Member {
   e_dizimista?: string;
   setor_eclesiastico?: string | null;
   setor_residencial?: string | null;
+  isLider?: boolean;
+  isAuxiliar?: boolean;
+  isDiscipulador?: boolean;
+  cargo_gc?: string;
 }
 
 interface Cell {
   grupo_caseiro: string;
   lider?: string;
   auxiliar?: string;
+  auxiliar_1?: string;
+  auxiliar_2?: string;
   setor?: string;
 }
 
@@ -42,6 +48,9 @@ interface SectorSummary {
   gcsCount: number;
   membersCount: number;
   leadersCount: number;
+  actualLeadersCount: number;
+  actualAuxiliariesCount: number;
+  actualDiscipuladoresCount: number;
   tithersCount: number;
   childrenCount: number;
   percentage: number;
@@ -137,22 +146,71 @@ export const Sectors: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [membersRes, cellsRes] = await Promise.all([
+        const [membersRes, cellsRes, discRes] = await Promise.all([
           supabaseReader
             .from('membros')
             .select('id, nome, tipo_de_pessoa, grupos_caseiros, status, sexo, bairro, nascimento, estado_civil, e_dizimista, setor_eclesiastico, setor_residencial')
             .limit(10000),
           supabaseReader
             .from('celulas')
-            .select('grupo_caseiro, lider, auxiliar, setor')
-            .limit(1000)
+            .select('grupo_caseiro, lider, auxiliar, auxiliar_1, auxiliar_2, setor')
+            .limit(1000),
+          supabaseReader
+            .from('discipulado')
+            .select('discipulo, discipulador')
+            .limit(5000)
         ]);
 
         if (membersRes.error) throw membersRes.error;
         if (cellsRes.error) throw cellsRes.error;
+        const discData = discRes && !discRes.error ? (discRes.data || []) : [];
 
-        setMembers(membersRes.data || []);
-        setCells(cellsRes.data || []);
+        const allCelulas = cellsRes.data || [];
+
+        // Build mapping sets for leadership and discipleship
+        const lideresSet = new Set<string>();
+        const auxiliaresSet = new Set<string>();
+        const discipuladoresSet = new Set<string>();
+
+        allCelulas.forEach((c: any) => {
+          if (c.lider) {
+            c.lider.split(',').forEach((l: string) => {
+              const cleaned = l.trim().toUpperCase();
+              if (cleaned) lideresSet.add(cleaned);
+            });
+          }
+          const auxiliares = [c.auxiliar, c.auxiliar_1, c.auxiliar_2].filter(Boolean).join(',');
+          if (auxiliares) {
+            auxiliares.split(',').forEach((aux: string) => {
+              const cleaned = aux.trim().toUpperCase();
+              if (cleaned) auxiliaresSet.add(cleaned);
+            });
+          }
+        });
+
+        discData.forEach((d: any) => {
+          if (d.discipulador) {
+            discipuladoresSet.add(d.discipulador.trim().toUpperCase());
+          }
+        });
+
+        const enrichedMembers = (membersRes.data || []).map((m: any) => {
+          const nameUpper = (m.nome || '').trim().toUpperCase();
+          const isLider = lideresSet.has(nameUpper);
+          const isAuxiliar = auxiliaresSet.has(nameUpper) && !isLider;
+          const isDiscipulador = discipuladoresSet.has(nameUpper);
+          
+          return {
+            ...m,
+            isLider,
+            isAuxiliar,
+            isDiscipulador,
+            cargo_gc: isLider ? 'Líder' : (isAuxiliar ? 'Auxiliar de Liderança' : 'Membro Comum')
+          };
+        });
+
+        setMembers(enrichedMembers);
+        setCells(allCelulas);
       } catch (err: any) {
         setError(err.message || 'Erro ao carregar dados do Supabase');
       } finally {
@@ -224,6 +282,10 @@ export const Sectors: React.FC = () => {
         ['APÓSTOLO', 'PRESBÍTERO', 'DIÁCONO', 'LÍDER'].includes((m.tipo_de_pessoa || '').toUpperCase())
       ).length;
 
+      const actualLeadersCount = sectorMembers.filter(m => m.isLider).length;
+      const actualAuxiliariesCount = sectorMembers.filter(m => m.isAuxiliar).length;
+      const actualDiscipuladoresCount = sectorMembers.filter(m => m.isDiscipulador).length;
+
       const tithersCount = sectorMembers.filter(m => m.e_dizimista === 'Sim').length;
 
       // Children under 8 count
@@ -259,6 +321,9 @@ export const Sectors: React.FC = () => {
         gcsCount: meta.name === 'Sem Setor' ? cells.filter(c => !c.setor).length : sectorCells.length,
         membersCount: sectorMembers.length,
         leadersCount,
+        actualLeadersCount,
+        actualAuxiliariesCount,
+        actualDiscipuladoresCount,
         tithersCount,
         childrenCount,
         percentage,
@@ -510,20 +575,26 @@ export const Sectors: React.FC = () => {
                   </span>
                 </div>
 
-                <div className="grid grid-cols-3 gap-1 pt-2 border-t border-dashed border-slate-200/20">
+                <div className="grid grid-cols-4 gap-1 pt-2 border-t border-dashed border-slate-200/20">
                   <div className="text-left">
-                    <span className="text-[9px] font-bold text-slate-400 block uppercase">Membros</span>
-                    <span className="text-base font-black">{sector.membersCount}</span>
+                    <span className="text-[8px] font-bold text-slate-400 block uppercase truncate">Membros</span>
+                    <span className="text-sm font-black block mt-0.5">{sector.membersCount}</span>
                   </div>
                   <div className="text-center">
-                    <span className="text-[9px] font-bold text-slate-400 block uppercase">GCs</span>
-                    <span className="text-base font-black">{sector.gcsCount}</span>
+                    <span className="text-[8px] font-bold text-slate-400 block uppercase truncate">GCs</span>
+                    <span className="text-sm font-black block mt-0.5">{sector.gcsCount}</span>
+                  </div>
+                  <div className="text-center">
+                    <span className="text-[8px] font-bold text-amber-500 block uppercase flex items-center justify-center gap-0.5 truncate">
+                      <Baby className="w-2 h-2 shrink-0" /> Cria.
+                    </span>
+                    <span className="text-sm font-black block mt-0.5 text-amber-500">{sector.childrenCount}</span>
                   </div>
                   <div className="text-right">
-                    <span className="text-[9px] font-bold text-amber-500 block uppercase flex items-center justify-end gap-0.5">
-                      <Baby className="w-2.5 h-2.5" /> Cria.
+                    <span className="text-[8px] font-bold text-emerald-500 block uppercase flex items-center justify-end gap-0.5 truncate">
+                      <UserCheck className="w-2 h-2 shrink-0 text-emerald-500" /> Disc.
                     </span>
-                    <span className="text-base font-black text-amber-500">{sector.childrenCount}</span>
+                    <span className="text-sm font-black block mt-0.5 text-emerald-500">{sector.actualDiscipuladoresCount}</span>
                   </div>
                 </div>
 
@@ -548,14 +619,20 @@ export const Sectors: React.FC = () => {
                 )}
               </div>
 
-              <div className="pt-4 mt-4 border-t border-slate-100/10 flex items-center justify-between text-[10px] relative z-10">
-                <span className={isSelected ? "text-slate-400" : "text-slate-400"}>
-                  Líderes: <strong className={isSelected ? "text-slate-200" : "text-slate-700"}>{sector.leadersCount}</strong>
-                </span>
-                {hasFinanceAccess && (
-                  <span className={isSelected ? "text-slate-400" : "text-slate-400"}>
-                    Dizimistas: <strong className={isSelected ? "text-slate-200" : "text-slate-700"}>{sector.tithersCount}</strong>
+              <div className="pt-3 mt-auto border-t border-slate-100/10 space-y-1.5 text-[10px] relative z-10">
+                <div className="flex justify-between items-center">
+                  <span className={isSelected ? "text-slate-350" : "text-slate-500"}>
+                    Líderes: <strong className={isSelected ? "text-white" : "text-slate-800"}>{sector.actualLeadersCount}</strong>
                   </span>
+                  <span className={isSelected ? "text-slate-350" : "text-slate-500"}>
+                    Auxiliares: <strong className={isSelected ? "text-white" : "text-slate-800"}>{sector.actualAuxiliariesCount}</strong>
+                  </span>
+                </div>
+                {hasFinanceAccess && (
+                  <div className="flex justify-between items-center pt-1 border-t border-dashed border-slate-200/10 text-[9px]">
+                    <span className={isSelected ? "text-slate-400" : "text-slate-400"}>Dizimistas</span>
+                    <strong className={isSelected ? "text-slate-200" : "text-slate-700"}>{sector.tithersCount}</strong>
+                  </div>
                 )}
               </div>
             </div>
@@ -738,14 +815,33 @@ export const Sectors: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={clsx(
-                        "text-[9px] font-black uppercase px-2 py-0.5 rounded border",
-                        ['APÓSTOLO', 'PRESBÍTERO', 'DIÁCONO', 'LÍDER'].includes((m.tipo_de_pessoa || '').toUpperCase())
-                          ? "bg-amber-50 text-amber-700 border-amber-100"
-                          : "bg-slate-50 text-slate-500 border-slate-150"
-                      )}>
-                        {m.tipo_de_pessoa}
-                      </span>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <span className={clsx(
+                            "text-[9px] font-black uppercase px-2 py-0.5 rounded border",
+                            ['APÓSTOLO', 'PRESBÍTERO', 'DIÁCONO', 'LÍDER'].includes((m.tipo_de_pessoa || '').toUpperCase())
+                              ? "bg-amber-50 text-amber-700 border-amber-100"
+                              : "bg-slate-50 text-slate-500 border-slate-150"
+                          )}>
+                            {m.tipo_de_pessoa || 'Membro'}
+                          </span>
+                          {m.isDiscipulador && (
+                            <span className="text-[9px] font-black uppercase bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 py-0.5 rounded">
+                              Discipulador
+                            </span>
+                          )}
+                        </div>
+                        {m.cargo_gc !== 'Membro Comum' && (
+                          <span className={clsx(
+                            "text-[9px] font-black uppercase px-2 py-0.5 rounded border w-fit",
+                            m.cargo_gc === 'Líder'
+                              ? "bg-amber-50 text-amber-750 border-amber-200"
+                              : "bg-blue-50 text-blue-750 border border-blue-200"
+                          )}>
+                            {m.cargo_gc}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 font-semibold text-slate-700">
                       {m.grupos_caseiros || <span className="text-slate-400 italic">Sem GC</span>}
