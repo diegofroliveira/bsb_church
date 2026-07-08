@@ -5,7 +5,14 @@ const SUPABASE_URL = 'https://vadufkgbluisdamgkbln.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZhZHVma2dibHVpc2RhbWdrYmxuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4NjE2NDksImV4cCI6MjA5MjQzNzY0OX0.40XwaADEKukkhuLqcQQnNpx-6a1ipKnz_4Fy8DJdrao';
 
 // Client principal — usado para autenticação (login/logout)
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    storage: window.sessionStorage,
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+  }
+});
 
 // Client de leitura via SDK (mantido para queries simples sem .or())
 export const supabaseReader = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {

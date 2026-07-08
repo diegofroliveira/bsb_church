@@ -17,6 +17,9 @@ export const Login: React.FC = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  
+  const queryParams = new URLSearchParams(location.search);
+  const reason = queryParams.get('reason');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,6 +100,20 @@ export const Login: React.FC = () => {
             {isReset ? 'Recupere seu acesso ao painel.' : 'Entre para acessar as análises e métricas.'}
           </p>
         </div>
+
+        {reason === 'inactivity' && (
+          <div className="p-4 mb-4 rounded-xl bg-amber-50 text-amber-800 text-sm border border-amber-200 flex flex-col gap-1.5 animate-in fade-in slide-in-from-top-4 duration-500">
+             <span className="font-bold text-amber-950 flex items-center gap-1.5">
+               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-amber-700">
+                 <circle cx="12" cy="12" r="10" />
+                 <line x1="12" y1="8" x2="12" y2="12" />
+                 <line x1="12" y1="16" x2="12.01" y2="16" />
+               </svg>
+               Sessão Expirada
+             </span>
+             Você foi desconectado automaticamente após 15 minutos de inatividade para proteger seus dados.
+          </div>
+        )}
 
         {error && (
           <div className="p-3 mb-4 rounded-lg bg-red-50 text-red-600 text-sm border border-red-100 flex flex-col gap-1">

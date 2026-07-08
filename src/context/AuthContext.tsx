@@ -90,6 +90,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
   };
 
+  useEffect(() => {
+    if (!user) return;
+
+    let timeoutId: any;
+
+    const handleAutoLogout = async () => {
+      console.log("Auto-logging out due to inactivity...");
+      await logout();
+      window.location.href = '/login?reason=inactivity';
+    };
+
+    const resetTimer = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(handleAutoLogout, 15 * 60 * 1000); // 15 mins
+    };
+
+    const activityEvents = ['mousemove', 'mousedown', 'keypress', 'scroll', 'touchstart'];
+
+    activityEvents.forEach(event => {
+      window.addEventListener(event, resetTimer);
+    });
+
+    resetTimer();
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      activityEvents.forEach(event => {
+        window.removeEventListener(event, resetTimer);
+      });
+    };
+  }, [user]);
+
   return (
     <AuthContext.Provider value={{ user, login, logout, isLoading }}>
       {children}
