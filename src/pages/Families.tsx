@@ -886,11 +886,11 @@ export const Families: React.FC = () => {
                             {/* Member GC allocation with color audit */}
                             {m.grupos_caseiros ? (
                               <span className={clsx(
-                                "text-[9px] font-bold px-2 py-0.5 rounded-lg border max-w-[110px] truncate shrink-0",
+                                "text-[9px] font-bold px-2 py-0.5 rounded-lg border max-w-[110px] truncate shrink-0 cursor-help",
                                 fam.isDivided 
                                   ? "text-amber-700 bg-amber-50/50 border-amber-100 animate-pulse"
                                   : "text-emerald-700 bg-emerald-50/50 border-emerald-100"
-                              )}>
+                              )} title={`Grupo caseiro: ${m.grupos_caseiros}`} aria-label={`Grupo caseiro: ${m.grupos_caseiros}`}>
                                 {m.grupos_caseiros}
                               </span>
                             ) : (
