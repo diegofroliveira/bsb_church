@@ -12,10 +12,13 @@ const AVAILABLE_MODULES = [
   { id: 'Dashboard',       label: 'Dashboard',       path: '/' },
   { id: 'Mapa',            label: 'Mapa',            path: '/georeferencing' },
   { id: 'Membros',         label: 'Membros',         path: '/members' },
+  { id: 'Famílias',        label: 'Famílias',        path: '/families' },
+  { id: 'Aniversariantes', label: 'Aniversariantes', path: '/birthdays' },
   { id: 'GCs/Localidades', label: 'GCs/Localidades', path: '/cells' },
   { id: 'Setores',         label: 'Setores',         path: '/sectors' },
   { id: 'Discipulado',     label: 'Discipulado',     path: '/discipleship' },
   { id: 'Rede',            label: 'Rede',            path: '/network' },
+  { id: 'Simulações',      label: 'Simulações',      path: '/simulations' },
   { id: 'Relatórios',      label: 'Relatórios',      path: '/reports' },
   { id: 'QA',              label: 'QA',              path: '/qa' },
   { id: 'Financeiro',      label: 'Financeiro',      path: '/finance' },
@@ -29,8 +32,8 @@ const AVAILABLE_MODULES = [
 ];
 
 const DEFAULT_ROLES: Record<string, { label: string; modules: string[] }> = {
-  admin: { label: 'Administrador', modules: ['Dashboard', 'Mapa', 'Membros', 'GCs/Localidades', 'Setores', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Financeiro', 'Consultor IA', 'Insights IA', 'Configurações', 'Companheirismo', 'Lab: Visão da Plenitude', 'Lab: Gestão de Visitas', 'Lab: Consultas & Estudos'] },
-  pastor: { label: 'Pastor', modules: ['Dashboard', 'Mapa', 'Membros', 'GCs/Localidades', 'Setores', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Financeiro', 'Consultor IA', 'Insights IA', 'Companheirismo', 'Lab: Visão da Plenitude', 'Lab: Gestão de Visitas', 'Lab: Consultas & Estudos'] },
+  admin: { label: 'Administrador', modules: ['Dashboard', 'Mapa', 'Membros', 'Famílias', 'Aniversariantes', 'GCs/Localidades', 'Setores', 'Discipulado', 'Rede', 'Simulações', 'Relatórios', 'QA', 'Financeiro', 'Consultor IA', 'Insights IA', 'Configurações', 'Companheirismo', 'Lab: Visão da Plenitude', 'Lab: Gestão de Visitas', 'Lab: Consultas & Estudos'] },
+  pastor: { label: 'Pastor', modules: ['Dashboard', 'Mapa', 'Membros', 'Famílias', 'Aniversariantes', 'GCs/Localidades', 'Setores', 'Discipulado', 'Rede', 'Simulações', 'Relatórios', 'QA', 'Financeiro', 'Consultor IA', 'Insights IA', 'Companheirismo', 'Lab: Visão da Plenitude', 'Lab: Gestão de Visitas', 'Lab: Consultas & Estudos'] },
   secretaria: { label: 'Secretaria', modules: ['Dashboard', 'Membros', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Consultor IA'] },
   financeiro: { label: 'Financeiro', modules: ['Dashboard', 'Financeiro'] }
 };
