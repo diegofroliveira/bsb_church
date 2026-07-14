@@ -23,6 +23,7 @@ export interface Member {
   latitude?: number | null;
   longitude?: number | null;
   tipo_de_pessoa?: string | null;
+  tipo_cadastro?: string | null;
   cidade?: string | null;
   estado?: string | null;
   setor_eclesiastico?: string | null;

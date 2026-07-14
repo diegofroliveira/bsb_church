@@ -77,6 +77,15 @@ import type { Member, Cell, DiscipleshipLink, FamilyRelation } from '../hooks/us
 
 // Helper components ChangeMapView and BairroTag moved to modular files in ./simulations
 
+const isCountableGCMember = (member: Member): boolean => {
+  const type = String(member.tipo_de_pessoa || member.tipo_cadastro || '')
+    .trim()
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+  return type !== 'AGREGADO' && type !== 'AGREGADOS';
+};
+
 
 export const Simulations: React.FC = () => {
   useAuth();
@@ -1246,9 +1255,9 @@ export const Simulations: React.FC = () => {
       }
     });
 
-    // 1. Calculate members count in each GC today (excluding Cobertura VIX)
+    // Count only active linked members; aggregates are usually dependents/children.
     const membersCountByGC: Record<string, number> = {};
-    draftMembers.filter(m => m.status === 'Ativo' && m.grupos_caseiros).forEach(m => {
+    draftMembers.filter(m => m.status === 'Ativo' && m.grupos_caseiros && isCountableGCMember(m)).forEach(m => {
       const gc = m.grupos_caseiros!;
       if (gc === 'COBERTURA - VIX') return;
       membersCountByGC[gc] = (membersCountByGC[gc] || 0) + 1;
@@ -1544,9 +1553,9 @@ export const Simulations: React.FC = () => {
       return { gcs: [], isLocal: false, recommendedRegion: '' };
     };
 
-    // 2. Count members per GC
+    // Count only active linked members; aggregates do not represent GC capacity.
     const membersCountByGC: Record<string, number> = {};
-    draftMembers.filter(m => m.status === 'Ativo' && m.grupos_caseiros).forEach(m => {
+    draftMembers.filter(m => m.status === 'Ativo' && m.grupos_caseiros && isCountableGCMember(m)).forEach(m => {
       const gc = m.grupos_caseiros!;
       membersCountByGC[gc] = (membersCountByGC[gc] || 0) + 1;
     });
@@ -3179,7 +3188,7 @@ export const Simulations: React.FC = () => {
                   >
                     <div className="flex items-center gap-2">
                       <TrendingUp className="w-4 h-4 text-rose-500" />
-                      <span className="text-xs font-bold text-gray-700">GCs Superlotados (&gt; 20)</span>
+                      <span className="text-xs font-bold text-gray-700">GCs Superlotados (&gt; 20 vinculados)</span>
                       <span className="text-[10px] bg-rose-100 text-rose-800 font-bold px-1.5 py-0.5 rounded-full">
                         {activeOvercrowdedGCs.length}
                       </span>
