@@ -3,7 +3,7 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, Users, Home, DollarSign, Settings, LogOut,
   Menu, BookOpen, FileText, Network, AlertTriangle, MapPin,
-  Brain, Calendar, Play, Heart, Handshake, FlaskConical, Compass
+  Brain, Calendar, Play, Heart, Handshake, Compass
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -127,7 +127,6 @@ export const MainLayout: React.FC = () => {
     { id: 'Consultor IA',    name: 'IA',              path: '/ai-consultant', icon: Brain,           group: 'Gestão & Ferramentas' },
     { id: 'QA',              name: 'QA',              path: '/qa',           icon: AlertTriangle,   group: 'Gestão & Ferramentas' },
     { id: 'Configurações',   name: 'Configurações',   path: '/admin/users',  icon: Settings,        group: 'Gestão & Ferramentas' },
-    { id: 'Lab',             name: 'Laboratório',     path: '#',             icon: FlaskConical,    group: 'Gestão & Ferramentas' },
   ];
 
   const GROUPS = [
@@ -138,11 +137,7 @@ export const MainLayout: React.FC = () => {
     { id: 'Gestão & Ferramentas', name: 'Gestão & Ferramentas' },
   ];
 
-  const finalAllowedModules = hasAccessToAnyLab && !allowedModules.includes('Lab')
-    ? [...allowedModules, 'Lab']
-    : allowedModules;
-
-  const authorizedNavItems = navItems.filter(item => finalAllowedModules.includes(item.id));
+  const authorizedNavItems = navItems.filter(item => allowedModules.includes(item.id));
 
   const FamilyLogo = ({ className }: { className?: string }) => (
     <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -197,34 +192,20 @@ export const MainLayout: React.FC = () => {
                 </h3>
                 <ul className="space-y-1">
                   {group.items.map((item) => {
-                    const isLabItem = item.id === 'Lab';
                     return (
                       <li key={item.name}>
-                        {isLabItem ? (
-                          <button
-                            onClick={() => {
-                              setIsMobileMenuOpen(false);
-                              setIsLabOpen(true);
-                            }}
-                            className="w-full text-left text-gray-600 hover:bg-gray-50 hover:text-gray-900 group flex gap-x-3 rounded-md p-2 text-sm leading-6 transition-all duration-200"
-                          >
-                            <item.icon className="h-5 w-5 shrink-0" aria-hidden="true" />
-                            {item.name}
-                          </button>
-                        ) : (
-                          <NavLink
-                            to={item.path}
-                            end={item.path === '/'}
-                            className={({ isActive }) => clsx(
-                              isActive ? 'bg-primary-50 text-primary-700 font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
-                              'group flex gap-x-3 rounded-md p-2 text-sm leading-6 transition-all duration-200'
-                            )}
-                            onClick={() => setIsMobileMenuOpen(false)}
-                          >
-                            <item.icon className="h-5 w-5 shrink-0" aria-hidden="true" />
-                            {item.name}
-                          </NavLink>
-                        )}
+                        <NavLink
+                          to={item.path}
+                          end={item.path === '/'}
+                          className={({ isActive }) => clsx(
+                            isActive ? 'bg-primary-50 text-primary-700 font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
+                            'group flex gap-x-3 rounded-md p-2 text-sm leading-6 transition-all duration-200'
+                          )}
+                          onClick={() => setIsMobileMenuOpen(false)}
+                        >
+                          <item.icon className="h-5 w-5 shrink-0" aria-hidden="true" />
+                          {item.name}
+                        </NavLink>
                       </li>
                     );
                   })}
@@ -248,7 +229,7 @@ export const MainLayout: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50/50">
-      {/* Secret Lab Launcher — invisible in nav, activated by typing L-A-B or clicking Laboratório in sidebar */}
+      {/* Secret Lab Launcher — activated only by typing L-A-B. */}
       {isLabOpen && <LabLauncher onClose={() => setIsLabOpen(false)} allowedModules={allowedModules} />}
       {isMobileMenuOpen && (
         <div className="fixed inset-0 z-50 flex lg:hidden">
