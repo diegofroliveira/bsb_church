@@ -190,28 +190,34 @@ export const AdminUsers: React.FC = () => {
     }
   };
 
+  const getAuthHeaders = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    return {
+      'Content-Type': 'application/json',
+      ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {})
+    };
+  };
+
+  const parseApiResponse = async (response: Response) => {
+    const text = await response.text();
+    let body: any = {};
+    if (text.trim()) {
+      try { body = JSON.parse(text); }
+      catch { body = { error: text.slice(0, 300) }; }
+    }
+    if (!response.ok) throw new Error(body.error || `Erro HTTP ${response.status}`);
+    return body;
+  };
+
   const fetchUsers = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch('/api/list-users');
-      if (res.ok) {
-        const json = await res.json();
-        setUsers(json.users || []);
-      } else {
-        const { data, error } = await supabase.from('profiles').select('*');
-        if (!error && data) {
-          const realUsers = data.filter(u => u.id !== SPECIAL_CONFIG_ID);
-          setUsers(realUsers.map(u => ({ ...u, avatar: u.avatar || u.foto })));
-        }
-      }
-    } catch (_) {
-      try {
-        const { data, error } = await supabase.from('profiles').select('*');
-        if (!error && data) {
-          const realUsers = data.filter(u => u.id !== SPECIAL_CONFIG_ID);
-          setUsers(realUsers.map(u => ({ ...u, avatar: u.avatar || u.foto })));
-        }
-      } catch (__) {}
+      const res = await fetch('/api/list-users', { headers: await getAuthHeaders() });
+      const json = await parseApiResponse(res);
+      setUsers(json.users || []);
+    } catch (error) {
+      console.error('Erro ao carregar usuários:', error);
+      alert(`Erro ao carregar usuários: ${(error as Error).message}`);
     }
     setIsLoading(false);
   };
@@ -258,17 +264,13 @@ export const AdminUsers: React.FC = () => {
     try {
       const res = await fetch('/api/delete-user', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({ userId })
       });
       
-      if (res.ok) {
-        setUsers(prev => prev.filter(u => u.id !== userId));
-        alert('Usuário excluído com sucesso!');
-      } else {
-        const errJson = await res.json();
-        throw new Error(errJson.error || 'Erro na exclusão');
-      }
+      await parseApiResponse(res);
+      setUsers(prev => prev.filter(u => u.id !== userId));
+      alert('Usuário excluído com sucesso!');
     } catch (err: any) {
       alert(`Erro ao excluir usuário: ${err.message}`);
     } finally {
@@ -316,14 +318,11 @@ export const AdminUsers: React.FC = () => {
     try {
       const response = await fetch('/api/reset-password', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({ userId, password: pass })
       });
 
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || 'Erro na requisição');
-      }
+      await parseApiResponse(response);
 
       if (navigator.clipboard) {
         await navigator.clipboard.writeText(pass);
@@ -341,38 +340,18 @@ export const AdminUsers: React.FC = () => {
   const saveProfile = async (userId: string) => {
     setSavingId(userId);
     try {
-      const isCurrent = userId === currentUser?.id;
-
-      if (isCurrent) {
-        await supabase.auth.updateUser({ 
-          data: { name: editName, role: editRole, assigned_gc: editAssignedGC } 
-        });
-      } else {
-        const res = await fetch('/api/update-user', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId, name: editName, role: editRole, assigned_gc: editAssignedGC })
-        });
-        if (!res.ok) {
-          const err = await res.json();
-          throw new Error(err.error || 'Erro ao salvar perfil');
-        }
-      }
-
-      const { error } = await supabase.from('profiles').upsert({
-        id: userId,
-        email: users.find(u => u.id === userId)?.email,
-        name: editName,
-        role: editRole,
-        updated_at: new Date().toISOString()
+      const res = await fetch('/api/update-user', {
+        method: 'POST',
+        headers: await getAuthHeaders(),
+        body: JSON.stringify({ userId, name: editName, role: editRole, assigned_gc: editAssignedGC })
       });
-
-      if (error) throw error;
+      await parseApiResponse(res);
 
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, name: editName, role: editRole, assigned_gc: editAssignedGC } : u));
       setSavedId(userId); setTimeout(() => setSavedId(null), 2000);
       
       if (userId === currentUser?.id) {
+        await supabase.auth.refreshSession();
         window.location.reload();
       }
     } catch (err: any) {
@@ -388,42 +367,10 @@ export const AdminUsers: React.FC = () => {
     try {
       const response = await fetch('/api/create-user', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({ email: newEmail, password: newPassword, name: newName, role: newRole, assigned_gc: newAssignedGC })
       });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        if (result.error?.includes('SUPABASE_SERVICE_ROLE_KEY')) {
-           const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-             email: newEmail,
-             password: newPassword,
-             options: {
-               data: { name: newName, role: newRole, assigned_gc: newAssignedGC },
-               emailRedirectTo: window.location.origin
-             }
-           });
-           
-           if (signUpError) throw signUpError;
-
-           if (signUpData.user) {
-              await supabase.from('profiles').insert({
-                 id: signUpData.user.id,
-                 email: newEmail,
-                 name: newName,
-                 role: newRole,
-                 avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${newName}`
-              });
-           }
-           
-           setShowNewForm(false); setNewEmail(''); setNewPassword(''); setNewName(''); setNewRole('secretaria');
-           fetchUsers();
-           alert('Usuário cadastrado. IMPORTANTE: Ele deve confirmar o e-mail.');
-           return;
-        }
-        throw new Error(result.error || 'Falha ao criar usuário');
-      }
+      await parseApiResponse(response);
 
       fetchUsers();
       setShowNewForm(false); setNewEmail(''); setNewPassword(''); setNewName(''); setNewRole('secretaria'); setNewAssignedGC('');
