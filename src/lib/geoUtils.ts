@@ -83,7 +83,7 @@ export const getAdministrativeRegion = (bairro: string | null | undefined): stri
   if (norm.includes('CEILANDIA')) return 'CEILÂNDIA';
   if (norm.includes('SAMAMBAIA')) return 'SAMAMBAIA';
   if (norm.includes('RECANTO DAS EMAS') || norm.includes('RECANTO') || norm.includes('ENTORNO')) return 'RECANTO-ENTORNO';
-  if (norm.includes('JARDIM INGA') || norm.includes('LUZIANIA')) return 'JARDIM INGA';
+  if (norm.includes('JARDIM INGA') || norm.includes('JARDIM DO INGA') || norm.includes('LUZIANIA')) return 'JARDIM INGA';
   if (norm.includes('CIDADE OCIDENTAL')) return 'CIDADE OCIDENTAL';
   if (norm.includes('SOBRADINHO')) return 'SOBRADINHO';
   if (norm.includes('RIACHO FUNDO')) return 'RIACHO FUNDO';
