@@ -804,28 +804,46 @@ export const Dashboard: React.FC = () => {
         })}
       </div>
 
-      <div className="flex flex-col gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-sm font-semibold text-gray-800">Evolução da Base</p>
-          <p className="text-xs text-gray-400">Ajuste o período e alterne entre drill down mensal e drill up anual.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <label className="font-semibold uppercase tracking-wide text-gray-400" htmlFor="evolution-range">Período</label>
-          <select id="evolution-range" value={evolutionRange} onChange={e => setEvolutionRange(e.target.value as typeof evolutionRange)} className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 font-medium text-gray-700 outline-none focus:border-primary-500">
-            <option value="12">12 meses</option>
-            <option value="24">24 meses</option>
-            <option value="36">36 meses</option>
-            <option value="all">Base completa</option>
-          </select>
-          <div className="flex rounded-lg border border-gray-200 p-0.5">
-            <button type="button" onClick={() => setEvolutionGranularity('month')} className={clsx('rounded-md px-2.5 py-1.5 font-semibold transition-colors', evolutionGranularity === 'month' ? 'bg-primary-600 text-white' : 'text-gray-500 hover:bg-gray-50')}>Detalhar mês</button>
-            <button type="button" onClick={() => setEvolutionGranularity('year')} className={clsx('rounded-md px-2.5 py-1.5 font-semibold transition-colors', evolutionGranularity === 'year' ? 'bg-primary-600 text-white' : 'text-gray-500 hover:bg-gray-50')}>Agrupar ano</button>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100 flex flex-col">
+          <div className="pb-4 mb-4 border-b border-gray-100">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-lg font-semibold leading-6 text-gray-900">Evolução da Base</h3>
+              <select
+                aria-label="Período da evolução da base"
+                value={evolutionRange}
+                onChange={e => setEvolutionRange(e.target.value as typeof evolutionRange)}
+                className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs font-semibold text-gray-700 outline-none focus:border-primary-500"
+              >
+                <option value="12">12 meses</option>
+                <option value="24">24 meses</option>
+                <option value="36">36 meses</option>
+                <option value="all">Base completa</option>
+              </select>
+            </div>
+            <div className="mt-3 flex items-center justify-between gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Detalhamento</span>
+              <div className="flex rounded-lg border border-gray-200 p-0.5">
+                <button type="button" title="Drill down: detalhar os dados por mês" onClick={() => setEvolutionGranularity('month')} className={clsx('rounded-md px-3 py-1 text-xs font-semibold transition-colors', evolutionGranularity === 'month' ? 'bg-primary-600 text-white' : 'text-gray-500 hover:bg-gray-50')}>Mês</button>
+                <button type="button" title="Drill up: agrupar os dados por ano" onClick={() => setEvolutionGranularity('year')} className={clsx('rounded-md px-3 py-1 text-xs font-semibold transition-colors', evolutionGranularity === 'year' ? 'bg-primary-600 text-white' : 'text-gray-500 hover:bg-gray-50')}>Ano</button>
+              </div>
+            </div>
+          </div>
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={dashboardData?.charts.growth} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <defs><linearGradient id="colorEntradas" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/><stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/></linearGradient><linearGradient id="colorSaidas" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/><stop offset="95%" stopColor="#ef4444" stopOpacity={0}/></linearGradient></defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                <XAxis dataKey="name" interval="preserveStartEnd" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 11}} dy={10} />
+                <YAxis axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} />
+                <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                <Legend verticalAlign="top" height={36} iconType="circle" />
+                <Area type="monotone" dataKey="entradas" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorEntradas)" name="Entradas" />
+                <Area type="monotone" dataKey="saidas" stroke="#ef4444" strokeWidth={3} fillOpacity={1} fill="url(#colorSaidas)" name="Saídas" />
+              </AreaChart>
+            </ResponsiveContainer>
           </div>
         </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100 flex flex-col"><div className="pb-4 mb-4 border-b border-gray-100 flex justify-between items-center"><h3 className="text-lg font-semibold leading-6 text-gray-900">Evolução da Base</h3></div><div className="h-64 w-full"><ResponsiveContainer width="100%" height="100%"><AreaChart data={dashboardData?.charts.growth} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}><defs><linearGradient id="colorEntradas" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/><stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/></linearGradient><linearGradient id="colorSaidas" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/><stop offset="95%" stopColor="#ef4444" stopOpacity={0}/></linearGradient></defs><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" /><XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} dy={10} /><YAxis axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} /><Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} /><Legend verticalAlign="top" height={36} iconType="circle" /><Area type="monotone" dataKey="entradas" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorEntradas)" name="Entradas" /><Area type="monotone" dataKey="saidas" stroke="#ef4444" strokeWidth={3} fillOpacity={1} fill="url(#colorSaidas)" name="Saídas" /></AreaChart></ResponsiveContainer></div></div>
         <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100 flex flex-col"><div className="pb-4 mb-4 border-b border-gray-100"><h3 className="text-lg font-semibold leading-6 text-gray-900">Demografia (Perfil)</h3></div><div className="flex-1 flex flex-col justify-center items-center relative"><div className="h-64 w-full"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={dashboardData?.charts.demographics} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value" stroke="none">{dashboardData?.charts.demographics.map((entry: any, index: number) => <Cell key={`cell-${index}`} fill={entry.fill} />)}</Pie><Tooltip /></PieChart></ResponsiveContainer></div><div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-12"><span className="text-2xl font-bold text-gray-900">{dashboardData?.stats.ativos}</span></div><div className="grid grid-cols-2 gap-2 w-full mt-4">{dashboardData?.charts.demographics.map((item: any, i: number) => (<div key={i} className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.fill }}></div><span className="text-[10px] font-medium text-gray-600 truncate">{item.name} ({item.percent}%)</span></div>))}</div></div></div>
         <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100 flex flex-col"><div className="pb-4 mb-4 border-b border-gray-100"><h3 className="text-lg font-semibold leading-6 text-gray-900">Pirâmide Etária por Sexo</h3></div><div className="h-64 w-full"><ResponsiveContainer width="100%" height="100%"><BarChart data={dashboardData?.charts.pyramid} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}><CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} /><XAxis type="number" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} /><YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} /><Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{borderRadius:'12px', border:'none'}} /><Legend /><Bar dataKey="masc" fill="#3b82f6" name="Masc" radius={[0, 4, 4, 0]} /><Bar dataKey="fem" fill="#ec4899" name="Fem" radius={[0, 4, 4, 0]} /></BarChart></ResponsiveContainer></div></div>
       </div>
