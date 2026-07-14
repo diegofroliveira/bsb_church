@@ -46,40 +46,19 @@ const findCycles = (edges: { from: string; to: string }[]): string[][] => {
   return Array.from(unique.values());
 };
 
-// Enhanced similarity check for duplicate names
-const similar = (a: string, b: string): boolean => {
-  if (a === b) return false;
-  const partsA = a.split(' ').filter(p => p.length > 2);
-  const partsB = b.split(' ').filter(p => p.length > 2);
-  
-  // If surnames are clearly different, they are likely different people
-  // Ex: "PEDRO HENRIQUE SOUZA" vs "PEDRO HENRIQUE SALES"
-  if (partsA.length >= 3 && partsB.length >= 3) {
-    const lastA = partsA[partsA.length - 1];
-    const lastB = partsB[partsB.length - 1];
-    if (lastA !== lastB) return false;
-  }
-
-  const shorter = a.length < b.length ? a : b;
-  const longer = a.length < b.length ? b : a;
-  
-  // Catch "Alex Machado" vs "Alex Machado Junior" or small typos at the end
-  if (longer.startsWith(shorter + ' ')) return true;
-  
-  return false;
-};
-
 const severityLabel: Record<string, string> = { high: 'Alta', medium: 'Média', low: 'Baixa' };
 
 export const QA: React.FC = () => {
   const [reports, setReports] = useState<QAReport[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'high' | 'medium' | 'low'>('all');
 
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
+      setLoadError(null);
       try {
         // Fetch ALL membros with pagination
         let allMembros: any[] = [];
@@ -101,9 +80,18 @@ export const QA: React.FC = () => {
           supabaseReader.from('discipulado').select('discipulador, discipulo, status')
         ]);
 
+        if (celulasRes.error) throw celulasRes.error;
+        if (discRes.error) throw discRes.error;
+
         const membros = allMembros;
         const celulas = celulasRes.data || [];
-        const discipulado = discRes.data || [];
+        // A relação é contada uma única vez por par. A exportação pode conter
+        // linhas repetidas do mesmo vínculo, o que não é um novo discípulo.
+        const discipulado = Array.from(new Map(
+          (discRes.data || [])
+            .filter((d: any) => normalizeStr(d.discipulador) && normalizeStr(d.discipulo))
+            .map((d: any) => [`${normalizeStr(d.discipulador)}->${normalizeStr(d.discipulo)}`, d])
+        ).values());
 
         const membrosNomes = new Set(membros.map((m: any) => normalizeStr(m.nome)));
         const membrosMap = new Map(membros.map((m: any) => [normalizeStr(m.nome), m] as [string, any]));
@@ -122,29 +110,29 @@ export const QA: React.FC = () => {
         // 1. Membros sem Discipulador
         const semDisc = membros.filter((m: any) => {
           if (m.status !== 'Ativo') return false;
-          const tipo = (m.tipo_cadastro || '').toLowerCase();
+          const tipo = `${m.tipo_cadastro || ''} ${m.tipo_de_pessoa || ''}`.toLowerCase();
           if (tipo.includes('pastor') || tipo.includes('ext') || tipo.includes('agregado') || tipo.includes('externo')) return false;
           if (!['membro', 'líder', 'lider', 'diácono', 'diacono'].some(t => tipo.includes(t))) return false;
           return !discipulos.has(normalizeStr(m.nome));
         });
-        newReports.push({ id: 'sem_disc', title: 'Membros sem Discipulador', description: 'Membros/Líderes/Diáconos ativos que não aparecem como discípulo de ninguém.', count: semDisc.length, severity: 'high', data: semDisc.map(m => ({ nome: m.nome, tipo: m.tipo_cadastro })), columns: [{ key: 'nome', label: 'Nome' }, { key: 'tipo', label: 'Tipo' }] });
+        newReports.push({ id: 'sem_disc', title: 'Membros sem vínculo de discipulado localizado', description: 'Cadastro ativo elegível cujo nome não foi localizado como discípulo na base oficial de discipulado. A validação é textual e requer confirmação do cadastro.', count: semDisc.length, severity: 'medium', data: semDisc.map(m => ({ nome: m.nome, tipo: m.tipo_cadastro })), columns: [{ key: 'nome', label: 'Nome' }, { key: 'tipo', label: 'Tipo' }] });
 
         // 2. Ativos sem Grupo Caseiro
         const semGrupo = membros.filter((m: any) => {
           if (m.status !== 'Ativo') return false;
           if (m.grupos_caseiros && m.grupos_caseiros.trim() !== '') return false;
-          const tipo = (m.tipo_cadastro || '').toLowerCase();
+          const tipo = `${m.tipo_cadastro || ''} ${m.tipo_de_pessoa || ''}`.toLowerCase();
           if (tipo.includes('ext') || tipo.includes('agregado') || tipo.includes('externo')) return false;
           return ['membro', 'pastor', 'líder', 'lider', 'diácono', 'diacono'].some(t => tipo.includes(t));
         });
-        newReports.push({ id: 'sem_grupo', title: 'Ativos sem Grupo Caseiro', description: 'Membros ativos que deveriam estar vinculados a uma célula, mas o campo está vazio.', count: semGrupo.length, severity: 'high', data: semGrupo.map(m => ({ nome: m.nome, tipo: m.tipo_cadastro })), columns: [{ key: 'nome', label: 'Nome' }, { key: 'tipo', label: 'Tipo' }] });
+        newReports.push({ id: 'sem_grupo', title: 'Ativos sem Grupo Caseiro informado', description: 'Cadastro ativo elegível com o campo oficial de Grupo Caseiro vazio. O alerta não presume que todo cadastro precise estar em um GC.', count: semGrupo.length, severity: 'medium', data: semGrupo.map(m => ({ nome: m.nome, tipo: m.tipo_cadastro })), columns: [{ key: 'nome', label: 'Nome' }, { key: 'tipo', label: 'Tipo' }] });
 
         // 3. Discipuladores Inativos
         const discInativos = [...discipuladores].filter((nome: any) => {
           const m = membrosMap.get(nome as string);
           return m && m.status !== 'Ativo';
         });
-        newReports.push({ id: 'disc_inativo', title: 'Discipuladores Inativos', description: 'Pessoas inativas que ainda constam como líderes de alguém na rede de discipulado.', count: discInativos.length, severity: 'high', data: discInativos.map((nome: any) => ({ nome, status: membrosMap.get(nome as string)?.status || 'Inativo' })), columns: [{ key: 'nome', label: 'Nome' }, { key: 'status', label: 'Status' }] });
+        newReports.push({ id: 'disc_inativo', title: 'Discipuladores com cadastro inativo', description: 'Nome do discipulador localizado na base de membros com status diferente de Ativo.', count: discInativos.length, severity: 'high', data: discInativos.map((nome: any) => ({ nome, status: membrosMap.get(nome as string)?.status || 'Inativo' })), columns: [{ key: 'nome', label: 'Nome' }, { key: 'status', label: 'Status' }] });
 
         // 4. Grupos Caseiros sem LÃ­der VÃ¡lido
         const celulasSemLider = celulas.filter((c: any) => {
@@ -185,19 +173,8 @@ export const QA: React.FC = () => {
         });
         newReports.push({ id: 'superlotada', title: 'Células Acima da Capacidade', description: 'Grupos com mais membros cadastrados do que o limite definido — indicativo de necessidade de multiplicação.', count: superlotadas.length, severity: 'medium', data: superlotadas.map((c: any) => ({ grupo: c.grupo_caseiro, atual: grupoCount[normalizeStr(c.grupo_caseiro)] || 0, limite: c.limite_de_pessoas, setor: c.setor })), columns: [{ key: 'grupo', label: 'Grupo' }, { key: 'atual', label: 'Membros Atuais' }, { key: 'limite', label: 'Limite' }, { key: 'setor', label: 'Setor' }] });
 
-        // 11. PossÃ­veis Duplicatas de Membros
-        const nomesList = membros.map(m => normalizeStr(m.nome)).filter(Boolean);
-        const dupeGroups: { a: string; b: string }[] = [];
-        for (let i = 0; i < nomesList.length; i++) {
-          for (let j = i + 1; j < nomesList.length; j++) {
-            if (nomesList[i] !== nomesList[j] && similar(nomesList[i], nomesList[j])) {
-              dupeGroups.push({ a: membros[i].nome, b: membros[j].nome });
-              if (dupeGroups.length >= 50) break;
-            }
-          }
-          if (dupeGroups.length >= 50) break;
-        }
-        newReports.push({ id: 'duplicatas', title: 'Possíveis Membros Duplicados', description: 'Nomes muito semelhantes que podem representar o mesmo cadastro em duplicidade.', count: dupeGroups.length, severity: 'medium', data: dupeGroups.map((d, i) => ({ num: i + 1, nome_a: d.a, nome_b: d.b })), columns: [{ key: 'num', label: '#' }, { key: 'nome_a', label: 'Cadastro 1' }, { key: 'nome_b', label: 'Cadastro 2' }] });
+        // Heurísticas de duplicidade e titularidade familiar não entram nos
+        // relatórios exibidos: sem ID ou regra oficial, não são fatos.
 
         // 12. Famílias Sem Titular Ativo
         let relationsList: any[] = [];
@@ -495,13 +472,21 @@ export const QA: React.FC = () => {
           console.error('Error generating family reports:', err);
         }
 
-        setReports(newReports.sort((a, b) => {
+        const factualReports = newReports.filter(report => ![
+          'familias_sem_titular',
+          'menores_titulares',
+          'filhos_menores_fora_domicilio'
+        ].includes(report.id));
+
+        setReports(factualReports.sort((a, b) => {
           const sev = { high: 3, medium: 2, low: 1 };
           if (sev[b.severity] !== sev[a.severity]) return sev[b.severity] - sev[a.severity];
           return b.count - a.count;
         }));
       } catch (error) {
         console.error('Error computing QA reports:', error);
+        setReports([]);
+        setLoadError('Não foi possível carregar todas as fontes oficiais. Nenhum alerta foi calculado para evitar números incorretos.');
       } finally {
         setIsLoading(false);
       }
@@ -532,7 +517,7 @@ export const QA: React.FC = () => {
           </div>
           <h1 className="text-3xl font-bold tracking-tight text-gray-900">Auditoria de Dados</h1>
           <p className="mt-2 text-sm text-gray-500 max-w-2xl">
-            Identifique inconsistências, cadastros órfãos e quebras de regras de negócio para manter a saúde do banco de dados.
+            Validações factuais baseadas exclusivamente nos registros atuais do Supabase. Sinais heurísticos não são exibidos como erros.
           </p>
         </div>
         {!isLoading && (
@@ -579,6 +564,12 @@ export const QA: React.FC = () => {
           <Loader2 className="h-10 w-10 animate-spin text-primary-600 mb-4" />
           <p className="text-gray-700 font-semibold text-lg">Analisando base de dados...</p>
           <p className="text-gray-400 text-sm mt-1">Cruzando membros, células e vínculos de discipulado.</p>
+        </div>
+      ) : loadError ? (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-8 text-center text-amber-900">
+          <FileWarning className="w-8 h-8 mx-auto mb-3 text-amber-600" />
+          <p className="font-semibold">Auditoria indisponível</p>
+          <p className="text-sm mt-1">{loadError}</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4">
