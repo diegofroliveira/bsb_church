@@ -78,22 +78,22 @@ import type { Member, Cell, DiscipleshipLink, FamilyRelation } from '../hooks/us
 // Helper components ChangeMapView and BairroTag moved to modular files in ./simulations
 
 const isCountableGCMember = (member: Member): boolean => {
-  const type = String(member.tipo_de_pessoa || member.tipo_cadastro || '')
-    .trim()
-    .toUpperCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
-  return type !== 'AGREGADO' && type !== 'AGREGADOS';
+  return !isAggregateMember(member);
 };
 
 const isAggregateMember = (member: Member): boolean => {
-  const type = String(member.tipo_de_pessoa || member.tipo_cadastro || '')
-    .trim()
-    .toUpperCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
-  return type === 'AGREGADO' || type === 'AGREGADOS';
+  return [member.tipo_de_pessoa, member.tipo_cadastro].some(value => {
+    const type = String(value || '')
+      .trim()
+      .toUpperCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+    return type === 'AGREGADO' || type === 'AGREGADOS';
+  });
 };
+
+const isMemberRecord = (member: Member): boolean =>
+  [member.tipo_de_pessoa, member.tipo_cadastro].some(value => String(value || '').trim().toUpperCase() === 'MEMBRO');
 
 const formatTerritorialCount = (linkedCount: number, aggregateCount = 0): string =>
   `${linkedCount} membros${aggregateCount > 0 ? ` (${aggregateCount} agregados)` : ''}`;
@@ -1289,11 +1289,9 @@ export const Simulations: React.FC = () => {
     Object.entries(allActiveByRA).forEach(([ra, residents]) => {
       if (ra === 'NÃO INFORMADO') return;
       
-      // Strict filter: only type = MEMBRO count (case-insensitive)
-      const countableMembersList = residents.filter(m => {
-        const type = (m.tipo_de_pessoa || '').toUpperCase().trim();
-        return type === 'MEMBRO';
-      });
+      // Count members from either source column, excluding aggregates even
+      // when tipo_de_pessoa and tipo_cadastro disagree.
+      const countableMembersList = residents.filter(m => isMemberRecord(m) && isCountableGCMember(m));
       const countableCount = countableMembersList.length;
       const aggregateMembersList = residents.filter(m => isAggregateMember(m));
       const aggregateCount = aggregateMembersList.length;
@@ -1361,9 +1359,9 @@ export const Simulations: React.FC = () => {
             displayDescription: `A base identifica ${formatTerritorialCount(countableCount, aggregateCount)} ativos residentes em SAMAMBAIA. ${formatTerritorialCount(externalResidentCandidates.length, externalAggregateCandidates.length)} estao hoje fora do GC local, distribuidos em ${residentGroupSummary}. Em vez de concentrar todos em um unico grupo que ficaria grande, a proposta e avaliar um segundo GC em Samambaia para acolher esse nucleo com mais equilibrio.`,
             displayMemberCount: shouldSuggestSecondGroup ? externalResidentCandidates.length : countableCount,
             displayAggregateCount: shouldSuggestSecondGroup ? externalAggregateCandidates.length : aggregateCount,
-            title: 'Proposta de expansão: SAMAMBAIA II',
-            description: `A base identifica ${countableCount} membros ativos residentes em SAMAMBAIA. ${externalResidentCandidates.length} estão hoje fora do GC local, distribuídos em ${residentGroupSummary}. Em vez de concentrar todos em um único grupo que ficaria grande, a proposta é avaliar um segundo GC em Samambaia para acolher esse núcleo com mais equilíbrio.`,
-            action: 'AÇÃO SUGERIDA: CONSIDERAR UM SEGUNDO GC EM SAMAMBAIA',
+            title: 'Otimização e expansão: SAMAMBAIA II',
+            description: `A base identifica ${formatTerritorialCount(countableCount, aggregateCount)} ativos residentes em SAMAMBAIA. ${formatTerritorialCount(externalResidentCandidates.length, externalAggregateCandidates.length)} estão hoje fora do GC local, distribuídos em ${residentGroupSummary}. Em vez de concentrar todos em um único grupo que ficaria grande, a proposta é avaliar a criação de um segundo GC em Samambaia para acolher esse núcleo com mais equilíbrio. Os agregados não determinam a decisão, mas devem ser considerados no planejamento da capacidade e do cuidado.`,
+            action: 'AÇÃO SUGERIDA: AVALIAR A CRIAÇÃO DE UM SEGUNDO GC EM SAMAMBAIA',
             memberNames: (shouldSuggestSecondGroup ? externalResidentCandidates : countableMembersList).map(m => m.nome).sort(),
             coverageRegions: Object.keys(externalResidentRegionCounts)
           });
