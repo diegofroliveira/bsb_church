@@ -1690,9 +1690,9 @@ export const Simulations: React.FC = () => {
       return a.memberName.localeCompare(b.memberName);
     });
 
-    // 4. Overcrowded GCs (> 20 members - Musk Rule)
+    // 4. Overcrowded GCs (> 25 linked members)
     const overcrowdedGCs = Object.entries(membersCountByGC)
-      .filter(([gc, count]) => count > 20 && gc !== 'COBERTURA - VIX')
+      .filter(([gc, count]) => count > 25 && gc !== 'COBERTURA - VIX')
       .map(([gc, count]) => ({ gc, count }))
       .sort((a, b) => b.count - a.count);
 
@@ -3271,7 +3271,7 @@ export const Simulations: React.FC = () => {
                   >
                     <div className="flex items-center gap-2">
                       <TrendingUp className="w-4 h-4 text-rose-500" />
-                      <span className="text-xs font-bold text-gray-700">GCs Superlotados (&gt; 20 vinculados)</span>
+                      <span className="text-xs font-bold text-gray-700">GCs Superlotados (&gt; 25 vinculados)</span>
                       <span className="text-[10px] bg-rose-100 text-rose-800 font-bold px-1.5 py-0.5 rounded-full">
                         {activeOvercrowdedGCs.length}
                       </span>
