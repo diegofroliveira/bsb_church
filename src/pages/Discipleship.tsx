@@ -19,7 +19,15 @@ export const Discipleship: React.FC = () => {
 
         const { data: results, error } = await query.order('discipulador', { ascending: true });
         if (error) throw error;
-        setData(results || []);
+        const uniqueResults = Array.from(new Map(
+          (results || [])
+            .filter((item: any) => item.discipulador?.trim() && item.discipulo?.trim())
+            .map((item: any) => [
+              `${item.discipulador.trim().replace(/\s+/g, ' ').toUpperCase()}->${item.discipulo.trim().replace(/\s+/g, ' ').toUpperCase()}`,
+              item
+            ])
+        ).values());
+        setData(uniqueResults);
       } catch (error) {
         console.error('Error fetching discipleship data:', error);
       } finally {

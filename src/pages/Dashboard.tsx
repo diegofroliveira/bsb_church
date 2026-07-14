@@ -76,7 +76,15 @@ export const Dashboard: React.FC = () => {
 
         setRawMembros(membrosRes.data || []);
         setRawCelulas(celulasRes.data || []);
-        setRawDiscipulado(discRes.data || []);
+        const uniqueDiscipulado = Array.from(new Map(
+          (discRes.data || [])
+            .filter((d: any) => d.discipulador?.trim() && d.discipulo?.trim())
+            .map((d: any) => [
+              `${d.discipulador.trim().replace(/\s+/g, ' ').toUpperCase()}->${d.discipulo.trim().replace(/\s+/g, ' ').toUpperCase()}`,
+              d
+            ])
+        ).values());
+        setRawDiscipulado(uniqueDiscipulado);
         setRawFuncoes(funcoesRes);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
@@ -403,8 +411,11 @@ export const Dashboard: React.FC = () => {
         const sectorCells = rawCelulas.filter(c => getNormalizedSectorName(c.setor) === title);
         dataResp = sectorCells.map(d => ({ col1: d.grupo_caseiro, col2: d.lider || 'Sem Líder', col3: 'Grupo Caseiro', col4: 'Detalhar', isAction: true }));
       } else if (type === 'discipulador') {
-        const { data } = await supabaseReader.from('discipulado').select('discipulo, status, tipo').eq('discipulador', title);
-        dataResp = (data || []).map(d => ({ col1: d.discipulo, col2: d.status || 'Ativo', col3: d.tipo || '-', col4: '-', col5: '-' }));
+        const { data } = await supabaseReader.from('discipulado').select('discipulo, discipulador, status, tipo').eq('discipulador', title);
+        const uniqueDiscipulos = Array.from(new Map(
+          (data || []).filter(d => d.discipulo).map(d => [d.discipulo.trim().replace(/\s+/g, ' ').toUpperCase(), d])
+        ).values());
+        dataResp = uniqueDiscipulos.map(d => ({ col1: d.discipulo, col2: d.status || 'Ativo', col3: d.tipo || '-', col4: '-', col5: '-' }));
       }
       setModalItems(dataResp);
     } catch (e) { console.error(e); } finally { setIsModalLoading(false); }
