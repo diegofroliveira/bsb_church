@@ -1283,24 +1283,39 @@ export const Simulations: React.FC = () => {
       
       const gcList = gcsByRA[ra] || [];
       const actualGCs = gcList.length;
+      const exactLocalGCNames = new Set(
+        draftCells
+          .filter(c => getGCRegion(c.grupo_caseiro) === ra)
+          .map(c => c.grupo_caseiro)
+      );
+      const externalResidentCandidates = countableMembersList.filter(m =>
+        Boolean(m.grupos_caseiros) &&
+        m.grupos_caseiros !== 'COBERTURA - VIX' &&
+        !exactLocalGCNames.has(m.grupos_caseiros!)
+      );
       
       // Territorial suggested GCs based on tens rule:
       // 10 members -> 1 GC, 20 members -> 2 GCs, 30 members -> 3 GCs
       // Suggest starting a GC only if there are at least 12 countable members (Bezos Rule)
       const suggestedGCs = Math.floor(countableCount / 10);
       
-      const shouldSuggestExpansion = actualGCs === 0 
-        ? countableCount >= 12 
-        : (suggestedGCs > actualGCs && suggestedGCs >= 1);
+      // Use a lower threshold for a local opportunity, and require a larger
+      // base plus external residents before proposing a second GC.
+      const shouldSuggestLocalGroup = actualGCs === 0 && countableCount >= 6;
+      const shouldSuggestSecondGroup = actualGCs > 0 &&
+        countableCount >= 18 &&
+        externalResidentCandidates.length >= 6;
+      const shouldSuggestExpansion = shouldSuggestLocalGroup || shouldSuggestSecondGroup ||
+        (suggestedGCs > actualGCs && suggestedGCs >= 1);
 
       if (shouldSuggestExpansion) {
         if (actualGCs === 0) {
           insights.push({
             type: 'expansion',
             ra: ra,
-            title: `Alerta de Expansão: ${ra}`,
-            description: `Localidade ${ra} possui quórum de ${countableCount} membros ativos (tipo = MEMBRO) e ${totalCount} residentes totais. Pela regra de dezenas (mínimo de 12 membros para primeiro GC), sugere-se a criação de um grupo local no bairro para acolher e pastorear estes moradores locais.`,
-            action: 'Ação sugerida: Avaliar criação de GC local ou reorganização regional',
+            title: `Proposta de criação: GC ${ra}`,
+            description: `A base registra ${countableCount} membros ativos residentes em ${ra}, ${actualGCs} GC próprio e ${externalResidentCandidates.length} desses membros alocados atualmente fora da localidade. O dado sustenta avaliar a criação de um GC local, sem recomendar mudança automática de vínculos.`,
+            action: 'AÇÃO SUGERIDA: AVALIAR CRIAÇÃO DE GC LOCAL',
             memberNames: countableMembersList.map(m => m.nome).sort()
           });
         } else {
@@ -1313,10 +1328,12 @@ export const Simulations: React.FC = () => {
           insights.push({
             type: 'expansion_next',
             ra: ra,
-            title: `Oportunidade: Novo Grupo em ${ra}`,
-            description: `Localidade ${ra} já possui ${actualGCs} grupo(s) cadastrado(s), mas conta com um quórum de ${countableCount} membros ativos (tipo = MEMBRO) e ${totalCount} residentes totais. Pela regra territorial de dezenas (10 membros por GC), a região comporta sugerir ${suggestedGCs} grupo(s). Recomenda-se planejar a abertura de um novo grupo local (${ra} ${nextNumStr}) para desdobramento territorial.`,
-            action: `Ação sugerida: Avaliar abertura de ${ra} ${nextNumStr} / desdobramento territorial`,
-            memberNames: countableMembersList.map(m => m.nome).sort()
+            title: `Proposta de expansão: ${ra} ${nextNumStr}`,
+            description: shouldSuggestSecondGroup
+              ? `A base registra ${countableCount} membros ativos residentes em ${ra}. ${externalResidentCandidates.length} deles estão atualmente alocados fora da localidade, indicando uma oportunidade de avaliar um segundo GC em ${ra} para acolher esse núcleo, sem mover pessoas automaticamente.`
+              : `Localidade ${ra} já possui ${actualGCs} grupo(s) cadastrado(s), mas conta com ${countableCount} membros ativos residentes. Pela regra territorial de dezenas, recomenda-se avaliar um desdobramento local antes de qualquer alteração de vínculos.`,
+            action: `AÇÃO SUGERIDA: AVALIAR ${ra} ${nextNumStr} / DESDOBRAMENTO TERRITORIAL`,
+            memberNames: (shouldSuggestSecondGroup ? externalResidentCandidates : countableMembersList).map(m => m.nome).sort()
           });
         }
       }
@@ -1392,15 +1409,27 @@ export const Simulations: React.FC = () => {
 
       // Recanto is an existing GC whose mixed residence profile supports a
       // naming proposal, not a new-group or repatriation recommendation.
-      const currentRecanto = gcList.find(c => normalizeName(c.grupo_caseiro) === 'RECANTO');
-      if (currentRecanto && externalParticipants.length > 0) {
+      const currentRecanto = gcList.find(c => normalizeName(c.grupo_caseiro).includes('RECANTO'));
+      const recantoExternalParticipants = currentRecanto
+        ? draftMembers.filter(m =>
+            m.status === 'Ativo' &&
+            isCountableGCMember(m) &&
+            m.grupos_caseiros === currentRecanto.grupo_caseiro &&
+            getAdministrativeRegion(m.bairro) !== ra
+          )
+        : [];
+      const namingParticipants = externalParticipants.length > 0
+        ? externalParticipants
+        : recantoExternalParticipants;
+
+      if (currentRecanto && namingParticipants.length >= 3) {
         insights.push({
           type: 'renaming',
           ra: 'RECANTO-ENTORNO',
           title: 'Proposta de nome: RECANTO-ENTORNO',
-          description: `O grupo caseiro atualmente chamado ${currentRecanto.grupo_caseiro} reúne ${externalParticipants.length} membros ativos residentes em outras regiões, incluindo ${proposalExternalRAs.join(', ')}. A proposta é renomear o grupo para RECANTO-ENTORNO para refletir sua cobertura territorial atual, sem criar um novo grupo e sem alterar vínculos automaticamente.`,
+          description: `O grupo caseiro atualmente chamado ${currentRecanto.grupo_caseiro} reúne ${namingParticipants.length} membros ativos residentes em outras regiões, incluindo ${Array.from(new Set(namingParticipants.map(m => getAdministrativeRegion(m.bairro)))).sort().join(', ')}. A proposta é renomear o grupo para RECANTO-ENTORNO para refletir sua cobertura territorial atual, sem criar um novo grupo e sem alterar vínculos automaticamente.`,
           action: 'AÇÃO SUGERIDA: AVALIAR RENOMEAÇÃO ADMINISTRATIVA',
-          externalParticipants: externalParticipants.map(m => ({
+          externalParticipants: namingParticipants.map(m => ({
             nome: m.nome,
             gc: m.grupos_caseiros,
             bairro: m.bairro || 'Não informado',
@@ -1411,7 +1440,7 @@ export const Simulations: React.FC = () => {
         });
       }
 
-      if (scatteredResidents.length > 0 || externalParticipants.length > 0) {
+      if (!shouldSuggestLocalGroup && (scatteredResidents.length > 0 || externalParticipants.length > 0)) {
         const externalGCs = Array.from(new Set(scatteredResidents.map(m => m.grupos_caseiros!))).sort();
         const externalRAs = Array.from(new Set(externalParticipants.map(m => getAdministrativeRegion(m.bairro)))).sort();
         
