@@ -66,7 +66,7 @@ export const QA: React.FC = () => {
         while (true) {
           const { data, error } = await supabase
             .from('membros')
-            .select('id, nome, status, tipo_cadastro, tipo_de_pessoa, nascimento, grupos_caseiros, celular_principal_sms, email, sexo, estado_civil, pai, mae, esposo_a')
+            .select('id, nome, status, tipo_cadastro, tipo_de_pessoa, nascimento, grupos_caseiros, sexo, estado_civil, pai, mae, esposo_a')
             .range(from, from + 999);
           if (error) throw error;
           if (!data || data.length === 0) break;
@@ -155,15 +155,7 @@ export const QA: React.FC = () => {
         const typos = [...allDiscNames].filter(nome => nome && !membrosNomes.has(nome as string));
         newReports.push({ id: 'typo_disc', title: 'Nomes Órfãos no Discipulado', description: 'Nomes na tabela de Discipulado que não têm cadastro correspondente na tabela de Membros.', count: typos.length, severity: 'medium', data: typos.map(nome => ({ nome: (discOriginalNames.get(nome as string) || nome) as string })), columns: [{ key: 'nome', label: 'Nome no Discipulado' }] });
 
-        // 8. Ativos sem Telefone
-        const semTel = membros.filter((m: any) => m.status === 'Ativo' && (!m.celular_principal_sms || String(m.celular_principal_sms).trim().length < 8));
-        newReports.push({ id: 'sem_tel', title: 'Membros Ativos sem Telefone', description: 'Cadastros sem celular dificultam contato e comunicação pastoral.', count: semTel.length, severity: 'low', data: semTel.map(m => ({ nome: m.nome, tipo: m.tipo_cadastro })), columns: [{ key: 'nome', label: 'Nome' }, { key: 'tipo', label: 'Tipo' }] });
-
-        // 9. Ativos sem Email
-        const semEmail = membros.filter((m: any) => m.status === 'Ativo' && (!m.email || m.email.trim() === '' || !m.email.includes('@')));
-        newReports.push({ id: 'sem_email', title: 'Membros Ativos sem Email', description: 'Cadastros sem e-mail válido limitam comunicação digital e convites.', count: semEmail.length, severity: 'low', data: semEmail.map(m => ({ nome: m.nome, tipo: m.tipo_cadastro })), columns: [{ key: 'nome', label: 'Nome' }, { key: 'tipo', label: 'Tipo' }] });
-
-        // 10. Células Acima da Capacidade
+        // 8. Células Acima da Capacidade
         const grupoCount: Record<string, number> = {};
         membros.forEach((m: any) => { if (m.grupos_caseiros) grupoCount[normalizeStr(m.grupos_caseiros)] = (grupoCount[normalizeStr(m.grupos_caseiros)] || 0) + 1; });
         const superlotadas = celulas.filter((c: any) => {
