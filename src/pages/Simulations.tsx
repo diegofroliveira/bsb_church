@@ -68,6 +68,7 @@ import {
   normalizeName, 
   getAdministrativeRegion, 
   getGCRegion,
+  isOperationallyAligned,
   getFallbackRegion,
   getSectorByResidence
 } from '../lib/geoUtils';
@@ -1573,9 +1574,11 @@ export const Simulations: React.FC = () => {
         // Mismatch exists if:
         // 1. Coordinates exist and distance is greater than 8 km.
         // 2. Coordinates missing and member's residence sector is different from GC's sector.
-        const isCorrectAllocation = distance !== null 
-          ? distance <= 8.0 
-          : (memberSector === gcSector);
+        const gcRegion = getGCRegion(gcName);
+        const alignedByRegion = isOperationallyAligned(memberRA, gcRegion);
+        const isCorrectAllocation = alignedByRegion || (distance !== null
+          ? distance <= 8.0
+          : (memberSector === gcSector));
 
         if (!isCorrectAllocation) {
           const rec = getRecommendedGCsForRegion(memberRA);

@@ -118,6 +118,30 @@ export const getGCRegion = (gcName: string): string => {
   return 'OUTRO';
 };
 
+const normalizeRegion = (value: string): string => value
+  .trim()
+  .toUpperCase()
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '');
+
+// These are accepted ministry/coverage equivalences, not territorial errors.
+const VALID_COVERAGE_PAIRS = new Set([
+  'AGUAS CLARAS|ARNIQUEIRA',
+  'GUARA|GUARA-NB',
+  'GUARA-NB|NUCLEO BANDEIRANTE',
+  'GAMA|RECANTO-ENTORNO',
+  'RECANTO-ENTORNO|SAMAMBAIA',
+  'RECANTO-ENTORNO|SANTA MARIA'
+]);
+
+export const isOperationallyAligned = (residenceRegion: string, gcRegion: string): boolean => {
+  const residence = normalizeRegion(residenceRegion);
+  const group = normalizeRegion(gcRegion);
+  if (!residence || !group || residence === 'NAO INFORMADO' || group === 'OUTRO') return false;
+  if (residence === group) return true;
+  return VALID_COVERAGE_PAIRS.has([residence, group].sort().join('|'));
+};
+
 export const getFallbackRegion = (memberRA: string): string => {
   const fallbackRules: Record<string, string> = {
     'LAGO NORTE': 'ASA NORTE',
