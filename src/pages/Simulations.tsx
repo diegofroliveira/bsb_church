@@ -114,6 +114,7 @@ export const Simulations: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'gc' | 'discipleship'>('gc');
   const [isMapExpanded, setIsMapExpanded] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
+  const [mobileView, setMobileView] = useState<'board' | 'diagnostics'>('board');
   
   // Sandbox Data (Drafts)
   const [draftMembers, setDraftMembers] = useState<Member[]>([]);
@@ -1932,6 +1933,28 @@ export const Simulations: React.FC = () => {
 
 
 
+  const warningsCount = useMemo(() => {
+    return (
+      activeMismatches.length +
+      activeOvercrowdedGCs.length +
+      activeCriticalGCs.length +
+      activeInsights.length +
+      activeIsolatedMembers.length +
+      activeOverloadedDisciplers.length +
+      activeUnassignedMembers.length +
+      activeDisplacedDisciples.length
+    );
+  }, [
+    activeMismatches,
+    activeOvercrowdedGCs,
+    activeCriticalGCs,
+    activeInsights,
+    activeIsolatedMembers,
+    activeOverloadedDisciplers,
+    activeUnassignedMembers,
+    activeDisplacedDisciples
+  ]);
+
   if (isLoading) return <div className="flex h-96 items-center justify-center"><TrendingUp className="h-8 w-8 animate-spin text-primary-600" /></div>;
 
   return (
@@ -2024,9 +2047,38 @@ export const Simulations: React.FC = () => {
 
 
 
+      {/* Mobile-only toggle for columns */}
+      <div className="flex bg-gray-150 p-1 rounded-2xl mb-4 lg:hidden gap-1">
+        <button
+          type="button"
+          onClick={() => setMobileView('board')}
+          className={clsx(
+            "flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 outline-none",
+            mobileView === 'board' ? "bg-white text-gray-800 shadow-sm" : "text-gray-500 hover:text-gray-700"
+          )}
+        >
+          <TrendingUp className="w-3.5 h-3.5" /> Quadro de Simulação
+        </button>
+        <button
+          type="button"
+          onClick={() => setMobileView('diagnostics')}
+          className={clsx(
+            "flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 outline-none relative",
+            mobileView === 'diagnostics' ? "bg-white text-gray-800 shadow-sm" : "text-gray-500 hover:text-gray-700"
+          )}
+        >
+          <Brain className="w-3.5 h-3.5" /> Alertas & Diagnósticos
+          {warningsCount > 0 && (
+            <span className="ml-1 bg-red-500 text-white rounded-full text-[9px] font-black h-4 w-4 flex items-center justify-center leading-none">
+              {warningsCount}
+            </span>
+          )}
+        </button>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Column: Simulation Board */}
-        <div className="lg:col-span-8 space-y-6">
+        <div className={clsx("lg:col-span-8 space-y-6", mobileView === 'board' ? "block" : "hidden lg:block")}>
            {/* Tabs and Mode Toggles */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100">
             <div className="flex gap-4">
@@ -2667,7 +2719,7 @@ export const Simulations: React.FC = () => {
         </div>
 
         {/* Right Column: Analytics & Insights */}
-        <div className="lg:col-span-4 space-y-6">
+        <div className={clsx("lg:col-span-4 space-y-6", mobileView === 'diagnostics' ? "block" : "hidden lg:block")}>
            {/* 1. Destination Group Preview Comparison Table */}
            {activeTab === 'gc' && targetComparison && (
              <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm space-y-4">

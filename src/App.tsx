@@ -55,7 +55,7 @@ function App() {
               <Route path="/discipleship" element={<Discipleship />} />
               <Route path="/network" element={<Network />} />
               <Route path="/membro/:name" element={<MemberProfile />} />
-              <Route element={<ProtectedRoute allowedRoles={['admin', 'pastor', 'finance']} />}>
+              <Route element={<ProtectedRoute allowedRoles={['admin', 'pastor', 'financeiro']} />}>
                 <Route path="/finance" element={<Finance />} />
               </Route>
               <Route element={<ProtectedRoute allowedRoles={['admin']} />}>

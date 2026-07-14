@@ -3,7 +3,7 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, Users, Home, DollarSign, Settings, LogOut,
   Menu, BookOpen, FileText, Network, AlertTriangle, MapPin,
-  Brain, Calendar, Play, Heart, Handshake, Compass, Sparkles, RefreshCw
+  Brain, Calendar, Play, Heart, Handshake, Compass, Sparkles, RefreshCw, X
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -269,6 +269,15 @@ export const MainLayout: React.FC = () => {
         <div className="fixed inset-0 z-50 flex lg:hidden">
           <div className="fixed inset-0 bg-gray-900/80 transition-opacity" onClick={() => setIsMobileMenuOpen(false)} />
           <div className="relative flex w-full max-w-xs flex-1 flex-col bg-white shadow-2xl animate-in slide-in-from-left duration-300">
+            <div className="absolute right-4 top-4 z-50">
+              <button
+                type="button"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="rounded-full p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900 outline-none"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
             <SidebarContent />
           </div>
         </div>

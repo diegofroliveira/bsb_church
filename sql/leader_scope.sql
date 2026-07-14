@@ -2,6 +2,7 @@
 -- Execute no Supabase SQL Editor antes de liberar o modulo "Visoes de Lideranca".
 
 alter table public.profiles add column if not exists assigned_sector text;
+alter table public.profiles add column if not exists assigned_gc text;
 
 create or replace function public.leader_scope_profile()
 returns public.profiles

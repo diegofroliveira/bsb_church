@@ -222,7 +222,7 @@ export const Settings: React.FC = () => {
                                    user.role === 'admin' ? 'text-purple-700' :
                                    user.role === 'pastor' ? 'text-blue-700' :
                                    user.role === 'leader' ? 'text-green-700' :
-                                   user.role === 'finance' ? 'text-yellow-700' : 'text-orange-700'
+                                   user.role === 'financeiro' ? 'text-yellow-700' : 'text-orange-700'
                                 }>{user.role || 'user'}</span>
                              </div>
                          </td>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Filter, Mail, Phone, MoreVertical, Loader2, Eye } from 'lucide-react';
+import { Search, Filter, Mail, Phone, MoreVertical, Loader2, Eye, SlidersHorizontal } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabaseReader } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -40,6 +40,7 @@ export const Members: React.FC = () => {
   const [filterMaxAge, setFilterMaxAge] = useState<number>(120);
   const [showInactive, setShowInactive] = useState(false);
   const [populationMode, setPopulationMode] = useState<PopulationMode>('todos');
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false);
 
   useEffect(() => {
     const fetchAllData = async () => {
@@ -199,112 +200,132 @@ export const Members: React.FC = () => {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <PopulationFlags value={populationMode} onChange={setPopulationMode} className="md:col-span-4 border-b border-gray-100 pb-3" />
-          <div>
-             <label className="block text-xs font-medium text-gray-500 mb-1">Buscar por Nome</label>
-             <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <input
-                   type="text" value={filterQuery} onChange={e => { setFilterQuery(e.target.value); setPage(1); }}
-                   className="pl-9 pr-3 py-2 w-full text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
-                   placeholder="Ex: João da Silva..."
-                />
-             </div>
-          </div>
+        <div className="flex flex-col gap-4">
+          <PopulationFlags value={populationMode} onChange={setPopulationMode} className="border-b border-gray-100 pb-3" />
           
-          <div>
-             <label className="block text-xs font-medium text-gray-500 mb-1">Tipo / Vínculo</label>
-             <select value={filterType} onChange={e => { setFilterType(e.target.value); setPage(1); }} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white">
-                 <option value="Todos">Todos</option>
-                 {uniqueTypes.map(t => <option key={t as string} value={t as string}>{t as string}</option>)}
-             </select>
+          <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-end">
+            <div className="flex-1">
+               <label className="block text-xs font-medium text-gray-500 mb-1">Buscar por Nome</label>
+               <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input
+                     type="text" value={filterQuery} onChange={e => { setFilterQuery(e.target.value); setPage(1); }}
+                     className="pl-9 pr-3 py-2 w-full text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white"
+                     placeholder="Ex: João da Silva..."
+                  />
+               </div>
+            </div>
+            
+            <button
+              type="button"
+              onClick={() => setIsFiltersOpen(!isFiltersOpen)}
+              className={clsx(
+                "sm:w-auto px-4 py-2 border rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-all outline-none md:hidden",
+                isFiltersOpen ? "bg-primary-50 border-primary-200 text-primary-750" : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+              )}
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              {isFiltersOpen ? "Ocultar Filtros" : "Filtros Avançados"}
+            </button>
           </div>
 
-          <div>
-             <label className="block text-xs font-medium text-gray-500 mb-1">Faixa Etária</label>
-             <select value={filterAgeCategory} onChange={e => { setFilterAgeCategory(e.target.value); setPage(1); }} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white">
-                 {['Todas', 'Criança', 'Adolescente', 'Jovem', 'Adulto', 'Idoso', 'Indefinida'].map(t => <option key={t} value={t}>{t}</option>)}
-             </select>
-          </div>
+          <div className={clsx(
+            "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 transition-all duration-300",
+            isFiltersOpen ? "block" : "hidden md:grid"
+          )}>
+            <div>
+               <label className="block text-xs font-medium text-gray-500 mb-1">Tipo / Vínculo</label>
+               <select value={filterType} onChange={e => { setFilterType(e.target.value); setPage(1); }} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white">
+                   <option value="Todos">Todos</option>
+                   {uniqueTypes.map(t => <option key={t as string} value={t as string}>{t as string}</option>)}
+               </select>
+            </div>
 
-          <div>
-             <label className="block text-xs font-medium text-gray-500 mb-1">Sexo / Gênero</label>
-             <select value={filterGender} onChange={e => { setFilterGender(e.target.value); setPage(1); }} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white">
-                 <option value="Todos">Todos</option>
-                 {uniqueGenders.map(t => <option key={t as string} value={t as string}>{t as string}</option>)}
-             </select>
-          </div>
+            <div>
+               <label className="block text-xs font-medium text-gray-500 mb-1">Faixa Etária</label>
+               <select value={filterAgeCategory} onChange={e => { setFilterAgeCategory(e.target.value); setPage(1); }} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white">
+                   {['Todas', 'Criança', 'Adolescente', 'Jovem', 'Adulto', 'Idoso', 'Indefinida'].map(t => <option key={t} value={t}>{t}</option>)}
+               </select>
+            </div>
 
-          <div>
-             <label className="block text-xs font-medium text-gray-500 mb-1">Setor de Residência</label>
-             <select value={filterSetor} onChange={e => { setFilterSetor(e.target.value); setPage(1); }} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white">
-                 <option value="Todos">Todos</option>
-                 {uniqueSetores.map(t => <option key={t as string} value={t as string}>{t as string}</option>)}
-             </select>
-          </div>
+            <div>
+               <label className="block text-xs font-medium text-gray-500 mb-1">Sexo / Gênero</label>
+               <select value={filterGender} onChange={e => { setFilterGender(e.target.value); setPage(1); }} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white">
+                   <option value="Todos">Todos</option>
+                   {uniqueGenders.map(t => <option key={t as string} value={t as string}>{t as string}</option>)}
+               </select>
+            </div>
 
-          <div>
-             <label className="block text-xs font-medium text-gray-500 mb-1">Setor do GC (Ecl.)</label>
-             <select value={filterSetorEcl} onChange={e => { setFilterSetorEcl(e.target.value); setPage(1); }} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white">
-                 <option value="Todos">Todos</option>
-                 {uniqueSetoresEcl.map(t => <option key={t as string} value={t as string}>{t as string}</option>)}
-             </select>
-          </div>
+            <div>
+               <label className="block text-xs font-medium text-gray-500 mb-1">Setor de Residência</label>
+               <select value={filterSetor} onChange={e => { setFilterSetor(e.target.value); setPage(1); }} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white">
+                   <option value="Todos">Todos</option>
+                   {uniqueSetores.map(t => <option key={t as string} value={t as string}>{t as string}</option>)}
+               </select>
+            </div>
 
-          <div>
-             <label className="block text-xs font-medium text-gray-500 mb-1">Grupo Caseiro</label>
-             <select value={filterGC} onChange={e => { setFilterGC(e.target.value); setPage(1); }} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white">
-                 <option value="Todos">Todos</option>
-                 {uniqueGCs.map(t => <option key={t as string} value={t as string}>{t as string}</option>)}
-             </select>
-          </div>
+            <div>
+               <label className="block text-xs font-medium text-gray-500 mb-1">Setor do GC (Ecl.)</label>
+               <select value={filterSetorEcl} onChange={e => { setFilterSetorEcl(e.target.value); setPage(1); }} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white">
+                   <option value="Todos">Todos</option>
+                   {uniqueSetoresEcl.map(t => <option key={t as string} value={t as string}>{t as string}</option>)}
+               </select>
+            </div>
 
-          <div>
-             <label className="block text-xs font-medium text-gray-500 mb-1">UF / Estado</label>
-             <select value={filterState} onChange={e => { setFilterState(e.target.value); setPage(1); }} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white">
-                 <option value="Todos">Todos</option>
-                 {uniqueStates.map(t => <option key={t as string} value={t as string}>{t as string}</option>)}
-             </select>
-          </div>
+            <div>
+               <label className="block text-xs font-medium text-gray-500 mb-1">Grupo Caseiro</label>
+               <select value={filterGC} onChange={e => { setFilterGC(e.target.value); setPage(1); }} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white">
+                   <option value="Todos">Todos</option>
+                   {uniqueGCs.map(t => <option key={t as string} value={t as string}>{t as string}</option>)}
+               </select>
+            </div>
 
-          <div>
-             <label className="block text-xs font-medium text-gray-500 mb-1">Discipulador</label>
-             <select value={filterMestre} onChange={e => { setFilterMestre(e.target.value); setPage(1); }} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white">
-                 <option value="Todos">Todos</option>
-                 {uniqueMestres.map(t => <option key={t as string} value={t as string}>{t as string}</option>)}
-             </select>
-          </div>
+            <div>
+               <label className="block text-xs font-medium text-gray-500 mb-1">UF / Estado</label>
+               <select value={filterState} onChange={e => { setFilterState(e.target.value); setPage(1); }} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white">
+                   <option value="Todos">Todos</option>
+                   {uniqueStates.map(t => <option key={t as string} value={t as string}>{t as string}</option>)}
+               </select>
+            </div>
 
-          <div>
-             <label className="block text-xs font-medium text-gray-500 mb-1">Estado Civil</label>
-             <select value={filterMaritalStatus} onChange={e => { setFilterMaritalStatus(e.target.value); setPage(1); }} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white">
-                 <option value="Todos">Todos</option>
-                 {uniqueMaritalStatuses.map(t => <option key={t as string} value={t as string}>{t as string}</option>)}
-             </select>
-          </div>
+            <div>
+               <label className="block text-xs font-medium text-gray-500 mb-1">Discipulador</label>
+               <select value={filterMestre} onChange={e => { setFilterMestre(e.target.value); setPage(1); }} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white">
+                   <option value="Todos">Todos</option>
+                   {uniqueMestres.map(t => <option key={t as string} value={t as string}>{t as string}</option>)}
+               </select>
+            </div>
 
-          <div>
-             <label className="block text-xs font-medium text-gray-500 mb-1">Idade (Min / Max)</label>
-             <div className="flex items-center gap-2">
-                <input type="number" value={filterMinAge} onChange={e => { setFilterMinAge(parseInt(e.target.value) || 0); setPage(1); }} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white" placeholder="Min" />
-                <span className="text-gray-400">/</span>
-                <input type="number" value={filterMaxAge} onChange={e => { setFilterMaxAge(parseInt(e.target.value) || 120); setPage(1); }} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white" placeholder="Max" />
-             </div>
-          </div>
+            <div>
+               <label className="block text-xs font-medium text-gray-500 mb-1">Estado Civil</label>
+               <select value={filterMaritalStatus} onChange={e => { setFilterMaritalStatus(e.target.value); setPage(1); }} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white">
+                   <option value="Todos">Todos</option>
+                   {uniqueMaritalStatuses.map(t => <option key={t as string} value={t as string}>{t as string}</option>)}
+               </select>
+            </div>
 
-          <div className="flex items-end pb-1.5">
-             <label className="flex items-center gap-2 cursor-pointer select-none">
-                <input 
-                  type="checkbox" 
-                  checked={showInactive} 
-                  onChange={e => { setShowInactive(e.target.checked); setPage(1); }} 
-                  className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 h-4.5 w-4.5 cursor-pointer"
-                />
-                <span className="text-xs font-semibold text-gray-700">
-                  Mostrar Inativos
-                </span>
-             </label>
+            <div>
+               <label className="block text-xs font-medium text-gray-500 mb-1">Idade (Min / Max)</label>
+               <div className="flex items-center gap-2">
+                  <input type="number" value={filterMinAge} onChange={e => { setFilterMinAge(parseInt(e.target.value) || 0); setPage(1); }} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white" placeholder="Min" />
+                  <span className="text-gray-400">/</span>
+                  <input type="number" value={filterMaxAge} onChange={e => { setFilterMaxAge(parseInt(e.target.value) || 120); setPage(1); }} className="w-full py-2 px-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none bg-white" placeholder="Max" />
+               </div>
+            </div>
+
+            <div className="flex items-end pb-1.5">
+               <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input 
+                    type="checkbox" 
+                    checked={showInactive} 
+                    onChange={e => { setShowInactive(e.target.checked); setPage(1); }} 
+                    className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 h-4.5 w-4.5 cursor-pointer"
+                  />
+                  <span className="text-xs font-semibold text-gray-700">
+                    Mostrar Inativos
+                  </span>
+               </label>
+            </div>
           </div>
         </div>
       </div>
@@ -317,7 +338,77 @@ export const Members: React.FC = () => {
                </div>
              )}
              
-             <table className="min-w-full divide-y divide-gray-200">
+             {/* Mobile View: Cards */}
+             <div className="block sm:hidden divide-y divide-gray-100">
+                {paginatedMembers.map((person) => (
+                  <div key={person.id} className="p-4 flex flex-col gap-3 hover:bg-gray-50/50 transition-all">
+                     <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 shrink-0 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-bold border border-primary-200 overflow-hidden text-sm uppercase">
+                            {person.foto ? (
+                              <img src={person.foto} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <>
+                                <img 
+                                  src={`https://vadufkgbluisdamgkbln.supabase.co/storage/v1/object/public/avatars/avatars/${person.id}.jpg`} 
+                                  alt="" 
+                                  className="w-full h-full object-cover" 
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).classList.add('hidden');
+                                    (e.target as HTMLImageElement).parentElement?.querySelector('.list-fallback-char')?.classList.remove('hidden');
+                                  }}
+                                />
+                                <span className="list-fallback-char hidden">
+                                  {(person.nome || '?').charAt(0)}
+                                </span>
+                              </>
+                            )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                           <Link to={`/membro/${person.id}`} className="font-bold text-sm text-primary-650 hover:underline block truncate">
+                             {person.nome}
+                           </Link>
+                           <span className="text-[10px] text-gray-500 font-medium block truncate mt-0.5">
+                             {person.tipo_cadastro || 'Membro'} • {getAgeCategory(calculateAge(person.nascimento || person.data_nascimento || person.birth_date))}
+                           </span>
+                        </div>
+                        <div>
+                           <span className={clsx("inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset", 
+                              person.status === 'Ativo' ? 'bg-green-50 text-green-700 ring-green-600/20' : 
+                              person.status === 'Inativo' ? 'bg-red-50 text-red-700 ring-red-600/20' : 
+                              'bg-yellow-50 text-yellow-800 ring-yellow-600/20'
+                           )}>
+                              {person.status}
+                           </span>
+                        </div>
+                     </div>
+                     
+                     <div className="text-xs text-gray-600 flex flex-col gap-1 pl-13">
+                        <div className="flex flex-wrap items-center gap-x-2">
+                           <span className="font-semibold text-gray-800">{person.grupos_caseiros || 'Sem GC'}</span>
+                           {person.setor !== 'Sem Setor' && (
+                             <span className="text-indigo-600 font-bold">({person.setor})</span>
+                           )}
+                        </div>
+                        {person.discipulador !== 'Sem Discipulador' && (
+                          <div className="text-gray-500 text-[10px] font-medium">Disc.: {person.discipulador}</div>
+                        )}
+                        <div className="mt-1 flex flex-col gap-1 text-[11px] text-gray-400">
+                           {person.email && <div className="flex items-center gap-1.5 truncate"><Mail className="w-3.5 h-3.5" /> {person.email}</div>}
+                           {person.celular_principal_sms && <div className="flex items-center gap-1.5"><Phone className="w-3.5 h-3.5" /> {person.celular_principal_sms}</div>}
+                        </div>
+                     </div>
+                     
+                     <div className="flex justify-end pt-2 border-t border-gray-50/50 pl-13">
+                        <Link to={`/membro/${person.id}`} className="text-primary-600 hover:text-primary-800 text-xs font-extrabold flex items-center gap-1">
+                           <Eye className="w-3.5 h-3.5"/> Ver Ficha
+                        </Link>
+                     </div>
+                  </div>
+                ))}
+             </div>
+
+             {/* Desktop View: Table */}
+             <table className="hidden sm:table min-w-full divide-y divide-gray-200">
                 <thead className="bg-white">
                    <tr>
                       <th scope="col" className="py-3.5 pl-6 pr-3 text-left text-sm font-semibold text-gray-900">Nome</th>
@@ -404,7 +495,7 @@ export const Members: React.FC = () => {
                             </span>
                          </td>
                           <td className="relative whitespace-nowrap py-4 pl-3 pr-6 text-right text-xs font-bold">
-                             <Link to={`/membro/${person.id}`} className="text-primary-600 hover:text-primary-800 flex items-center justify-end gap-1 transition-colors">
+                             <Link to={`/membro/${person.id}`} className="text-primary-650 hover:text-primary-850 flex items-center justify-end gap-1 transition-colors">
                                 <Eye className="w-4 h-4"/> Ver Ficha
                              </Link>
                           </td>
