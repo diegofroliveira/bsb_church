@@ -11,6 +11,7 @@ import {
   Calendar, Sparkles, Check, Send, Heart, Download
 } from 'lucide-react';
 import clsx from 'clsx';
+import { filterOperationalCells, filterOperationalMembers } from '../lib/operationalScope';
 import * as XLSX from 'xlsx';
 
 // Interface for localStorage visit records
@@ -90,9 +91,9 @@ export const LabVisits: React.FC = () => {
           const nonExternal = (membrosRes.data as any[]).filter(
             m => (m.tipo_de_pessoa || '').toUpperCase().trim() !== 'EXTERNO'
           );
-          setMembers(nonExternal as Member[]);
+          setMembers(filterOperationalMembers(nonExternal) as Member[]);
         }
-        if (celulasRes.data) setCells(celulasRes.data as Cell[]);
+        if (celulasRes.data) setCells(filterOperationalCells(celulasRes.data) as Cell[]);
 
         // Paginated loading for pessoas_familiares to bypass the 1000-row Supabase limit
         let relationsList: FamilyRelation[] = [];

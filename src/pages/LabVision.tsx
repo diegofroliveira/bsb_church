@@ -9,6 +9,7 @@ import {
   ChevronDown, GitMerge
 } from 'lucide-react';
 import clsx from 'clsx';
+import { filterOperationalMembers } from '../lib/operationalScope';
 
 // ─────────────────────────────────────────────────────────
 // TYPES
@@ -363,7 +364,7 @@ export const LabVision: React.FC = () => {
       .limit(10000)
       .then(({ data, error }) => { 
         if (error) setFetchError(error.message);
-        setMembers(data || []); 
+      setMembers(filterOperationalMembers(data || []));
         setLoading(false); 
       });
   }, []);

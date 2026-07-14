@@ -8,6 +8,7 @@ import {
   Sliders, Play, RefreshCw, XCircle, FileSpreadsheet
 } from 'lucide-react';
 import clsx from 'clsx';
+import { filterOperationalMembers } from '../lib/operationalScope';
 
 const formatName = (fullName: string) => {
   if (!fullName) return '';
@@ -228,7 +229,7 @@ export const Companionship: React.FC = () => {
           };
         });
         setRawMembers(membrosData);
-        setMembers(filteredMembers);
+        setMembers(filterOperationalMembers(filteredMembers));
 
         // 2. Carregar companheirismos dos perfis do Supabase (com fallback no localStorage)
         let list: CompanionshipData[] = [];

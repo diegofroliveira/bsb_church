@@ -9,6 +9,7 @@ import {
   Clock, Play, Terminal, Code, ExternalLink, History, Trash2, ChevronDown, ChevronUp, Table2
 } from 'lucide-react';
 import clsx from 'clsx';
+import { filterOperationalMembers } from '../lib/operationalScope';
 
 interface Member {
   id: any;
@@ -192,7 +193,7 @@ return m.status !== 'Ativo' && meses > 0 && meses < 24;`
           .limit(10000);
 
         if (error) throw error;
-        setMembers(data || []);
+        setMembers(filterOperationalMembers(data || []));
       } catch (err: any) {
         console.error('Error fetching members for lab queries:', err);
         setFetchError(err.message);

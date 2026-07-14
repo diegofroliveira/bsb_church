@@ -3,6 +3,7 @@ import { Brain, Send, Bot, User, Sparkles } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { useAuth } from '../context/AuthContext';
+import { filterOperationalCells, filterOperationalMembers } from '../lib/operationalScope';
 
 interface Message {
   id: string;
@@ -52,8 +53,8 @@ export const AiConsultant: React.FC = () => {
         }
         const { data: mData } = await supabase.from('membros').select('*');
         const { data: cData } = await supabase.from('celulas').select('*');
-        if (mData) setMembers(mData);
-        if (cData) setCells(cData);
+        if (mData) setMembers(filterOperationalMembers(mData));
+        if (cData) setCells(filterOperationalCells(cData));
       } catch (err) {
         console.error('Error loading AI database:', err);
       }

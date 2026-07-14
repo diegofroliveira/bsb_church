@@ -8,6 +8,7 @@ import {
   getGCRegion,
   getSectorByResidence
 } from '../lib/geoUtils';
+import { filterOperationalCells, filterOperationalMembers } from '../lib/operationalScope';
 import { 
   Heart, Search, Users, MapPin, AlertCircle, Phone, 
   TrendingUp, Map as MapIcon, Filter, CheckCircle2, AlertTriangle, 
@@ -82,9 +83,9 @@ export const Families: React.FC = () => {
           const nonExternal = (membrosRes.data as any[]).filter(
             m => (m.tipo_de_pessoa || '').toUpperCase().trim() !== 'EXTERNO'
           );
-          setMembers(nonExternal as Member[]);
+          setMembers(filterOperationalMembers(nonExternal) as Member[]);
         }
-        if (celulasRes.data) setCells(celulasRes.data as Cell[]);
+        if (celulasRes.data) setCells(filterOperationalCells(celulasRes.data) as Cell[]);
         setRelations((relsRes.data || []) as FamilyRelation[]);
       } catch (err) {
         console.error('Error loading family data:', err);

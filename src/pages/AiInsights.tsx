@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Sparkles, RefreshCw, AlertCircle, Eye, EyeOff, ShieldAlert, BookOpen, Heart, TrendingUp } from 'lucide-react';
 import { supabaseReader } from '../lib/supabase';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { filterOperationalCells, filterOperationalMembers } from '../lib/operationalScope';
 
 interface Insight {
   id: string;
@@ -106,10 +107,12 @@ export const AiInsights: React.FC = () => {
     try {
       const { data: mData } = await supabaseReader.from('membros').select('*');
       const { data: cData } = await supabaseReader.from('celulas').select('*');
-      if (mData) setMembers(mData);
-      if (cData) setCells(cData);
+      const operationalMembers = filterOperationalMembers(mData || []);
+      const operationalCells = filterOperationalCells(cData || []);
+      if (mData) setMembers(operationalMembers);
+      if (cData) setCells(operationalCells);
 
-      generateHeuristicInsights(mData || [], cData || []);
+      generateHeuristicInsights(operationalMembers, operationalCells);
     } catch (err) {
       console.error('Error fetching data:', err);
     } finally {

@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { Home, Users, Navigation, Search, Filter, X, ClipboardList } from 'lucide-react';
 import { differenceInYears, parseISO } from 'date-fns';
 import clsx from 'clsx';
+import { isTechnicalGroup } from '../lib/operationalScope';
 
 // Fix para ícones do Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -378,10 +379,13 @@ const Georeferencing: React.FC = () => {
         }))
       ];
 
-      setAllLocations(formattedLocations);
+      const operationalLocations = formattedLocations.filter(location => !isTechnicalGroup(
+        location.tipo === 'grupo' ? location.nome : location.metadata.grupo
+      ));
+      setAllLocations(operationalLocations);
       
-      const setores = Array.from(new Set(formattedLocations.map(l => l.metadata.setor).filter(Boolean))) as string[];
-      const gruposNomes = Array.from(new Set(formattedLocations.map(l => l.metadata.grupo || (l.tipo === 'grupo' ? l.nome : '')).filter(Boolean))) as string[];
+      const setores = Array.from(new Set(operationalLocations.map(l => l.metadata.setor).filter(Boolean))) as string[];
+      const gruposNomes = Array.from(new Set(operationalLocations.map(l => l.metadata.grupo || (l.tipo === 'grupo' ? l.nome : '')).filter(Boolean))) as string[];
       const vinculos = Array.from(new Set(geoMembros.map(m => m.tipo_de_pessoa).filter(Boolean))) as string[];
 
       setOptions({
