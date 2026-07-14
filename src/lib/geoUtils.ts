@@ -75,6 +75,7 @@ export const getAdministrativeRegion = (bairro: string | null | undefined): stri
   if (norm.includes('VICENTE PIRES') || norm.includes('JOQUEI')) return 'VICENTE PIRES';
   if (norm.includes('TAGUATINGA') || norm.includes('TAGUA')) return 'TAGUATINGA';
   if (norm.includes('ARNIQUEIRA')) return 'ARNIQUEIRA';
+  if (norm.includes('ITAPOA')) return 'ITAPOA';
   if (norm.includes('AGUAS CLARAS') || norm.includes('AREAL')) return 'ÁGUAS CLARAS';
   if (norm.includes('GUARA') || norm.includes('LUCIO COSTA')) return 'GUARÁ';
   if (norm.includes('ASA SUL')) return 'ASA SUL';

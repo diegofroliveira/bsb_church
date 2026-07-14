@@ -1541,6 +1541,13 @@ export const Simulations: React.FC = () => {
         return { gcs: gcsByRA[memberRA], isLocal: true, recommendedRegion: memberRA, recommendedDistance: null };
       }
 
+      // Prefer explicit territorial coverage rules over raw coordinates. Some
+      // imported member/cell coordinates are known to be stale or misplaced.
+      const mappedTarget = getFallbackRegion(memberRA);
+      if (mappedTarget && gcsByRA[mappedTarget] && gcsByRA[mappedTarget].length > 0) {
+        return { gcs: gcsByRA[mappedTarget], isLocal: false, recommendedRegion: mappedTarget, recommendedDistance: null };
+      }
+
       const memberCoordinates = member?.latitude && member?.longitude
         ? [member.latitude, member.longitude] as [number, number]
         : null;
@@ -1568,13 +1575,7 @@ export const Simulations: React.FC = () => {
         }
       }
       
-      // 2. Predefined high-quality fallback mappings
-      const mappedTarget = getFallbackRegion(memberRA);
-      if (mappedTarget && gcsByRA[mappedTarget] && gcsByRA[mappedTarget].length > 0) {
-        return { gcs: gcsByRA[mappedTarget], isLocal: false, recommendedRegion: mappedTarget, recommendedDistance: null };
-      }
-      
-      // 3. Mathematical geographic closest region calculation
+      // 2. Mathematical geographic closest region calculation
       const memberCoords = regionCoordinates[memberRA];
       if (memberCoords) {
         let closestRegion = '';
@@ -1600,7 +1601,7 @@ export const Simulations: React.FC = () => {
         }
       }
       
-      // 4. Ultimate fallback: list GCs from any region that has them
+      // 3. Ultimate fallback: list GCs from any region that has them
       const anyRA = Object.keys(gcsByRA).find(ra => gcsByRA[ra] && gcsByRA[ra].length > 0);
       if (anyRA) {
           return { gcs: gcsByRA[anyRA], isLocal: false, recommendedRegion: anyRA, recommendedDistance: null };
