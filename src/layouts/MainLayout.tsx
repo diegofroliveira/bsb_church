@@ -3,7 +3,7 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, Users, Home, DollarSign, Settings, LogOut,
   Menu, BookOpen, FileText, Network, AlertTriangle, MapPin,
-  Brain, Calendar, Play, Heart, Handshake, Compass, Sparkles
+  Brain, Calendar, Play, Heart, Handshake, Compass, Sparkles, RefreshCw
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -25,8 +25,37 @@ export const MainLayout: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [allowedModules, setAllowedModules] = useState<string[]>([]);
   const [isLabOpen, setIsLabOpen] = useState(false);
+  const [hasNewVersion, setHasNewVersion] = useState(false);
 
   const hasAccessToAnyLab = allowedModules.some(m => m.startsWith('Lab:'));
+
+  useEffect(() => {
+    let initialVersion: string | null = null;
+    let isMounted = true;
+
+    const checkForUpdate = async () => {
+      try {
+        const response = await fetch(`/api/version?t=${Date.now()}`, { cache: 'no-store' });
+        if (!response.ok) return;
+        const payload = await response.json() as { version?: string };
+        if (!payload.version || !isMounted) return;
+        if (initialVersion === null) {
+          initialVersion = payload.version;
+        } else if (payload.version !== initialVersion) {
+          setHasNewVersion(true);
+        }
+      } catch {
+        // Version checks are non-blocking; the application remains usable offline.
+      }
+    };
+
+    checkForUpdate();
+    const intervalId = window.setInterval(checkForUpdate, 60_000);
+    return () => {
+      isMounted = false;
+      window.clearInterval(intervalId);
+    };
+  }, []);
 
   // Secret lab access: type L → A → B on keyboard (not in input fields)
   useLabShortcut(() => {
@@ -257,6 +286,17 @@ export const MainLayout: React.FC = () => {
           </div>
         </div>
         <main className="flex-1 py-10 px-4 sm:px-6 lg:px-8">
+          {hasNewVersion && (
+            <div className="mb-5 flex flex-col gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 shadow-sm sm:flex-row sm:items-center sm:justify-between" role="status">
+              <div>
+                <p className="font-semibold">Uma nova versão do IgrejaPro está disponível.</p>
+                <p className="text-xs text-blue-700">Atualize para carregar as correções e melhorias mais recentes.</p>
+              </div>
+              <button type="button" onClick={() => window.location.reload()} className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-blue-700">
+                <RefreshCw className="h-3.5 w-3.5" /> Atualizar agora
+              </button>
+            </div>
+          )}
           <Outlet />
         </main>
       </div>
