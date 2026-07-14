@@ -1759,7 +1759,7 @@ export const Simulations: React.FC = () => {
 
   const discipleshipAudit = useMemo(() => {
     if (isLoading || draftMembers.length === 0) {
-      return { isolatedMembers: [], overloadedDisciplers: [], displacedDisciples: [] };
+      return { isolatedMembers: [], unassignedMembers: [], overloadedDisciplers: [], displacedDisciples: [] };
     }
 
     const activeMembersByName = new Map<string, Member>();
@@ -1794,6 +1794,7 @@ export const Simulations: React.FC = () => {
     // Only active leadership without a registered discipleship link is an alert.
     const disciplesSet = new Set(draftLinks.map(l => l.discipulo));
     const isolatedMembers: any[] = [];
+    const unassignedMembers: any[] = [];
     
     draftMembers.forEach(m => {
       if (m.status === 'Ativo' && !disciplesSet.has(m.nome)) {
@@ -1803,6 +1804,14 @@ export const Simulations: React.FC = () => {
                              (m.nome || '').toUpperCase().includes('CO-LIDER');
         
         if (!isLeadership) {
+          if (isCountableGCMember(m)) {
+            unassignedMembers.push({
+              id: m.id,
+              name: m.nome,
+              bairro: m.bairro || 'Não informado',
+              ra: getAdministrativeRegion(m.bairro)
+            });
+          }
           return;
         }
 
@@ -1847,8 +1856,9 @@ export const Simulations: React.FC = () => {
     });
 
     isolatedMembers.sort((a, b) => a.name.localeCompare(b.name));
+    unassignedMembers.sort((a, b) => a.name.localeCompare(b.name));
 
-    return { isolatedMembers, overloadedDisciplers, displacedDisciples };
+    return { isolatedMembers, unassignedMembers, overloadedDisciplers, displacedDisciples };
   }, [isLoading, draftMembers, draftLinks]);
 
   const activeIsolatedMembers = useMemo(() => {
@@ -1858,6 +1868,10 @@ export const Simulations: React.FC = () => {
   const activeOverloadedDisciplers = useMemo(() => {
     return discipleshipAudit.overloadedDisciplers.filter(d => !ignoredAlerts.includes(`disc_overloaded_${d.name}`));
   }, [discipleshipAudit.overloadedDisciplers, ignoredAlerts]);
+
+  const activeUnassignedMembers = useMemo(() => {
+    return discipleshipAudit.unassignedMembers.filter(m => !ignoredAlerts.includes(`disc_unassigned_${m.id}`));
+  }, [discipleshipAudit.unassignedMembers, ignoredAlerts]);
 
   const activeDisplacedDisciples = useMemo(() => {
     return discipleshipAudit.displacedDisciples.filter(d => !ignoredAlerts.includes(`disc_displaced_${d.discipleId}`));
@@ -3132,7 +3146,27 @@ export const Simulations: React.FC = () => {
                              );
                            })()}
 
-                           {activeIsolatedMembers.length === 0 && activeOverloadedDisciplers.length === 0 && (
+                           {activeUnassignedMembers.length > 0 && (
+                             <div className="rounded-2xl p-4 border border-indigo-400/20 bg-indigo-500/10 animate-in fade-in duration-200">
+                               <div className="flex items-center justify-between gap-2 mb-2">
+                                 <h4 className="text-sm font-bold text-white">Membros sem discipulador (informativo)</h4>
+                                 <span className="text-[10px] bg-indigo-500/20 text-indigo-200 font-bold px-1.5 py-0.5 rounded-full">{activeUnassignedMembers.length}</span>
+                               </div>
+                               <p className="text-[10px] text-gray-300 mb-2">Registros ativos sem vínculo de discipulado cadastrado. Ocultar aqui não altera a base.</p>
+                               <div className="space-y-1 max-h-32 overflow-y-auto">
+                                 {activeUnassignedMembers.map((m: any) => (
+                                   <div key={m.id} className="flex items-center justify-between gap-2 rounded-lg bg-black/10 px-2 py-1.5 text-[10px]">
+                                     <span className="text-gray-200 truncate">{m.name}</span>
+                                     <button onClick={() => toggleIgnoreAlert(`disc_unassigned_${m.id}`)} className="text-indigo-300 hover:text-white shrink-0" title="Ocultar pessoa desta lista">
+                                       <EyeOff className="w-3.5 h-3.5" />
+                                     </button>
+                                   </div>
+                                 ))}
+                               </div>
+                             </div>
+                           )}
+
+                           {activeIsolatedMembers.length === 0 && activeOverloadedDisciplers.length === 0 && activeUnassignedMembers.length === 0 && (
                              <div className="text-center py-8 opacity-50">
                                 <CheckCircle2 className="w-10 h-10 mx-auto mb-2 text-emerald-400 animate-pulse" />
                                 <p className="text-xs font-semibold">Tudo verde! Rede de discipulado de liderança 100% cuidada e integrada.</p>
