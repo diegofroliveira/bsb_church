@@ -19,6 +19,48 @@ import {
 import clsx from 'clsx';
 import * as XLSX from 'xlsx';
 
+const buildExplicitParentelas = (familyList: any[], members: Member[]) => {
+  const normalize = (value: unknown): string => String(value || '')
+    .trim()
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ');
+  const isValidParent = (value: unknown): boolean => {
+    const normalized = normalize(value);
+    return normalized.length > 3 && !normalized.includes('INFORMADO') && !normalized.includes('CONSTA') && !normalized.includes('IGNORADO');
+  };
+
+  const childrenByParent = new Map<string, { label: string; children: Set<string> }>();
+  members.forEach(member => {
+    [member.pai, member.mae].forEach(parent => {
+      if (!isValidParent(parent)) return;
+      const key = normalize(parent);
+      const group = childrenByParent.get(key) || { label: String(parent).trim(), children: new Set<string>() };
+      group.children.add(member.id.toString());
+      childrenByParent.set(key, group);
+    });
+  });
+
+  return Array.from(childrenByParent.entries())
+    .filter(([, group]) => group.children.size >= 2)
+    .map(([parentKey, group]) => {
+      const subFamilies = familyList.filter(family => family.familyMembers.some((member: Member) => {
+        return group.children.has(member.id.toString()) || normalize(member.nome) === parentKey;
+      }));
+      return {
+        id: `PARENTELA:${parentKey}`,
+        name: `Parentela de ${group.label}`,
+        anchor: group.label,
+        subFamilies,
+        totalMembersCount: subFamilies.reduce((sum: number, family: any) => sum + family.membersCount, 0),
+        surnames: []
+      };
+    })
+    .filter(parentela => parentela.subFamilies.length >= 2)
+    .sort((a, b) => b.totalMembersCount - a.totalMembersCount || a.name.localeCompare(b.name));
+};
+
 
 const getNormalizedSectorName = (dbSector: string | null | undefined): string => {
   if (!dbSector) return 'Sem Setor';
@@ -285,7 +327,7 @@ export const Families: React.FC = () => {
   }, [families, members]);
 
   // Dynamic grouping into extended lineage arrays ("Parentelas" / relatives)
-  const parentelas = useMemo(() => {
+  const legacyParentelas = useMemo(() => {
     if (members.length === 0 || Object.keys(families).length === 0) return [];
 
     const normName = (name: string | null | undefined): string => {
@@ -437,6 +479,11 @@ export const Families: React.FC = () => {
 
     return parentelasList.sort((a, b) => b.totalMembersCount - a.totalMembersCount);
   }, [familyData, members, families]);
+
+  const parentelas = useMemo(
+    () => buildExplicitParentelas(familyData.list, members),
+    [familyData.list, members]
+  );
 
   const getMemberSector = (m: Member | undefined): string => {
     if (!m) return 'Sem Setor';
@@ -949,7 +996,7 @@ export const Families: React.FC = () => {
             <div>
               <h3 className="text-base font-bold">Mapeamento de Parentelas Estendidas</h3>
               <p className="text-xs text-pink-700/90 leading-relaxed mt-1">
-                Este motor relaciona e agrupa múltiplos núcleos familiares que possuem ascendentes diretos em comum (nomes de pai ou mãe compartilhados no cadastro). Isso ajuda a mapear linhagens completas para aconselhamentos e eventos de pastoreamento familiar integrado.
+                Este mapa usa apenas relações explícitas de pai e mãe registradas na base. Cada ascendente gera sua própria parentela, permitindo que um mesmo lar apareça em mais de uma linhagem sem arrastar famílias por sobrenome.
               </p>
             </div>
           </div>
@@ -964,7 +1011,7 @@ export const Families: React.FC = () => {
                         <Sparkles className="w-4 h-4 text-pink-500 shrink-0" /> {p.name}
                       </h4>
                       <span className="text-[10px] text-gray-400">
-                        Sobrenomes: {p.surnames.join(', ')}
+                        Ascendente registrado: {p.anchor}
                       </span>
                     </div>
                     <span className="text-[10px] bg-pink-50 text-pink-700 border border-pink-100 font-extrabold px-2.5 py-0.5 rounded-full shrink-0">
