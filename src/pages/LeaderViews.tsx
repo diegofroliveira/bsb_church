@@ -84,14 +84,17 @@ export const LeaderViews: React.FC = () => {
     const key = link.discipulador.trim().toUpperCase();
     disciplesByName.set(key, [...(disciplesByName.get(key) || []), link.discipulo]);
   });
-  const title = mode === 'group' ? snapshot?.scope?.group || user?.assigned_gc || 'Meu Grupo' : snapshot?.scope?.sector || user?.assigned_sector || 'Meu Setor';
+  const isAdmin = user?.role === 'admin';
+  const title = mode === 'group'
+    ? snapshot?.scope?.group || user?.assigned_gc || (isAdmin ? 'Todos os grupos' : 'Meu Grupo')
+    : snapshot?.scope?.sector || user?.assigned_sector || (isAdmin ? 'Todos os setores' : 'Meu Setor');
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <header>
         <p className="text-xs font-black uppercase tracking-widest text-indigo-500">Visões de Liderança</p>
         <h1 className="mt-2 text-3xl font-black tracking-tight text-gray-900">{title}</h1>
-        <p className="mt-2 text-sm text-gray-500">Dados operacionais limitados ao escopo autorizado para este usuário.</p>
+        <p className="mt-2 text-sm text-gray-500">{isAdmin ? 'Visão global autorizada para o administrador.' : 'Dados operacionais limitados ao escopo autorizado para este usuário.'}</p>
       </header>
 
       <div className="inline-flex rounded-xl border border-gray-200 bg-white p-1 shadow-sm">

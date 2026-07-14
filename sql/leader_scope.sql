@@ -30,14 +30,16 @@ as $$
 declare
   p public.profiles;
   result jsonb;
+  is_admin boolean;
 begin
   select * into p from public.leader_scope_profile();
-  if p.id is null or nullif(trim(p.assigned_gc), '') is null then
+  is_admin := lower(coalesce(p.role, '')) = 'admin';
+  if p.id is null or (not is_admin and nullif(trim(p.assigned_gc), '') is null) then
     raise exception 'Nenhum grupo caseiro foi atribuido a este usuario.' using errcode = '42501';
   end if;
 
   select jsonb_build_object(
-    'scope', jsonb_build_object('group', p.assigned_gc),
+    'scope', jsonb_build_object('group', case when is_admin then 'Todos os grupos' else p.assigned_gc end),
     'members', coalesce((select jsonb_agg(to_jsonb(x) order by x.nome) from (
       select m.id, m.nome, m.sexo, m.nascimento, m.status, m.tipo_de_pessoa,
         m.grupos_caseiros, m.data_de_cadastro,
@@ -51,7 +53,8 @@ begin
         (select d.discipulador from public.discipulado d where upper(trim(d.discipulo)) = upper(trim(m.nome)) limit 1) as discipulador
       from public.membros m
       left join public.celulas c on upper(trim(c.grupo_caseiro)) = upper(trim(m.grupos_caseiros))
-      where m.status = 'Ativo' and upper(trim(m.grupos_caseiros)) = upper(trim(p.assigned_gc))
+      where m.status = 'Ativo'
+        and (is_admin or upper(trim(m.grupos_caseiros)) = upper(trim(p.assigned_gc)))
     ) x), '[]'::jsonb),
     'links', coalesce((select jsonb_agg(to_jsonb(l) order by l.discipulador, l.discipulo) from (
       select d.discipulo, d.discipulador, d.status
@@ -59,11 +62,11 @@ begin
       where exists (
         select 1 from public.membros m
         where m.status = 'Ativo'
-          and upper(trim(m.grupos_caseiros)) = upper(trim(p.assigned_gc))
+          and (is_admin or upper(trim(m.grupos_caseiros)) = upper(trim(p.assigned_gc)))
           and upper(trim(m.nome)) = upper(trim(d.discipulo))
       )
     ) l), '[]'::jsonb),
-    'cells', coalesce((select jsonb_agg(to_jsonb(c)) from public.celulas c where upper(trim(c.grupo_caseiro)) = upper(trim(p.assigned_gc))), '[]'::jsonb)
+    'cells', coalesce((select jsonb_agg(to_jsonb(c) order by c.grupo_caseiro) from public.celulas c where is_admin or upper(trim(c.grupo_caseiro)) = upper(trim(p.assigned_gc))), '[]'::jsonb)
   ) into result;
   return result;
 end;
@@ -79,24 +82,26 @@ as $$
 declare
   p public.profiles;
   result jsonb;
+  is_admin boolean;
 begin
   select * into p from public.leader_scope_profile();
-  if p.id is null or nullif(trim(p.assigned_sector), '') is null then
+  is_admin := lower(coalesce(p.role, '')) = 'admin';
+  if p.id is null or (not is_admin and nullif(trim(p.assigned_sector), '') is null) then
     raise exception 'Nenhum setor foi atribuido a este usuario.' using errcode = '42501';
   end if;
 
   select jsonb_build_object(
-    'scope', jsonb_build_object('sector', p.assigned_sector),
+    'scope', jsonb_build_object('sector', case when is_admin then 'Todos os setores' else p.assigned_sector end),
     'members', coalesce((select jsonb_agg(to_jsonb(x) order by x.nome) from (
       select m.id, m.nome, m.sexo, m.nascimento, m.status, m.tipo_de_pessoa,
         m.grupos_caseiros, m.data_de_cadastro,
         (select d.discipulador from public.discipulado d where upper(trim(d.discipulo)) = upper(trim(m.nome)) limit 1) as discipulador
       from public.membros m
-      where m.status = 'Ativo' and exists (
+      where m.status = 'Ativo' and (is_admin or exists (
         select 1 from public.celulas c
         where upper(trim(c.grupo_caseiro)) = upper(trim(m.grupos_caseiros))
           and upper(trim(c.setor)) = upper(trim(p.assigned_sector))
-      )
+      ))
     ) x), '[]'::jsonb),
     'links', coalesce((select jsonb_agg(to_jsonb(l) order by l.discipulador, l.discipulo) from (
       select d.discipulo, d.discipulador, d.status
@@ -104,14 +109,14 @@ begin
       where exists (
         select 1 from public.membros m
         where m.status = 'Ativo' and upper(trim(m.nome)) = upper(trim(d.discipulo))
-          and exists (
+          and (is_admin or exists (
             select 1 from public.celulas c
             where upper(trim(c.grupo_caseiro)) = upper(trim(m.grupos_caseiros))
               and upper(trim(c.setor)) = upper(trim(p.assigned_sector))
-          )
+          ))
       )
     ) l), '[]'::jsonb),
-    'cells', coalesce((select jsonb_agg(to_jsonb(c) order by c.grupo_caseiro) from public.celulas c where upper(trim(c.setor)) = upper(trim(p.assigned_sector))), '[]'::jsonb)
+    'cells', coalesce((select jsonb_agg(to_jsonb(c) order by c.grupo_caseiro) from public.celulas c where is_admin or upper(trim(c.setor)) = upper(trim(p.assigned_sector))), '[]'::jsonb)
   ) into result;
   return result;
 end;

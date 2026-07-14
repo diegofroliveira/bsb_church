@@ -1,12 +1,15 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Lock, Mail, ArrowRight, ArrowLeft, CheckCircle } from 'lucide-react';
 
 export const Login: React.FC = () => {
+  const savedAccessKey = 'igrejapro_saved_access';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberAccess, setRememberAccess] = useState(false);
+  const [rememberDays, setRememberDays] = useState('7');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   
@@ -21,6 +24,24 @@ export const Login: React.FC = () => {
   const queryParams = new URLSearchParams(location.search);
   const reason = queryParams.get('reason');
 
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(savedAccessKey);
+      if (!saved) return;
+      const parsed = JSON.parse(saved) as { email?: string; password?: string; expiresAt?: number };
+      if (!parsed.expiresAt || parsed.expiresAt <= Date.now() || !parsed.email || !parsed.password) {
+        localStorage.removeItem(savedAccessKey);
+        return;
+      }
+      setEmail(parsed.email);
+      setPassword(parsed.password);
+      setRememberAccess(true);
+      setRememberDays(String(Math.max(1, Math.round((parsed.expiresAt - Date.now()) / 86400000))));
+    } catch {
+      localStorage.removeItem(savedAccessKey);
+    }
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -28,6 +49,15 @@ export const Login: React.FC = () => {
     
     try {
       await login(email, password);
+      if (rememberAccess) {
+        localStorage.setItem(savedAccessKey, JSON.stringify({
+          email,
+          password,
+          expiresAt: Date.now() + Number(rememberDays) * 86400000,
+        }));
+      } else {
+        localStorage.removeItem(savedAccessKey);
+      }
       const from = (location.state as any)?.from || '/';
       navigate(from, { replace: true });
     } catch (err: any) {
@@ -220,6 +250,31 @@ export const Login: React.FC = () => {
                 />
               </div>
             </div>
+
+            <div className="flex items-center justify-between gap-3 -mt-2">
+              <label className="flex items-center gap-2 text-xs text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={rememberAccess}
+                  onChange={(e) => setRememberAccess(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-600"
+                />
+                Guardar acesso
+              </label>
+              {rememberAccess && (
+                <select
+                  value={rememberDays}
+                  onChange={(e) => setRememberDays(e.target.value)}
+                  className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs text-gray-600 focus:ring-2 focus:ring-primary-600"
+                  aria-label="Por quanto tempo guardar o acesso"
+                >
+                  <option value="1">1 dia</option>
+                  <option value="7">7 dias</option>
+                  <option value="30">30 dias</option>
+                </select>
+              )}
+            </div>
+            <p className="-mt-4 text-[11px] leading-4 text-gray-400">A senha fica salva somente neste navegador.</p>
 
             <button
               type="submit"
