@@ -1712,7 +1712,7 @@ export const Simulations: React.FC = () => {
 
   const discipleshipAudit = useMemo(() => {
     if (isLoading || draftMembers.length === 0) {
-      return { isolatedMembers: [], overloadedDisciplers: [], displacedDisciples: [], regularIsolatedCount: 0 };
+      return { isolatedMembers: [], overloadedDisciplers: [], displacedDisciples: [] };
     }
 
     const activeMembersByName = new Map<string, Member>();
@@ -1731,7 +1731,7 @@ export const Simulations: React.FC = () => {
       disciplesCountByDiscipler[dName].push(link.discipulo);
     });
 
-    // Overloaded threshold: > 6 (Musk Rule)
+    // A discipler with more than six active links is flagged for review.
     const overloadedDisciplers = Object.entries(disciplesCountByDiscipler)
       .filter(([_, disciples]) => disciples.length > 6)
       .map(([discipler, disciples]) => ({
@@ -1741,11 +1741,10 @@ export const Simulations: React.FC = () => {
       }))
       .sort((a, b) => b.count - a.count);
 
-    // Displaced Disciples: Removed entirely to reduce geographical noise (Musk Rule)
+    // Displaced disciples are intentionally not presented as an automatic alert.
     const displacedDisciples: any[] = [];
 
-    // Isolated Members: Filter to keep only leadership, count regular members (Jobs Rule)
-    let regularIsolatedCount = 0;
+    // Only active leadership without a registered discipleship link is an alert.
     const disciplesSet = new Set(draftLinks.map(l => l.discipulo));
     const isolatedMembers: any[] = [];
     
@@ -1757,7 +1756,6 @@ export const Simulations: React.FC = () => {
                              (m.nome || '').toUpperCase().includes('CO-LIDER');
         
         if (!isLeadership) {
-          regularIsolatedCount++;
           return;
         }
 
@@ -1803,7 +1801,7 @@ export const Simulations: React.FC = () => {
 
     isolatedMembers.sort((a, b) => a.name.localeCompare(b.name));
 
-    return { isolatedMembers, overloadedDisciplers, displacedDisciples, regularIsolatedCount };
+    return { isolatedMembers, overloadedDisciplers, displacedDisciples };
   }, [isLoading, draftMembers, draftLinks]);
 
   const activeIsolatedMembers = useMemo(() => {
@@ -3812,14 +3810,6 @@ export const Simulations: React.FC = () => {
                           <p className="text-[11px] text-gray-400 text-center py-2 animate-in fade-in duration-150">Nenhum líder ativo isolado detectado.</p>
                         )}
                         
-                        {discipleshipAudit.regularIsolatedCount > 0 && (
-                          <div className="mt-2.5 p-3 bg-amber-50/40 border border-amber-100/40 rounded-2xl text-[10px] text-amber-900 flex items-start gap-2 animate-in fade-in duration-200">
-                            <Brain className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5 animate-pulse" />
-                            <div>
-                              <strong>Nota de Steve Jobs:</strong> Além dos líderes estratégicos acima, identificamos <strong>{discipleshipAudit.regularIsolatedCount} membros comuns</strong> sem discipulador cadastrado no sistema. O cuidado destes membros deve ser delegado localmente por seus respectivos líderes de GC.
-                            </div>
-                          </div>
-                        )}
                       </div>
                     )}
                   </div>
@@ -3913,7 +3903,7 @@ export const Simulations: React.FC = () => {
                     )}
                   </div>
 
-                  {/* 3. Vínculos Distantes - Removed to prevent geographical noise (Musk Rule) */}
+                  {/* 3. Vínculos distantes não são apresentados como alerta automático. */}
                 </div>
               </div>
             )}
