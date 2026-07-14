@@ -3,7 +3,7 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, Users, Home, DollarSign, Settings, LogOut,
   Menu, BookOpen, FileText, Network, AlertTriangle, MapPin,
-  Brain, Calendar, Play, Heart, Handshake, Compass
+  Brain, Calendar, Play, Heart, Handshake, Compass, Sparkles
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -125,6 +125,7 @@ export const MainLayout: React.FC = () => {
 
     { id: 'Financeiro',      name: 'Financeiro',      path: '/finance',      icon: DollarSign,      group: 'Gestão & Ferramentas' },
     { id: 'Consultor IA',    name: 'IA',              path: '/ai-consultant', icon: Brain,           group: 'Gestão & Ferramentas' },
+    { id: 'Insights IA',     name: 'Insights IA',     path: '/ai-insights',   icon: Sparkles,        group: 'Gestão & Ferramentas' },
     { id: 'QA',              name: 'QA',              path: '/qa',           icon: AlertTriangle,   group: 'Gestão & Ferramentas' },
     { id: 'Configurações',   name: 'Configurações',   path: '/admin/users',  icon: Settings,        group: 'Gestão & Ferramentas' },
   ];
