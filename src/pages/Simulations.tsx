@@ -3297,12 +3297,12 @@ export const Simulations: React.FC = () => {
                           }
 
                           return (
-                            <div key={key} className="pt-2 first:pt-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs group relative animate-in fade-in duration-150">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <span className="font-semibold text-gray-700 truncate">{gc.gc}</span>
-                                <span className="font-black text-rose-600 shrink-0">{gc.count} membros</span>
+                            <div key={key} className="pt-2 first:pt-0 space-y-2 text-xs group relative animate-in fade-in duration-150">
+                              <div className="flex items-center justify-between gap-3 min-w-0">
+                                <span className="font-semibold text-gray-700 truncate min-w-0">{gc.gc}</span>
+                                <span className="font-black text-rose-600 whitespace-nowrap">{gc.count} membros</span>
                               </div>
-                              <div className="flex items-center gap-1.5 flex-wrap shrink-0">
+                              <div className="flex items-center gap-x-3 gap-y-1.5 flex-wrap pl-1">
                                 <button
                                   onClick={() => handleLocalizeGC(gc.gc)}
                                   className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline cursor-pointer"
