@@ -86,6 +86,9 @@ const isCountableGCMember = (member: Member): boolean => {
   return type !== 'AGREGADO' && type !== 'AGREGADOS';
 };
 
+const getTerritorialAlertKey = (insight: { type: string; ra: string }): string =>
+  `territory_v2_${insight.type}_${insight.ra}`;
+
 
 export const Simulations: React.FC = () => {
   useAuth();
@@ -1293,6 +1296,15 @@ export const Simulations: React.FC = () => {
         m.grupos_caseiros !== 'COBERTURA - VIX' &&
         !exactLocalGCNames.has(m.grupos_caseiros!)
       );
+      const externalResidentRegionCounts = externalResidentCandidates.reduce<Record<string, number>>((acc, member) => {
+        const region = getAdministrativeRegion(member.bairro);
+        acc[region] = (acc[region] || 0) + 1;
+        return acc;
+      }, {});
+      const externalResidentRegionSummary = Object.entries(externalResidentRegionCounts)
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+        .map(([region, count]) => `${region} (${count})`)
+        .join(', ');
       
       // Territorial suggested GCs based on tens rule:
       // 10 members -> 1 GC, 20 members -> 2 GCs, 30 members -> 3 GCs
@@ -1314,9 +1326,10 @@ export const Simulations: React.FC = () => {
             type: 'expansion',
             ra: ra,
             title: `Proposta de criação: GC ${ra}`,
-            description: `A base registra ${countableCount} membros ativos residentes em ${ra}, ${actualGCs} GC próprio e ${externalResidentCandidates.length} desses membros alocados atualmente fora da localidade. O dado sustenta avaliar a criação de um GC local, sem recomendar mudança automática de vínculos.`,
+            description: `A base registra ${countableCount} membros ativos residentes em ${ra}, ${actualGCs} GC próprio e ${externalResidentCandidates.length} desses membros alocados atualmente fora da localidade${externalResidentRegionSummary ? ` (${externalResidentRegionSummary})` : ''}. O dado sustenta avaliar a criação de um GC local, sem recomendar mudança automática de vínculos.`,
             action: 'AÇÃO SUGERIDA: AVALIAR CRIAÇÃO DE GC LOCAL',
-            memberNames: countableMembersList.map(m => m.nome).sort()
+            memberNames: countableMembersList.map(m => m.nome).sort(),
+            coverageRegions: Object.keys(externalResidentRegionCounts)
           });
         } else {
           const getRomanNumeral = (num: number): string => {
@@ -1330,10 +1343,11 @@ export const Simulations: React.FC = () => {
             ra: ra,
             title: `Proposta de expansão: ${ra} ${nextNumStr}`,
             description: shouldSuggestSecondGroup
-              ? `A base registra ${countableCount} membros ativos residentes em ${ra}. ${externalResidentCandidates.length} deles estão atualmente alocados fora da localidade, indicando uma oportunidade de avaliar um segundo GC em ${ra} para acolher esse núcleo, sem mover pessoas automaticamente.`
+              ? `A base registra ${countableCount} membros ativos residentes em ${ra}. ${externalResidentCandidates.length} deles estão atualmente alocados fora da localidade${externalResidentRegionSummary ? ` (${externalResidentRegionSummary})` : ''}, indicando uma oportunidade de avaliar um segundo GC em ${ra} para acolher esse núcleo, sem mover pessoas automaticamente.`
               : `Localidade ${ra} já possui ${actualGCs} grupo(s) cadastrado(s), mas conta com ${countableCount} membros ativos residentes. Pela regra territorial de dezenas, recomenda-se avaliar um desdobramento local antes de qualquer alteração de vínculos.`,
             action: `AÇÃO SUGERIDA: AVALIAR ${ra} ${nextNumStr} / DESDOBRAMENTO TERRITORIAL`,
-            memberNames: (shouldSuggestSecondGroup ? externalResidentCandidates : countableMembersList).map(m => m.nome).sort()
+            memberNames: (shouldSuggestSecondGroup ? externalResidentCandidates : countableMembersList).map(m => m.nome).sort(),
+            coverageRegions: Object.keys(externalResidentRegionCounts)
           });
         }
       }
@@ -1436,7 +1450,8 @@ export const Simulations: React.FC = () => {
             tipo: m.tipo_de_pessoa || 'Membro',
             residenceRA: getAdministrativeRegion(m.bairro)
           })).sort((a, b) => a.nome.localeCompare(b.nome)),
-          scatteredResidents: []
+          scatteredResidents: [],
+          coverageRegions: Array.from(new Set(namingParticipants.map(m => getAdministrativeRegion(m.bairro)))).sort()
         });
       }
 
@@ -1704,10 +1719,8 @@ export const Simulations: React.FC = () => {
   }, [auditData.criticalGCs, ignoredAlerts]);
 
   const activeInsights = useMemo(() => {
-    const removedTerritorialAlerts = new Set(['expansion', 'expansion_next', 'consolidation']);
     return territorialInsights.insights.filter((insight: any) =>
-      !removedTerritorialAlerts.has(insight.type) &&
-      !ignoredAlerts.includes(`${insight.type}_${insight.ra}`)
+      !ignoredAlerts.includes(getTerritorialAlertKey(insight))
     );
   }, [territorialInsights.insights, ignoredAlerts]);
 
@@ -2662,12 +2675,12 @@ export const Simulations: React.FC = () => {
                          </span>
                       </span>
                       <div className="flex items-center gap-2 shrink-0">
-                        {(ignoredAlerts.some(k => k.startsWith('expansion') || k.startsWith('consolidation')) || minimizedAlerts.some(k => k.startsWith('expansion') || k.startsWith('consolidation'))) && (
+                        {(ignoredAlerts.some(k => k.startsWith('territory_v2_')) || minimizedAlerts.some(k => k.startsWith('territory_v2_'))) && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              setIgnoredAlerts(prev => prev.filter(k => !k.startsWith('expansion') && !k.startsWith('consolidation')));
-                              setMinimizedAlerts(prev => prev.filter(k => !k.startsWith('expansion') && !k.startsWith('consolidation')));
+                              setIgnoredAlerts(prev => prev.filter(k => !k.startsWith('territory_v2_')));
+                              setMinimizedAlerts(prev => prev.filter(k => !k.startsWith('territory_v2_')));
                             }}
                             className="text-[9px] font-bold text-indigo-300 hover:text-indigo-200 hover:underline flex items-center gap-1 cursor-pointer transition-all bg-white/5 hover:bg-white/10 px-2 py-0.5 rounded-lg border border-white/10 active:scale-95 z-20"
                             title="Restaurar alertas territoriais ocultados ou minimizados"
@@ -2698,7 +2711,7 @@ export const Simulations: React.FC = () => {
                        <div className="space-y-4 animate-in fade-in duration-200">
                           {activeInsights.length > 0 ? activeInsights.map((insight, i) => {
                             const isConsolidation = insight.type === 'consolidation' || insight.type === 'renaming';
-                            const key = `${insight.type}_${insight.ra}`;
+                            const key = getTerritorialAlertKey(insight);
                             const isMinimized = minimizedAlerts.includes(key);
 
                             if (isMinimized) {
@@ -2842,6 +2855,11 @@ export const Simulations: React.FC = () => {
                                  <div className="mt-3">
                                    {isConsolidation ? (
                                      <div className="p-2 bg-black/35 rounded-xl space-y-3 max-h-56 overflow-y-auto border border-white/5 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent text-[10px]">
+                                       {insight.coverageRegions?.length > 0 && (
+                                         <div className="text-[10px] font-extrabold text-indigo-300 border-b border-white/5 pb-2">
+                                           Regiões de residência: {insight.coverageRegions.join(', ')}
+                                         </div>
+                                       )}
                                        {insight.scatteredResidents.length > 0 && (
                                          <div>
                                            <div className="font-extrabold text-amber-400 mb-1 border-b border-white/5 pb-0.5 uppercase tracking-wider">
