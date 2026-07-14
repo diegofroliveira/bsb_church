@@ -15,6 +15,8 @@ export const regionCoordinates: Record<string, [number, number]> = {
   'RECANTO-ENTORNO': [-15.905, -48.075],
   'RECANTO DAS EMAS': [-15.905, -48.075],
   'RIACHO FUNDO': [-15.872, -48.012],
+  'JARDIM INGA': [-16.05, -48.00],
+  'CIDADE OCIDENTAL': [-16.08, -47.98],
   'NUCLEO BANDEIRANTE': [-15.862, -47.962],
   'LAGO NORTE': [-15.735, -47.865],
   'NOROESTE': [-15.768, -47.935],
@@ -80,6 +82,8 @@ export const getAdministrativeRegion = (bairro: string | null | undefined): stri
   if (norm.includes('CEILANDIA')) return 'CEILÂNDIA';
   if (norm.includes('SAMAMBAIA')) return 'SAMAMBAIA';
   if (norm.includes('RECANTO DAS EMAS') || norm.includes('RECANTO') || norm.includes('ENTORNO')) return 'RECANTO-ENTORNO';
+  if (norm.includes('JARDIM INGA') || norm.includes('LUZIANIA')) return 'JARDIM INGA';
+  if (norm.includes('CIDADE OCIDENTAL')) return 'CIDADE OCIDENTAL';
   if (norm.includes('SOBRADINHO')) return 'SOBRADINHO';
   if (norm.includes('RIACHO FUNDO')) return 'RIACHO FUNDO';
   if (norm.includes('GAMA')) return 'GAMA';
@@ -131,7 +135,10 @@ const VALID_COVERAGE_PAIRS = new Set([
   'GUARA-NB|NUCLEO BANDEIRANTE',
   'GAMA|RECANTO-ENTORNO',
   'RECANTO-ENTORNO|SAMAMBAIA',
-  'RECANTO-ENTORNO|SANTA MARIA'
+  'RECANTO-ENTORNO|SANTA MARIA',
+  'ASA NORTE|NOROESTE',
+  'CIDADE OCIDENTAL|RECANTO-ENTORNO',
+  'JARDIM INGA|RECANTO-ENTORNO'
 ]);
 
 export const isOperationallyAligned = (residenceRegion: string, gcRegion: string): boolean => {
@@ -156,6 +163,8 @@ export const getFallbackRegion = (memberRA: string): string => {
     'PLANALTINA': 'SOBRADINHO',
     'GAMA': 'RECANTO-ENTORNO',
     'SANTA MARIA': 'GAMA',
+    'CIDADE OCIDENTAL': 'RECANTO-ENTORNO',
+    'JARDIM INGA': 'RECANTO-ENTORNO',
   };
   return fallbackRules[memberRA] || '';
 };

@@ -1535,16 +1535,43 @@ export const Simulations: React.FC = () => {
       gcsByRA[ra].push(c.grupo_caseiro);
     });
 
-    const getRecommendedGCsForRegion = (memberRA: string) => {
+    const getRecommendedGCsForRegion = (memberRA: string, member?: Member) => {
       // 1. If we have GCs in this region, return them
       if (gcsByRA[memberRA] && gcsByRA[memberRA].length > 0) {
-        return { gcs: gcsByRA[memberRA], isLocal: true, recommendedRegion: memberRA };
+        return { gcs: gcsByRA[memberRA], isLocal: true, recommendedRegion: memberRA, recommendedDistance: null };
+      }
+
+      const memberCoordinates = member?.latitude && member?.longitude
+        ? [member.latitude, member.longitude] as [number, number]
+        : null;
+
+      // When coordinates exist, compare against the actual GC locations,
+      // not only the centroid of the administrative regions.
+      if (memberCoordinates) {
+        let nearestGC = '';
+        let nearestDistance = Infinity;
+        draftCells.forEach(cell => {
+          if (cell.grupo_caseiro === 'COBERTURA - VIX' || !cell.latitude || !cell.longitude) return;
+          const dist = calculateDistance(memberCoordinates[0], memberCoordinates[1], cell.latitude, cell.longitude);
+          if (dist && parseFloat(dist) < nearestDistance) {
+            nearestDistance = parseFloat(dist);
+            nearestGC = cell.grupo_caseiro;
+          }
+        });
+        if (nearestGC) {
+          return {
+            gcs: [nearestGC],
+            isLocal: getGCRegion(nearestGC) === memberRA,
+            recommendedRegion: getGCRegion(nearestGC),
+            recommendedDistance: nearestDistance
+          };
+        }
       }
       
       // 2. Predefined high-quality fallback mappings
       const mappedTarget = getFallbackRegion(memberRA);
       if (mappedTarget && gcsByRA[mappedTarget] && gcsByRA[mappedTarget].length > 0) {
-        return { gcs: gcsByRA[mappedTarget], isLocal: false, recommendedRegion: mappedTarget };
+        return { gcs: gcsByRA[mappedTarget], isLocal: false, recommendedRegion: mappedTarget, recommendedDistance: null };
       }
       
       // 3. Mathematical geographic closest region calculation
@@ -1569,17 +1596,17 @@ export const Simulations: React.FC = () => {
         });
         
         if (closestRegion && gcsByRA[closestRegion] && gcsByRA[closestRegion].length > 0) {
-          return { gcs: gcsByRA[closestRegion], isLocal: false, recommendedRegion: closestRegion };
+          return { gcs: gcsByRA[closestRegion], isLocal: false, recommendedRegion: closestRegion, recommendedDistance: minDistance };
         }
       }
       
       // 4. Ultimate fallback: list GCs from any region that has them
       const anyRA = Object.keys(gcsByRA).find(ra => gcsByRA[ra] && gcsByRA[ra].length > 0);
       if (anyRA) {
-        return { gcs: gcsByRA[anyRA], isLocal: false, recommendedRegion: anyRA };
+          return { gcs: gcsByRA[anyRA], isLocal: false, recommendedRegion: anyRA, recommendedDistance: null };
       }
       
-      return { gcs: [], isLocal: false, recommendedRegion: '' };
+      return { gcs: [], isLocal: false, recommendedRegion: '', recommendedDistance: null };
     };
 
     // Count only active linked members; aggregates do not represent GC capacity.
@@ -1609,17 +1636,17 @@ export const Simulations: React.FC = () => {
         const memberSector = getSectorByResidence(m.bairro, undefined, undefined);
         const gcSector = assignedCell.setor || 'Sem Setor';
 
-        // Mismatch exists if:
-        // 1. Coordinates exist and distance is greater than 8 km.
-        // 2. Coordinates missing and member's residence sector is different from GC's sector.
         const gcRegion = getGCRegion(gcName);
         const alignedByRegion = isOperationallyAligned(memberRA, gcRegion);
-        const isCorrectAllocation = alignedByRegion || (distance !== null
-          ? distance <= 8.0
-          : (memberSector === gcSector));
+        const rec = getRecommendedGCsForRegion(memberRA, m);
+        const hasCloserGC = distance !== null && rec.recommendedDistance !== null &&
+          rec.recommendedDistance + 2 < distance;
+        const isDistanceDeviation = distance !== null
+          ? distance > 8.0 || hasCloserGC
+          : memberSector !== gcSector;
+        const isCorrectAllocation = alignedByRegion || !isDistanceDeviation;
 
         if (!isCorrectAllocation) {
-          const rec = getRecommendedGCsForRegion(memberRA);
           allocationMismatches.push({
             memberId: m.id,
             memberName: m.nome,
@@ -1631,6 +1658,10 @@ export const Simulations: React.FC = () => {
             hasLocalGCs: rec.gcs.length > 0,
             isLocalRecommendation: rec.isLocal,
             recommendedRegion: rec.recommendedRegion,
+            recommendedDistance: rec.recommendedDistance,
+            distanceDelta: distance !== null && rec.recommendedDistance !== null
+              ? Number((distance - rec.recommendedDistance).toFixed(1))
+              : null,
             localGCs: rec.gcs
           });
         }
@@ -3180,6 +3211,11 @@ export const Simulations: React.FC = () => {
                                 </div>
                               </div>
                               <p className="text-[10px] text-gray-500 leading-relaxed">
+                                {mismatch.distance !== null && mismatch.recommendedDistance !== null && (
+                                  <span className="block text-[9px] text-amber-700 font-semibold">
+                                    Distancia atual: {mismatch.distance.toFixed(1)} km; GC mais proximo: {mismatch.recommendedDistance.toFixed(1)} km ({mismatch.distanceDelta.toFixed(1)} km a menos).
+                                  </span>
+                                )}
                                 Reside em <span className="font-semibold text-gray-700">{mismatch.memberBairro}</span>, mas está alocado em <span className="font-semibold text-indigo-600">{mismatch.currentGC}</span>.
                               </p>
                               {mismatch.hasLocalGCs && (
