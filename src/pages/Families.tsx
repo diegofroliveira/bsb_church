@@ -808,22 +808,30 @@ export const Families: React.FC = () => {
 
                       {/* Parallel Sectors Badges */}
                       {(() => {
-                        const residentSector = getMemberSector(headMember);
-                        const rawEcl = headMember?.setor_eclesiastico || (headMember?.grupos_caseiros ? (cells.find(c => c.grupo_caseiro === headMember.grupos_caseiros)?.setor || '') : '');
-                        const eclSector = getNormalizedSectorName(rawEcl);
+                        const residentSectors = Array.from(new Set(
+                          fam.familyMembers.map((member: Member) => getMemberSector(member)).filter(sector => sector !== 'Sem Setor')
+                        ));
+                        const gcSectors = Array.from(new Set(
+                          fam.familyMembers.map((member: Member) => {
+                            const rawSector = member.setor_eclesiastico || (member.grupos_caseiros
+                              ? cells.find(c => c.grupo_caseiro === member.grupos_caseiros)?.setor
+                              : '');
+                            return getNormalizedSectorName(rawSector);
+                          }).filter(sector => sector !== 'Sem Setor')
+                        ));
 
                         return (
                           <div className="flex flex-wrap gap-1.5 mt-2">
-                            {residentSector !== 'Sem Setor' && (
-                              <span className="text-[9px] bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded font-semibold border border-indigo-100">
-                                Res.: {residentSector}
+                            {residentSectors.map(sector => (
+                              <span key={`res-${sector}`} className="text-[9px] bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded font-semibold border border-indigo-100">
+                                Res.: {sector}
                               </span>
-                            )}
-                            {eclSector !== 'Sem Setor' && (
-                              <span className="text-[9px] bg-teal-50 text-teal-700 px-1.5 py-0.5 rounded font-semibold border border-teal-100">
-                                GC: {eclSector}
+                            ))}
+                            {gcSectors.map(sector => (
+                              <span key={`gc-${sector}`} className="text-[9px] bg-teal-50 text-teal-700 px-1.5 py-0.5 rounded font-semibold border border-teal-100">
+                                GC: {sector}
                               </span>
-                            )}
+                            ))}
                           </div>
                         );
                       })()}
@@ -834,6 +842,11 @@ export const Families: React.FC = () => {
                       {fam.familyMembers.map((m: any) => {
                         const isHead = m.id.toString() === fam.headId;
                         const isSpouse = spouse && m.id.toString() === spouse.id;
+                        const memberGcSector = getNormalizedSectorName(
+                          m.setor_eclesiastico || (m.grupos_caseiros
+                            ? cells.find(c => c.grupo_caseiro === m.grupos_caseiros)?.setor
+                            : '')
+                        );
 
                         // Calculate age
                         let parts = m.nascimento ? (m.nascimento.includes('/') ? m.nascimento.split('/') : m.nascimento.split('-')) : [];
@@ -890,7 +903,7 @@ export const Families: React.FC = () => {
                                 fam.isDivided 
                                   ? "text-amber-700 bg-amber-50/50 border-amber-100 animate-pulse"
                                   : "text-emerald-700 bg-emerald-50/50 border-emerald-100"
-                              )} title={`Grupo caseiro: ${m.grupos_caseiros}`} aria-label={`Grupo caseiro: ${m.grupos_caseiros}`}>
+                              )} title={`Grupo caseiro: ${m.grupos_caseiros}${memberGcSector !== 'Sem Setor' ? ` | Setor: ${memberGcSector}` : ''}`} aria-label={`Grupo caseiro: ${m.grupos_caseiros}${memberGcSector !== 'Sem Setor' ? ` | Setor: ${memberGcSector}` : ''}`}>
                                 {m.grupos_caseiros}
                               </span>
                             ) : (
