@@ -1271,12 +1271,12 @@ export const Simulations: React.FC = () => {
     const minMembersInAnyGC = activeGCSizes.length > 0 ? Math.min(...activeGCSizes) : 10;
     const activeGCsCount = draftCells.filter(c => c.grupo_caseiro !== 'COBERTURA - VIX').length || 1;
     const insights: any[] = [];
+    const genericConsolidationRegions = new Set<string>();
     
     // 2. Scan all RAs to generate alerts based on the exact rules
     Object.entries(allActiveByRA).forEach(([ra, residents]) => {
       if (ra === 'NÃO INFORMADO') return;
       
-      const totalCount = residents.length;
       // Strict filter: only type = MEMBRO count (case-insensitive)
       const countableMembersList = residents.filter(m => {
         const type = (m.tipo_de_pessoa || '').toUpperCase().trim();
@@ -1301,24 +1301,21 @@ export const Simulations: React.FC = () => {
         acc[region] = (acc[region] || 0) + 1;
         return acc;
       }, {});
-      const externalResidentRegionSummary = Object.entries(externalResidentRegionCounts)
+      const residentGroupCounts = countableMembersList.reduce<Record<string, number>>((acc, member) => {
+        if (member.grupos_caseiros) acc[member.grupos_caseiros] = (acc[member.grupos_caseiros] || 0) + 1;
+        return acc;
+      }, {});
+      const residentGroupSummary = Object.entries(residentGroupCounts)
         .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-        .map(([region, count]) => `${region} (${count})`)
+        .map(([group, count]) => `${group} (${count})`)
         .join(', ');
       
-      // Territorial suggested GCs based on tens rule:
-      // 10 members -> 1 GC, 20 members -> 2 GCs, 30 members -> 3 GCs
-      // Suggest starting a GC only if there are at least 12 countable members (Bezos Rule)
-      const suggestedGCs = Math.floor(countableCount / 10);
-      
-      // Use a lower threshold for a local opportunity, and require a larger
-      // base plus external residents before proposing a second GC.
-      const shouldSuggestLocalGroup = actualGCs === 0 && countableCount >= 6;
-      const shouldSuggestSecondGroup = actualGCs > 0 &&
-        countableCount >= 18 &&
-        externalResidentCandidates.length >= 6;
-      const shouldSuggestExpansion = shouldSuggestLocalGroup || shouldSuggestSecondGroup ||
-        (suggestedGCs > actualGCs && suggestedGCs >= 1);
+      // Only emit the two proposals that have a clear pastoral rationale:
+      // establish Arniqueira and evaluate a second GC in Samambaia.
+      const shouldSuggestLocalGroup = ra === 'ARNIQUEIRA' && actualGCs === 0 && countableCount >= 6;
+      const shouldSuggestSecondGroup = ra === 'SAMAMBAIA' && actualGCs > 0 &&
+        countableCount >= 18 && externalResidentCandidates.length >= 6;
+      const shouldSuggestExpansion = shouldSuggestLocalGroup || shouldSuggestSecondGroup;
 
       if (shouldSuggestExpansion) {
         if (actualGCs === 0) {
@@ -1326,26 +1323,18 @@ export const Simulations: React.FC = () => {
             type: 'expansion',
             ra: ra,
             title: `Proposta de criação: GC ${ra}`,
-            description: `A base registra ${countableCount} membros ativos residentes em ${ra}, ${actualGCs} GC próprio e ${externalResidentCandidates.length} desses membros alocados atualmente fora da localidade${externalResidentRegionSummary ? ` (${externalResidentRegionSummary})` : ''}. O dado sustenta avaliar a criação de um GC local, sem recomendar mudança automática de vínculos.`,
-            action: 'AÇÃO SUGERIDA: AVALIAR CRIAÇÃO DE GC LOCAL',
+            description: `A base identifica ${countableCount} membros ativos residentes em ${ra}. Não há GC próprio cadastrado na localidade; hoje essas pessoas estão distribuídas em ${residentGroupSummary || 'outros grupos'}. Esse cenário justifica levar à avaliação a criação de um GC em ${ra}, sem recomendar mudança automática de vínculos.`,
+            action: 'AÇÃO SUGERIDA: CONSIDERAR A CRIAÇÃO DE UM GC EM ARNIQUEIRA',
             memberNames: countableMembersList.map(m => m.nome).sort(),
             coverageRegions: Object.keys(externalResidentRegionCounts)
           });
         } else {
-          const getRomanNumeral = (num: number): string => {
-            const roman = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
-            return roman[num - 1] || num.toString();
-          };
-          const nextNumStr = getRomanNumeral(actualGCs + 1);
-          
           insights.push({
             type: 'expansion_next',
             ra: ra,
-            title: `Proposta de expansão: ${ra} ${nextNumStr}`,
-            description: shouldSuggestSecondGroup
-              ? `A base registra ${countableCount} membros ativos residentes em ${ra}. ${externalResidentCandidates.length} deles estão atualmente alocados fora da localidade${externalResidentRegionSummary ? ` (${externalResidentRegionSummary})` : ''}, indicando uma oportunidade de avaliar um segundo GC em ${ra} para acolher esse núcleo, sem mover pessoas automaticamente.`
-              : `Localidade ${ra} já possui ${actualGCs} grupo(s) cadastrado(s), mas conta com ${countableCount} membros ativos residentes. Pela regra territorial de dezenas, recomenda-se avaliar um desdobramento local antes de qualquer alteração de vínculos.`,
-            action: `AÇÃO SUGERIDA: AVALIAR ${ra} ${nextNumStr} / DESDOBRAMENTO TERRITORIAL`,
+            title: 'Proposta de expansão: SAMAMBAIA II',
+            description: `A base identifica ${countableCount} membros ativos residentes em SAMAMBAIA. ${externalResidentCandidates.length} estão hoje fora do GC local, distribuídos em ${residentGroupSummary}. Em vez de concentrar todos em um único grupo que ficaria grande, a proposta é avaliar um segundo GC em Samambaia para acolher esse núcleo com mais equilíbrio.`,
+            action: 'AÇÃO SUGERIDA: CONSIDERAR UM SEGUNDO GC EM SAMAMBAIA',
             memberNames: (shouldSuggestSecondGroup ? externalResidentCandidates : countableMembersList).map(m => m.nome).sort(),
             coverageRegions: Object.keys(externalResidentRegionCounts)
           });
@@ -1417,10 +1406,6 @@ export const Simulations: React.FC = () => {
           externalParticipants.push(...members);
         }
       });
-      const proposalExternalRAs = Array.from(new Set(
-        externalParticipants.map(m => getAdministrativeRegion(m.bairro))
-      )).sort();
-
       // Recanto is an existing GC whose mixed residence profile supports a
       // naming proposal, not a new-group or repatriation recommendation.
       const currentRecanto = gcList.find(c => normalizeName(c.grupo_caseiro).includes('RECANTO'));
@@ -1432,9 +1417,7 @@ export const Simulations: React.FC = () => {
             getAdministrativeRegion(m.bairro) !== ra
           )
         : [];
-      const namingParticipants = externalParticipants.length > 0
-        ? externalParticipants
-        : recantoExternalParticipants;
+      const namingParticipants = recantoExternalParticipants;
 
       if (currentRecanto && namingParticipants.length >= 3) {
         insights.push({
@@ -1455,7 +1438,9 @@ export const Simulations: React.FC = () => {
         });
       }
 
-      if (!shouldSuggestLocalGroup && (scatteredResidents.length > 0 || externalParticipants.length > 0)) {
+      // Generic consolidation/repatriation alerts are intentionally disabled:
+      // geographic coverage is not, by itself, evidence that a member should move.
+      if (genericConsolidationRegions.has(ra) && (scatteredResidents.length > 0 || externalParticipants.length > 0)) {
         const externalGCs = Array.from(new Set(scatteredResidents.map(m => m.grupos_caseiros!))).sort();
         const externalRAs = Array.from(new Set(externalParticipants.map(m => getAdministrativeRegion(m.bairro)))).sort();
         
