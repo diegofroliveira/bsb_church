@@ -1608,7 +1608,11 @@ export const Simulations: React.FC = () => {
   }, [auditData.criticalGCs, ignoredAlerts]);
 
   const activeInsights = useMemo(() => {
-    return territorialInsights.insights.filter((insight: any) => !ignoredAlerts.includes(`${insight.type}_${insight.ra}`));
+    const removedTerritorialAlerts = new Set(['expansion', 'expansion_next', 'consolidation']);
+    return territorialInsights.insights.filter((insight: any) =>
+      !removedTerritorialAlerts.has(insight.type) &&
+      !ignoredAlerts.includes(`${insight.type}_${insight.ra}`)
+    );
   }, [territorialInsights.insights, ignoredAlerts]);
 
   const discipleshipAudit = useMemo(() => {
