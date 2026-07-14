@@ -3,6 +3,7 @@ import { supabase, supabaseReader } from '../lib/supabase';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, Loader2, ChevronDown, ChevronRight, ShieldCheck, Activity, FileWarning, Download } from 'lucide-react';
 import clsx from 'clsx';
+import { filterOperationalCells, filterOperationalMembers } from '../lib/operationalScope';
 
 interface QAReport {
   id: string;
@@ -83,8 +84,8 @@ export const QA: React.FC = () => {
         if (celulasRes.error) throw celulasRes.error;
         if (discRes.error) throw discRes.error;
 
-        const membros = allMembros;
-        const celulas = celulasRes.data || [];
+        const membros = filterOperationalMembers(allMembros);
+        const celulas = filterOperationalCells(celulasRes.data || []);
         // A relação é contada uma única vez por par. A exportação pode conter
         // linhas repetidas do mesmo vínculo, o que não é um novo discípulo.
         const discipulado = Array.from(new Map(

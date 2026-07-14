@@ -3,6 +3,7 @@ import { supabaseReader } from '../lib/supabase';
 import { Filter, Download, Loader2, Search, FileText, ArrowUpDown, ChevronUp, ChevronDown, Home, ShieldAlert, Users, Heart } from 'lucide-react';
 import clsx from 'clsx';
 import * as XLSX from 'xlsx';
+import { filterOperationalMembers } from '../lib/operationalScope';
 
 const normalizeStr = (s: string | null | undefined): string => {
   if (!s) return '';
@@ -431,7 +432,7 @@ export const Reports: React.FC = () => {
             };
         });
 
-        setMembers(enrichedMembers);
+        setMembers(filterOperationalMembers(enrichedMembers));
       } catch (error) {
         console.error('Error fetching data:', error);
       } finally {

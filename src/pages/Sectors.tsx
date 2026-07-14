@@ -8,6 +8,7 @@ import {
   Map, BarChart2, ShieldCheck, UserCheck, Flame, Baby
 } from 'lucide-react';
 import clsx from 'clsx';
+import { filterOperationalCells, filterOperationalMembers } from '../lib/operationalScope';
 
 interface Member {
   id: any;
@@ -209,8 +210,8 @@ export const Sectors: React.FC = () => {
           };
         });
 
-        setMembers(enrichedMembers);
-        setCells(allCelulas);
+        setMembers(filterOperationalMembers(enrichedMembers));
+        setCells(filterOperationalCells(allCelulas));
       } catch (err: any) {
         setError(err.message || 'Erro ao carregar dados do Supabase');
       } finally {

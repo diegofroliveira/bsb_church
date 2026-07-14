@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { supabaseReader } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import clsx from 'clsx';
+import { filterOperationalMembers } from '../lib/operationalScope';
 
 const getNormalizedSectorName = (dbSector: string | null | undefined): string => {
   if (!dbSector) return 'Sem Setor';
@@ -88,7 +89,7 @@ export const Members: React.FC = () => {
            };
         });
 
-        setMembers(enriched);
+        setMembers(filterOperationalMembers(enriched));
       } catch (error) {
         console.error('Error fetching members:', error);
       } finally {

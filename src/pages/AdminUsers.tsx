@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { UserCog, Plus, Save, X, Loader2, Check, Shield, Eye, EyeOff, Trash2, Lock, Cloud, CloudLightning, AlertCircle, CheckCircle2, Database } from 'lucide-react';
 import clsx from 'clsx';
+import { filterOperationalCells } from '../lib/operationalScope';
 
 // UUID especial para armazenar a configuração global de perfis
 const SPECIAL_CONFIG_ID = '00000000-0000-0000-0000-000000000000';
@@ -138,7 +139,7 @@ export const AdminUsers: React.FC = () => {
     try {
       const { data } = await supabase.from('celulas').select('grupo_caseiro');
       if (data) {
-        const gcs = Array.from(new Set(data.map(d => d.grupo_caseiro).filter(Boolean))) as string[];
+        const gcs = Array.from(new Set(filterOperationalCells(data).map(d => d.grupo_caseiro).filter(Boolean))) as string[];
         setOptionsGC(gcs.sort());
       }
     } catch (error) {

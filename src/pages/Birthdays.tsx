@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { supabase, supabaseReader } from '../lib/supabase';
+import { filterOperationalMembers } from '../lib/operationalScope';
 import { 
   Calendar, 
   Copy, 
@@ -152,7 +153,7 @@ export const Birthdays: React.FC = () => {
         .limit(10000);
 
       if (error) throw error;
-      setMembers(data || []);
+      setMembers(filterOperationalMembers(data || []));
       
       // Test storage access
       const { error: storageCheck } = await supabase.storage.from('avatars').list('', { limit: 1 });

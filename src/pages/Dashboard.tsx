@@ -8,6 +8,7 @@ import {
 import { Users, UserPlus, Home, TrendingUp, Loader2, X, Search, Layers, UserCheck, MapPin, SlidersHorizontal } from 'lucide-react';
 import clsx from 'clsx';
 import { getSectorByResidence } from '../lib/geoUtils';
+import { filterOperationalCells, filterOperationalMembers } from '../lib/operationalScope';
 
 export const Dashboard: React.FC = () => {
   const { user } = useAuth();
@@ -74,8 +75,8 @@ export const Dashboard: React.FC = () => {
           fetch('/data/pessoas_funcoes.json').then(r => r.ok ? r.json() : []).catch(() => [])
         ]);
 
-        setRawMembros(membrosRes.data || []);
-        setRawCelulas(celulasRes.data || []);
+        setRawMembros(filterOperationalMembers(membrosRes.data || []));
+        setRawCelulas(filterOperationalCells(celulasRes.data || []));
         const uniqueDiscipulado = Array.from(new Map(
           (discRes.data || [])
             .filter((d: any) => d.discipulador?.trim() && d.discipulo?.trim())

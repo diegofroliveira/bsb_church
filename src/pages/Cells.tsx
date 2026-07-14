@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { supabaseReader } from '../lib/supabase';
 import { Home, Users, MapPin, Search, Filter, Loader2, Shield, X, Phone, MessageSquare, ExternalLink } from 'lucide-react';
 import clsx from 'clsx';
+import { filterOperationalCells, filterOperationalMembers } from '../lib/operationalScope';
 
 interface CellInfo {
   id: number;
@@ -51,8 +52,8 @@ export const Cells: React.FC = () => {
           supabaseReader.from('discipulado').select('discipulador')
         ]);
 
-        const celulas = celulasRes.data || [];
-        const membros = membrosRes.data || [];
+        const celulas = filterOperationalCells(celulasRes.data || []);
+        const membros = filterOperationalMembers(membrosRes.data || []);
         const discipuladoData = discipuladoRes.data || [];
 
         const discNames = new Set<string>();
