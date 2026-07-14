@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabaseReader } from '../lib/supabase';
 import { Users, CalendarCheck2, MessageCircleHeart, Loader2 } from 'lucide-react';
+import { filterOperationalMembers } from '../lib/operationalScope';
 
 export const MyGroup: React.FC = () => {
   const { user } = useAuth();
@@ -25,7 +26,7 @@ export const MyGroup: React.FC = () => {
           .ilike('grupos_caseiros', `%${user.groupId}%`);
 
         if (error) throw error;
-        setMembers(data || []);
+        setMembers(filterOperationalMembers(data || []));
       } catch (error) {
         console.error('Error fetching group members:', error);
       } finally {
