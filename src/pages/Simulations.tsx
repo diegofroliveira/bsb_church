@@ -1376,6 +1376,30 @@ export const Simulations: React.FC = () => {
           externalParticipants.push(...members);
         }
       });
+      const proposalExternalRAs = Array.from(new Set(
+        externalParticipants.map(m => getAdministrativeRegion(m.bairro))
+      )).sort();
+
+      // Recanto is an existing GC whose mixed residence profile supports a
+      // naming proposal, not a new-group or repatriation recommendation.
+      const currentRecanto = gcList.find(c => normalizeName(c.grupo_caseiro) === 'RECANTO');
+      if (currentRecanto && externalParticipants.length > 0) {
+        insights.push({
+          type: 'renaming',
+          ra: 'RECANTO-ENTORNO',
+          title: 'Proposta de nome: RECANTO-ENTORNO',
+          description: `O grupo caseiro atualmente chamado ${currentRecanto.grupo_caseiro} reúne ${externalParticipants.length} membros ativos residentes em outras regiões, incluindo ${proposalExternalRAs.join(', ')}. A proposta é renomear o grupo para RECANTO-ENTORNO para refletir sua cobertura territorial atual, sem criar um novo grupo e sem alterar vínculos automaticamente.`,
+          action: 'AÇÃO SUGERIDA: AVALIAR RENOMEAÇÃO ADMINISTRATIVA',
+          externalParticipants: externalParticipants.map(m => ({
+            nome: m.nome,
+            gc: m.grupos_caseiros,
+            bairro: m.bairro || 'Não informado',
+            tipo: m.tipo_de_pessoa || 'Membro',
+            residenceRA: getAdministrativeRegion(m.bairro)
+          })).sort((a, b) => a.nome.localeCompare(b.nome)),
+          scatteredResidents: []
+        });
+      }
 
       if (scatteredResidents.length > 0 || externalParticipants.length > 0) {
         const externalGCs = Array.from(new Set(scatteredResidents.map(m => m.grupos_caseiros!))).sort();
@@ -2601,7 +2625,7 @@ export const Simulations: React.FC = () => {
 
                        <div className="space-y-4 animate-in fade-in duration-200">
                           {activeInsights.length > 0 ? activeInsights.map((insight, i) => {
-                            const isConsolidation = insight.type === 'consolidation';
+                            const isConsolidation = insight.type === 'consolidation' || insight.type === 'renaming';
                             const key = `${insight.type}_${insight.ra}`;
                             const isMinimized = minimizedAlerts.includes(key);
 
