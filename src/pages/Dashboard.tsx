@@ -27,6 +27,8 @@ const LOCALITY_EXCLUDED_TYPES = new Set([
   'APOSTOLO'
 ]);
 
+const EVOLUTION_HISTORY_START_YEAR = 2020;
+
 const isLocalMember = (member: any): boolean =>
   member.status === 'Ativo' && !LOCALITY_EXCLUDED_TYPES.has(normalizePersonType(member.tipo_de_pessoa));
 
@@ -291,7 +293,7 @@ export const Dashboard: React.FC = () => {
     const datedRecords = filteredMembros.flatMap(m => [
       { kind: 'entry' as const, date: parseSafeDate(m.data_de_cadastro) },
       ...(m.status === 'Inativo' ? [{ kind: 'exit' as const, date: parseSafeDate(m.data_atualizacao) }] : [])
-    ]).filter(record => record.date) as { kind: 'entry' | 'exit', date: Date }[];
+    ]).filter(record => record.date && record.date.getFullYear() >= EVOLUTION_HISTORY_START_YEAR) as { kind: 'entry' | 'exit', date: Date }[];
     const firstRecordDate = datedRecords.reduce((first, record) => record.date < first ? record.date : first, now);
     const startDate = evolutionRange === 'all'
       ? new Date(firstRecordDate.getFullYear(), firstRecordDate.getMonth(), 1)
@@ -828,6 +830,9 @@ export const Dashboard: React.FC = () => {
                 <button type="button" title="Drill up: agrupar os dados por ano" onClick={() => setEvolutionGranularity('year')} className={clsx('rounded-md px-3 py-1 text-xs font-semibold transition-colors', evolutionGranularity === 'year' ? 'bg-primary-600 text-white' : 'text-gray-500 hover:bg-gray-50')}>Ano</button>
               </div>
             </div>
+            {evolutionRange === 'all' && (
+              <p className="mt-2 text-[10px] leading-4 text-gray-400">A carga inicial de implantação de 2019 foi desconsiderada desta evolução.</p>
+            )}
           </div>
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
