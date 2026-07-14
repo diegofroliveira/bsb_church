@@ -3294,8 +3294,8 @@ export const Simulations: React.FC = () => {
                   )}
                 </div>
 
-                {/* 3. Collapsible: Critical GCs */}
-                <div className="border border-gray-100 rounded-2xl overflow-hidden">
+                {/* 3. Collapsible: Critical GCs (hidden by product decision) */}
+                <div className="hidden border border-gray-100 rounded-2xl overflow-hidden">
                   <button 
                     onClick={() => setIsAuditCriticalExpanded(!isAuditCriticalExpanded)}
                     className="w-full flex items-center justify-between p-3.5 bg-gray-50/50 hover:bg-gray-50 text-left transition-all cursor-pointer"
@@ -3394,7 +3394,7 @@ export const Simulations: React.FC = () => {
                   )}
                 </div>
 
-                {/* 4. Collapsible: Strategic Suggestions */}
+                {/* 3. Collapsible: Strategic Suggestions */}
                 <div className="border border-slate-100 rounded-2xl overflow-hidden bg-slate-50/50">
                   <button 
                     onClick={() => setIsAuditSuggestionsExpanded(!isAuditSuggestionsExpanded)}
