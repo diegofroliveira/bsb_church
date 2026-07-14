@@ -59,6 +59,8 @@ export const Dashboard: React.FC = () => {
   const [selectedCellRoles, setSelectedCellRoles] = useState<string[]>([]);
   const [filterIsDiscipulador, setFilterIsDiscipulador] = useState<string>('Todos');
   const [populationMode, setPopulationMode] = useState<'todos' | 'local' | 'vinculado'>('todos');
+  const [evolutionRange, setEvolutionRange] = useState<'12' | '24' | '36' | 'all'>('12');
+  const [evolutionGranularity, setEvolutionGranularity] = useState<'month' | 'year'>('month');
   const [isRolesOpen, setIsRolesOpen] = useState(false);
   const rolesDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -285,22 +287,33 @@ export const Dashboard: React.FC = () => {
     const membrosLocalidade = filteredMembros.filter(isLocalMember).length;
     const membrosLocalidadeVinculados = filteredMembros.filter(isLinkedMember).length;
 
-    const growthData: any[] = [];
     const monthsNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-    for (let i = 11; i >= 0; i--) {
-        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const mMonth = d.getMonth();
-        const mYear = d.getFullYear();
-        const label = `${monthsNames[mMonth]}/${mYear.toString().slice(-2)}`;
-        const entries = filteredMembros.filter(m => {
-            const md = parseSafeDate(m.data_de_cadastro);
-            return md && md.getMonth() === mMonth && md.getFullYear() === mYear;
-        }).length;
-        const exits = filteredMembros.filter(m => {
-            const md = parseSafeDate(m.data_atualizacao);
-            return m.status === 'Inativo' && md && md.getMonth() === mMonth && md.getFullYear() === mYear;
-        }).length;
-        growthData.push({ name: label, entradas: entries, saidas: exits });
+    const datedRecords = filteredMembros.flatMap(m => [
+      { kind: 'entry' as const, date: parseSafeDate(m.data_de_cadastro) },
+      ...(m.status === 'Inativo' ? [{ kind: 'exit' as const, date: parseSafeDate(m.data_atualizacao) }] : [])
+    ]).filter(record => record.date) as { kind: 'entry' | 'exit', date: Date }[];
+    const firstRecordDate = datedRecords.reduce((first, record) => record.date < first ? record.date : first, now);
+    const startDate = evolutionRange === 'all'
+      ? new Date(firstRecordDate.getFullYear(), firstRecordDate.getMonth(), 1)
+      : new Date(now.getFullYear(), now.getMonth() - Number(evolutionRange) + 1, 1);
+    const growthData: any[] = [];
+    const cursor = new Date(startDate);
+    while (cursor <= now) {
+      const bucketYear = cursor.getFullYear();
+      const bucketMonth = cursor.getMonth();
+      const bucketKey = evolutionGranularity === 'year'
+        ? String(bucketYear)
+        : `${bucketYear}-${String(bucketMonth + 1).padStart(2, '0')}`;
+      const inBucket = (date: Date) => evolutionGranularity === 'year'
+        ? date.getFullYear() === bucketYear
+        : date.getFullYear() === bucketYear && date.getMonth() === bucketMonth;
+      growthData.push({
+        name: evolutionGranularity === 'year' ? String(bucketYear) : `${monthsNames[bucketMonth]}/${String(bucketYear).slice(-2)}`,
+        key: bucketKey,
+        entradas: datedRecords.filter(record => record.kind === 'entry' && inBucket(record.date)).length,
+        saidas: datedRecords.filter(record => record.kind === 'exit' && inBucket(record.date)).length
+      });
+      cursor.setMonth(cursor.getMonth() + (evolutionGranularity === 'year' ? 12 : 1));
     }
 
     const demoCounts: Record<string, number> = {};
@@ -402,7 +415,7 @@ export const Dashboard: React.FC = () => {
             discipuladores: discList
         }
     };
-  }, [isLoading, rawMembros, rawCelulas, rawDiscipulado, rawFuncoes, filterGender, filterGroup, filterDisc, filterSector, filterSectorEcl, sectorViewMode, filterMinAge, filterMaxAge, filterMaritalStatus, filterStatus, selectedTypes, selectedCellRoles, filterIsDiscipulador, populationMode]);
+  }, [isLoading, rawMembros, rawCelulas, rawDiscipulado, rawFuncoes, filterGender, filterGroup, filterDisc, filterSector, filterSectorEcl, sectorViewMode, filterMinAge, filterMaxAge, filterMaritalStatus, filterStatus, selectedTypes, selectedCellRoles, filterIsDiscipulador, populationMode, evolutionRange, evolutionGranularity]);
 
   const handleOpenModal = async (type: 'grupo' | 'setor' | 'discipulador', title: string) => {
     setModalType(type); setModalTitle(title); setIsModalLoading(true);
@@ -789,6 +802,26 @@ export const Dashboard: React.FC = () => {
             </div>
           );
         })}
+      </div>
+
+      <div className="flex flex-col gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-sm font-semibold text-gray-800">Evolução da Base</p>
+          <p className="text-xs text-gray-400">Ajuste o período e alterne entre drill down mensal e drill up anual.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <label className="font-semibold uppercase tracking-wide text-gray-400" htmlFor="evolution-range">Período</label>
+          <select id="evolution-range" value={evolutionRange} onChange={e => setEvolutionRange(e.target.value as typeof evolutionRange)} className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 font-medium text-gray-700 outline-none focus:border-primary-500">
+            <option value="12">12 meses</option>
+            <option value="24">24 meses</option>
+            <option value="36">36 meses</option>
+            <option value="all">Base completa</option>
+          </select>
+          <div className="flex rounded-lg border border-gray-200 p-0.5">
+            <button type="button" onClick={() => setEvolutionGranularity('month')} className={clsx('rounded-md px-2.5 py-1.5 font-semibold transition-colors', evolutionGranularity === 'month' ? 'bg-primary-600 text-white' : 'text-gray-500 hover:bg-gray-50')}>Detalhar mês</button>
+            <button type="button" onClick={() => setEvolutionGranularity('year')} className={clsx('rounded-md px-2.5 py-1.5 font-semibold transition-colors', evolutionGranularity === 'year' ? 'bg-primary-600 text-white' : 'text-gray-500 hover:bg-gray-50')}>Agrupar ano</button>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
