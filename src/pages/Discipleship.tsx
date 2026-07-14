@@ -2,8 +2,37 @@ import React, { useEffect, useState } from 'react';
 import { Search, Loader2 } from 'lucide-react';
 import { supabaseReader } from '../lib/supabase';
 
+const normalizeName = (value: unknown): string => String(value || '')
+  .trim()
+  .toUpperCase()
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .replace(/\s+/g, ' ');
+
+const formatDate = (value?: string | null): string => {
+  if (!value) return '-';
+  const date = new Date(`${value.slice(0, 10)}T12:00:00`);
+  return Number.isNaN(date.getTime()) ? '-' : date.toLocaleDateString('pt-BR');
+};
+
+const formatDuration = (value?: string | null): string => {
+  if (!value) return '-';
+  const start = new Date(`${value.slice(0, 10)}T12:00:00`);
+  if (Number.isNaN(start.getTime()) || start > new Date()) return '-';
+  const now = new Date();
+  let months = (now.getFullYear() - start.getFullYear()) * 12 + now.getMonth() - start.getMonth();
+  if (now.getDate() < start.getDate()) months -= 1;
+  if (months < 0) return '-';
+  const years = Math.floor(months / 12);
+  const remainingMonths = months % 12;
+  if (years === 0) return `${remainingMonths} ${remainingMonths === 1 ? 'mês' : 'meses'}`;
+  if (remainingMonths === 0) return `${years} ${years === 1 ? 'ano' : 'anos'}`;
+  return `${years}a ${remainingMonths}m`;
+};
+
 export const Discipleship: React.FC = () => {
   const [data, setData] = useState<any[]>([]);
+  const [memberDates, setMemberDates] = useState<Record<string, { data_de_vinculo?: string | null; data_de_cadastro?: string | null }>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -17,8 +46,15 @@ export const Discipleship: React.FC = () => {
           query = query.or(`discipulador.ilike.%${searchTerm}%,discipulo.ilike.%${searchTerm}%`);
         }
 
-        const { data: results, error } = await query.order('discipulador', { ascending: true });
+        const [{ data: results, error }, { data: members }] = await Promise.all([
+          query.order('discipulador', { ascending: true }),
+          supabaseReader.from('membros').select('nome, data_de_vinculo, data_de_cadastro')
+        ]);
         if (error) throw error;
+        setMemberDates(Object.fromEntries((members || []).map((member: any) => [
+          normalizeName(member.nome),
+          { data_de_vinculo: member.data_de_vinculo, data_de_cadastro: member.data_de_cadastro }
+        ])));
         const uniqueResults = Array.from(new Map(
           (results || [])
             .filter((item: any) => item.discipulador?.trim() && item.discipulo?.trim())
@@ -78,6 +114,7 @@ export const Discipleship: React.FC = () => {
                       <th className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Discipulador</th>
                       <th className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Status</th>
                       <th className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Início</th>
+                      <th className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Tempo</th>
                    </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 bg-white">
@@ -90,12 +127,23 @@ export const Discipleship: React.FC = () => {
                                {item.status}
                             </span>
                          </td>
-                         <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{item.data_inicio}</td>
+                         {(() => {
+                           const dates = memberDates[normalizeName(item.discipulo)];
+                           const start = item.data_inicio || dates?.data_de_vinculo || dates?.data_de_cadastro;
+                           const source = item.data_inicio ? 'Discipulado' : dates?.data_de_vinculo ? 'Vínculo na igreja' : dates?.data_de_cadastro ? 'Cadastro' : 'Sem data';
+                           return <>
+                             <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                               <span>{formatDate(start)}</span>
+                               <span className="block text-[10px] text-gray-400">{source}</span>
+                             </td>
+                             <td className="whitespace-nowrap px-3 py-4 text-sm font-medium text-gray-600">{formatDuration(start)}</td>
+                           </>;
+                         })()}
                       </tr>
                    ))}
                    {data.length === 0 && !isLoading && (
                      <tr>
-                       <td colSpan={4} className="text-center py-12 text-gray-500">Nenhum vínculo de discipulado encontrado.</td>
+                       <td colSpan={5} className="text-center py-12 text-gray-500">Nenhum vínculo de discipulado encontrado.</td>
                      </tr>
                    )}
                 </tbody>
