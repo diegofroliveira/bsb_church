@@ -10,6 +10,29 @@ import clsx from 'clsx';
 import { getSectorByResidence } from '../lib/geoUtils';
 import { filterOperationalCells, filterOperationalMembers } from '../lib/operationalScope';
 
+const normalizePersonType = (value: unknown): string => String(value || '')
+  .trim()
+  .toUpperCase()
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .replace(/[-_]+/g, ' ')
+  .replace(/\s+/g, ' ');
+
+const LOCALITY_EXCLUDED_TYPES = new Set([
+  'CONTADOR',
+  'EXTERNO',
+  'EXTRA LOCAL',
+  'FUNCIONARIO',
+  'VISITANTE',
+  'APOSTOLO'
+]);
+
+const isLocalMember = (member: any): boolean =>
+  member.status === 'Ativo' && !LOCALITY_EXCLUDED_TYPES.has(normalizePersonType(member.tipo_de_pessoa));
+
+const isLinkedMember = (member: any): boolean =>
+  isLocalMember(member) && !['AGREGADO', 'AGREGADOS'].includes(normalizePersonType(member.tipo_de_pessoa));
+
 export const Dashboard: React.FC = () => {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
@@ -35,6 +58,7 @@ export const Dashboard: React.FC = () => {
   const [isAdvancedFiltersOpen, setIsAdvancedFiltersOpen] = useState(false);
   const [selectedCellRoles, setSelectedCellRoles] = useState<string[]>([]);
   const [filterIsDiscipulador, setFilterIsDiscipulador] = useState<string>('Todos');
+  const [populationMode, setPopulationMode] = useState<'todos' | 'local' | 'vinculado'>('todos');
   const [isRolesOpen, setIsRolesOpen] = useState(false);
   const rolesDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -241,22 +265,25 @@ export const Dashboard: React.FC = () => {
         const matchIsDiscipulador = filterIsDiscipulador === 'Todos' || (
           filterIsDiscipulador === 'Sim' ? mIsDiscipulador : !mIsDiscipulador
         );
+        const matchPopulation = populationMode === 'todos' ||
+          (populationMode === 'local' ? isLocalMember(m) : isLinkedMember(m));
         
-        return matchGender && matchGroup && matchDisc && matchAge && matchMarital && matchStatus && matchType && matchSector && matchSectorEcl && matchCellRole && matchIsDiscipulador;
+        return matchGender && matchGroup && matchDisc && matchAge && matchMarital && matchStatus && matchType && matchSector && matchSectorEcl && matchCellRole && matchIsDiscipulador && matchPopulation;
     });
 
     const ativosOnly = filteredMembros.filter(m => m.status === 'Ativo');
     const totalMembros = filteredMembros.length;
     const ativos = filteredMembros.filter(m => m.status === 'Ativo').length;
-    const visitantes = filteredMembros.filter(m => m.tipo_cadastro === 'Visitante').length;
-    const totalCelulas = rawCelulas.length;
-    const totalDiscipuladores = discSet.size;
-    
-    const tiposMembrosLocalidade = ['MEMBRO', 'LÍDER', 'LIDER', 'DISCIPULADOR', 'DIÁCONO', 'DIACONO', 'PASTOR', 'PRESBÍTERO', 'PRESBITERO'];
-    const membrosLocalidade = filteredMembros.filter(m => 
-        tiposMembrosLocalidade.includes((m.tipo_de_pessoa || '').toUpperCase().trim()) && 
-        m.status === 'Ativo'
+    const visitantes = filteredMembros.filter(m =>
+      normalizePersonType(m.tipo_cadastro) === 'VISITANTE' ||
+      normalizePersonType(m.tipo_de_pessoa) === 'VISITANTE'
     ).length;
+    const filteredNames = new Set(filteredMembros.map(m => m.nome?.trim().toUpperCase()).filter(Boolean));
+    const totalDiscipuladores = Array.from(discSet).filter(name => filteredNames.has(name)).length;
+    const totalLideres = Array.from(liderSet).filter(name => filteredNames.has(name)).length;
+    
+    const membrosLocalidade = filteredMembros.filter(isLocalMember).length;
+    const membrosLocalidadeVinculados = filteredMembros.filter(isLinkedMember).length;
 
     const growthData: any[] = [];
     const monthsNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
@@ -265,11 +292,11 @@ export const Dashboard: React.FC = () => {
         const mMonth = d.getMonth();
         const mYear = d.getFullYear();
         const label = `${monthsNames[mMonth]}/${mYear.toString().slice(-2)}`;
-        const entries = rawMembros.filter(m => {
+        const entries = filteredMembros.filter(m => {
             const md = parseSafeDate(m.data_de_cadastro);
             return md && md.getMonth() === mMonth && md.getFullYear() === mYear;
         }).length;
-        const exits = rawMembros.filter(m => {
+        const exits = filteredMembros.filter(m => {
             const md = parseSafeDate(m.data_atualizacao);
             return m.status === 'Inativo' && md && md.getMonth() === mMonth && md.getFullYear() === mYear;
         }).length;
@@ -306,17 +333,24 @@ export const Dashboard: React.FC = () => {
     });
 
     const grupoCounts: any = {};
-    filteredMembros.forEach(m => { if (m.grupos_caseiros) grupoCounts[m.grupos_caseiros] = (grupoCounts[m.grupos_caseiros] || 0) + 1; });
+    const grupoLinkedCounts: any = {};
+    filteredMembros.forEach(m => {
+      if (!m.grupos_caseiros) return;
+      grupoCounts[m.grupos_caseiros] = (grupoCounts[m.grupos_caseiros] || 0) + 1;
+      if (isLinkedMember(m)) grupoLinkedCounts[m.grupos_caseiros] = (grupoLinkedCounts[m.grupos_caseiros] || 0) + 1;
+    });
+    const visibleGroupNames = new Set(Object.keys(grupoCounts));
+    const totalCelulas = rawCelulas.filter(c => visibleGroupNames.has(c.grupo_caseiro)).length;
     const groupsList = rawCelulas.map(c => ({
-      nome: c.grupo_caseiro, lider: c.lider || 'Sem Lider', setor: c.setor || 'Sem Setor', membros: grupoCounts[c.grupo_caseiro] || 0
-    })).sort((a, b) => b.membros - a.membros);
+      nome: c.grupo_caseiro, lider: c.lider || 'Sem Lider', setor: c.setor || 'Sem Setor', membros: grupoCounts[c.grupo_caseiro] || 0, vinculados: grupoLinkedCounts[c.grupo_caseiro] || 0
+    })).filter(group => group.membros > 0).sort((a, b) => b.membros - a.membros);
 
-    const sectorCounts: Record<string, { nome: string, grupos: number, membros: number }> = {
-      'Setor Norte': { nome: 'Setor Norte', grupos: 0, membros: 0 },
-      'Setor Central': { nome: 'Setor Central', grupos: 0, membros: 0 },
-      'Setor Águas Claras': { nome: 'Setor Águas Claras', grupos: 0, membros: 0 },
-      'Setor Sul': { nome: 'Setor Sul', grupos: 0, membros: 0 },
-      'Sem Setor': { nome: 'Sem Setor', grupos: 0, membros: 0 }
+    const sectorCounts: Record<string, { nome: string, grupos: number, membros: number, vinculados: number }> = {
+      'Setor Norte': { nome: 'Setor Norte', grupos: 0, membros: 0, vinculados: 0 },
+      'Setor Central': { nome: 'Setor Central', grupos: 0, membros: 0, vinculados: 0 },
+      'Setor Águas Claras': { nome: 'Setor Águas Claras', grupos: 0, membros: 0, vinculados: 0 },
+      'Setor Sul': { nome: 'Setor Sul', grupos: 0, membros: 0, vinculados: 0 },
+      'Sem Setor': { nome: 'Sem Setor', grupos: 0, membros: 0, vinculados: 0 }
     };
 
     filteredMembros.forEach(m => {
@@ -325,12 +359,13 @@ export const Dashboard: React.FC = () => {
         : getMemberSector(m);
       if (sectorCounts[sec]) {
         sectorCounts[sec].membros += 1;
+        if (isLinkedMember(m)) sectorCounts[sec].vinculados += 1;
       }
     });
 
     rawCelulas.forEach(c => {
       const sec = getNormalizedSectorName(c.setor);
-      if (sectorCounts[sec]) {
+      if (sectorCounts[sec] && visibleGroupNames.has(c.grupo_caseiro)) {
         sectorCounts[sec].grupos += 1;
       }
     });
@@ -343,7 +378,7 @@ export const Dashboard: React.FC = () => {
     rawDiscipulado.forEach(d => {
       if (d.discipulador) {
         const upper = d.discipulador.trim().toUpperCase();
-        if (discSet.has(upper)) {
+        if (discSet.has(upper) && filteredNames.has(upper)) {
           const original = discNameMap.get(upper) || d.discipulador.trim();
           mestreCounts[original] = (mestreCounts[original] || 0) + 1;
         }
@@ -355,7 +390,7 @@ export const Dashboard: React.FC = () => {
       .sort((a, b) => b.discipulos - a.discipulos);
 
     return {
-        stats: { totalMembros, ativos, visitantes, totalCelulas, totalDiscipuladores, membrosLocalidade },
+        stats: { totalMembros, ativos, visitantes, totalCelulas, totalDiscipuladores, totalLideres, membrosLocalidade, membrosLocalidadeVinculados },
         charts: {
             growth: growthData,
             demographics: Object.entries(demoCounts).map(([name, value]) => ({ 
@@ -367,7 +402,7 @@ export const Dashboard: React.FC = () => {
             discipuladores: discList
         }
     };
-  }, [isLoading, rawMembros, rawCelulas, rawDiscipulado, rawFuncoes, filterGender, filterGroup, filterDisc, filterSector, filterSectorEcl, sectorViewMode, filterMinAge, filterMaxAge, filterMaritalStatus, filterStatus, selectedTypes, selectedCellRoles, filterIsDiscipulador]);
+  }, [isLoading, rawMembros, rawCelulas, rawDiscipulado, rawFuncoes, filterGender, filterGroup, filterDisc, filterSector, filterSectorEcl, sectorViewMode, filterMinAge, filterMaxAge, filterMaritalStatus, filterStatus, selectedTypes, selectedCellRoles, filterIsDiscipulador, populationMode]);
 
   const handleOpenModal = async (type: 'grupo' | 'setor' | 'discipulador', title: string) => {
     setModalType(type); setModalTitle(title); setIsModalLoading(true);
@@ -509,7 +544,7 @@ export const Dashboard: React.FC = () => {
             >
               <SlidersHorizontal className="w-3.5 h-3.5" />
               Filtros Avançados
-              {(filterSectorEcl !== 'Todos' || filterGender !== 'Todos' || filterGroup !== 'Todos' || filterDisc !== 'Todos' || filterMaritalStatus !== 'Todos' || selectedTypes.length > 0 || selectedCellRoles.length > 0 || filterIsDiscipulador !== 'Todos' || filterMinAge !== 0 || filterMaxAge !== 120) && (
+              {(filterSectorEcl !== 'Todos' || filterGender !== 'Todos' || filterGroup !== 'Todos' || filterDisc !== 'Todos' || filterMaritalStatus !== 'Todos' || selectedTypes.length > 0 || selectedCellRoles.length > 0 || filterIsDiscipulador !== 'Todos' || filterMinAge !== 0 || filterMaxAge !== 120 || populationMode !== 'todos') && (
                 <span className="ml-1 px-1.5 py-0.2 bg-primary-600 text-white rounded-full text-[9px] font-black animate-pulse">
                   !
                 </span>
@@ -532,6 +567,7 @@ export const Dashboard: React.FC = () => {
                   setSelectedTypes([]); 
                   setSelectedCellRoles([]);
                   setFilterIsDiscipulador('Todos');
+                  setPopulationMode('todos');
                 }} 
                 className="text-xs text-red-600 font-bold hover:underline cursor-pointer"
               >
@@ -544,6 +580,27 @@ export const Dashboard: React.FC = () => {
         {/* Advanced Filters (Collapsible Section) */}
         {isAdvancedFiltersOpen && (
           <div className="pt-4 border-t border-gray-50 flex flex-wrap gap-4 items-center animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="flex items-center gap-2 rounded-lg border border-indigo-100 bg-indigo-50/50 px-3 py-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-500">População:</span>
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={populationMode === 'local'}
+                  onChange={() => setPopulationMode(populationMode === 'local' ? 'todos' : 'local')}
+                  className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                />
+                Somente local
+              </label>
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={populationMode === 'vinculado'}
+                  onChange={() => setPopulationMode(populationMode === 'vinculado' ? 'todos' : 'vinculado')}
+                  className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                />
+                Somente vinculado
+              </label>
+            </div>
             {/* Sector of GC */}
             <select value={filterSectorEcl} onChange={e => setFilterSectorEcl(e.target.value)} className="text-sm border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500 bg-gray-50/50">
               <option value="Todos">Setor do GC (Todos)</option>
@@ -711,21 +768,23 @@ export const Dashboard: React.FC = () => {
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
         {[
           { label: 'Total de Cadastros', value: dashboardData?.stats.totalMembros, icon: Users, color: 'text-slate-700', bg: 'bg-slate-100/70' },
-          { label: 'Membros Ativos', value: dashboardData?.stats.ativos, sub: 'Status: Ativo', icon: TrendingUp, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+          { label: 'Membros Ativos Globais', value: dashboardData?.stats.ativos, sub: 'Status: Ativo', icon: TrendingUp, color: 'text-indigo-600', bg: 'bg-indigo-50' },
           { label: 'Membros Localidade', value: dashboardData?.stats.membrosLocalidade, icon: MapPin, color: 'text-violet-600', bg: 'bg-violet-50' },
+          { label: 'Membros Localidade Vinculados', value: dashboardData?.stats.membrosLocalidadeVinculados, icon: MapPin, color: 'text-emerald-600', bg: 'bg-emerald-50' },
           { label: 'Visitantes', value: dashboardData?.stats.visitantes, icon: UserPlus, color: 'text-amber-600', bg: 'bg-amber-50' },
           { label: 'Grupos Caseiros', value: dashboardData?.stats.totalCelulas, icon: Home, color: 'text-indigo-600', bg: 'bg-indigo-50' },
           { label: 'Discipuladores', value: dashboardData?.stats.totalDiscipuladores, icon: UserCheck, color: 'text-teal-600', bg: 'bg-teal-50' },
+          { label: 'Líderes', value: dashboardData?.stats.totalLideres, icon: Users, color: 'text-orange-600', bg: 'bg-orange-50' },
         ].map((kpi, idx) => {
           const Icon = kpi.icon || Users;
           return (
-            <div key={idx} className="relative overflow-hidden rounded-2xl bg-white/70 backdrop-blur-md p-5 shadow-sm border border-gray-100 hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 group">
-              <div className="flex flex-col gap-3">
-                <div className={clsx("flex h-10 w-10 items-center justify-center rounded-xl transition-transform group-hover:scale-110", kpi.bg)}><Icon className={clsx("h-5 w-5", kpi.color)} /></div>
-                <div><p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">{kpi.label}</p><div className="flex items-baseline gap-2 mt-1"><p className="text-2xl font-bold text-gray-900">{kpi.value}</p></div>{kpi.sub && <p className="text-[10px] text-gray-400 mt-0.5">{kpi.sub}</p>}</div>
+            <div key={idx} className="relative min-w-0 overflow-hidden rounded-2xl bg-white/70 backdrop-blur-md p-3.5 shadow-sm border border-gray-100 hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 group">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className={clsx("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-transform group-hover:scale-110", kpi.bg)}><Icon className={clsx("h-4 w-4", kpi.color)} /></div>
+                <div className="min-w-0"><p className="text-[9px] font-bold text-gray-400 uppercase tracking-wide leading-tight">{kpi.label}</p><div className="flex items-baseline gap-2 mt-0.5"><p className="text-xl font-bold text-gray-900">{kpi.value}</p></div>{kpi.sub && <p className="text-[9px] text-gray-400 mt-0.5 truncate">{kpi.sub}</p>}</div>
               </div>
             </div>
           );
@@ -741,8 +800,8 @@ export const Dashboard: React.FC = () => {
       {isPastorOrAdmin && (
         <div className="grid grid-cols-1 gap-6 mt-6">
           <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100 flex flex-col">
-            <div className="pb-4 border-b border-gray-100"><h3 className="text-lg font-semibold leading-6 text-gray-900 flex items-center gap-2"><Home className="h-5 w-5 text-primary-500" /> Grupos Caseiros Ativos</h3><p className="mt-1 text-sm text-gray-500">Membros agrupados pela coluna [grupos_caseiros]</p></div>
-            <div className="overflow-x-auto"><table className="min-w-full divide-y divide-gray-200 mt-4"><thead className="bg-gray-50/50"><tr><th className="py-3 pl-4 pr-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Grupo Caseiro</th><th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Líder</th><th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Membros</th><th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ação</th></tr></thead><tbody className="divide-y divide-gray-100 bg-white">{dashboardData?.charts.groups.slice(0, 10).map((group: any, idx: number) => (<tr key={idx} className="hover:bg-gray-50/50 transition-colors"><td className="whitespace-nowrap py-3 pl-4 pr-3 text-sm font-medium text-gray-900">{group.nome}</td><td className="whitespace-nowrap px-3 py-3 text-sm text-gray-500">{group.lider}</td><td className="whitespace-nowrap px-3 py-3 text-sm text-center font-bold text-gray-700"><span className="bg-primary-50 text-primary-700 py-1 px-3 rounded-full">{group.membros}</span></td><td className="whitespace-nowrap px-3 py-3 text-sm text-right"><button onClick={() => handleOpenModal('grupo', group.nome)} className="text-primary-600 font-medium hover:underline text-xs outline-none">Ver Detalhes</button></td></tr>))}</tbody></table></div>
+            <div className="pb-4 border-b border-gray-100"><h3 className="text-lg font-semibold leading-6 text-gray-900 flex items-center gap-2"><Home className="h-5 w-5 text-primary-500" /> Grupos Caseiros Ativos</h3><p className="mt-1 text-sm text-gray-500">Membros totais e membros vinculados por grupo</p></div>
+            <div className="overflow-x-auto"><table className="min-w-full divide-y divide-gray-200 mt-4"><thead className="bg-gray-50/50"><tr><th className="py-3 pl-4 pr-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Grupo Caseiro</th><th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Líder</th><th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Membros</th><th className="px-3 py-3 text-center text-xs font-medium text-emerald-600 uppercase tracking-wider">Vinculados</th><th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ação</th></tr></thead><tbody className="divide-y divide-gray-100 bg-white">{dashboardData?.charts.groups.slice(0, 10).map((group: any, idx: number) => (<tr key={idx} className="hover:bg-gray-50/50 transition-colors"><td className="whitespace-nowrap py-3 pl-4 pr-3 text-sm font-medium text-gray-900">{group.nome}</td><td className="whitespace-nowrap px-3 py-3 text-sm text-gray-500">{group.lider}</td><td className="whitespace-nowrap px-3 py-3 text-sm text-center font-bold text-gray-700"><span className="bg-primary-50 text-primary-700 py-1 px-3 rounded-full">{group.membros}</span></td><td className="whitespace-nowrap px-3 py-3 text-sm text-center font-bold text-emerald-700"><span className="bg-emerald-50 py-1 px-3 rounded-full">{group.vinculados}</span></td><td className="whitespace-nowrap px-3 py-3 text-sm text-right"><button onClick={() => handleOpenModal('grupo', group.nome)} className="text-primary-600 font-medium hover:underline text-xs outline-none">Ver Detalhes</button></td></tr>))}</tbody></table></div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100 flex flex-col">
@@ -779,6 +838,7 @@ export const Dashboard: React.FC = () => {
                       <th className="py-3 pl-4 pr-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Setor</th>
                       <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">GCs</th>
                       <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Membros</th>
+                      <th className="px-3 py-3 text-center text-xs font-medium text-emerald-600 uppercase tracking-wider">Vinculados</th>
                       <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ação</th>
                     </tr>
                   </thead>
@@ -791,6 +851,9 @@ export const Dashboard: React.FC = () => {
                         </td>
                         <td className="whitespace-nowrap px-3 py-3 text-sm text-center">
                           <span className="bg-indigo-50 text-indigo-600 py-1 px-2 rounded-md font-bold">{setor.membros}</span>
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-3 text-sm text-center">
+                          <span className="bg-emerald-50 text-emerald-700 py-1 px-2 rounded-md font-bold">{setor.vinculados}</span>
                         </td>
                         <td className="whitespace-nowrap px-3 py-3 text-sm text-right">
                           <button onClick={() => handleOpenModal('setor', setor.nome)} className="text-indigo-600 font-medium hover:underline text-xs">Acessar</button>
