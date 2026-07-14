@@ -53,19 +53,24 @@ function App() {
               <Route path="/qa" element={<QA />} />
               <Route path="/discipleship" element={<Discipleship />} />
               <Route path="/network" element={<Network />} />
-               <Route path="/membro/:name" element={<MemberProfile />} />
-              <Route path="/finance" element={<Finance />} />
-               <Route path="/admin/users" element={<AdminUsers />} />
+              <Route path="/membro/:name" element={<MemberProfile />} />
+              <Route element={<ProtectedRoute allowedRoles={['admin', 'pastor', 'finance']} />}>
+                <Route path="/finance" element={<Finance />} />
+              </Route>
+              <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
+                <Route path="/admin/users" element={<AdminUsers />} />
+              </Route>
               <Route path="/settings" element={<Settings />} />
-              <Route path="/simulations" element={<Simulations />} />
+              <Route element={<ProtectedRoute allowedRoles={['admin', 'pastor']} />}>
+                <Route path="/simulations" element={<Simulations />} />
+                <Route path="/lab/vision" element={<LabVision />} />
+                <Route path="/lab/visits" element={<LabVisits />} />
+                <Route path="/lab/queries" element={<LabQuery />} />
+              </Route>
               <Route path="/companionship" element={<Companionship />} />
               <Route path="/my-group" element={<MyGroup />} />
               <Route path="/ai-consultant" element={<AiConsultant />} />
               <Route path="/ai-insights" element={<AiInsights />} />
-              {/* ── SECRET LAB ROUTES — not linked anywhere in the UI — */}
-              <Route path="/lab/vision" element={<LabVision />} />
-              <Route path="/lab/visits" element={<LabVisits />} />
-              <Route path="/lab/queries" element={<LabQuery />} />
             </Route>
           </Route>
 

@@ -392,6 +392,7 @@ export const AdminUsers: React.FC = () => {
 
       const response = await fetch(apiUrl, {
         method: 'POST',
+        headers: await getAuthHeaders(),
       });
       
       const data = await response.json();

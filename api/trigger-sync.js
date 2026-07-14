@@ -1,3 +1,5 @@
+import { handleApiError, requireAdmin } from './_admin-auth.js';
+
 const GITHUB_API_VERSION = '2022-11-28';
 const WORKFLOW_OWNER = 'diegofroliveira';
 const WORKFLOW_REPO = 'bsb_church';
@@ -38,21 +40,19 @@ function buildGithubError(status, bodyText) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Credentials', true);
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
-  );
-
   if (req.method === 'OPTIONS') {
-    res.status(200).end();
+    res.status(204).end();
     return;
   }
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  try {
+    await requireAdmin(req);
+  } catch (error) {
+    return handleApiError(res, error);
   }
 
   const token = getGithubToken();
