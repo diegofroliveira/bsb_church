@@ -1,11 +1,12 @@
-import { handleApiError, readJson, requireAdmin, sendJson, upsertProfile } from './_admin-auth.js';
+import { handleApiError, readJson, requireAdmin, requireServiceRole, sendJson, upsertProfile } from './_admin-auth.js';
 
 const SPECIAL_CONFIG_ID = '00000000-0000-0000-0000-000000000000';
 
 export default async function handler(req, res) {
   if (!['POST', 'PATCH'].includes(req.method)) return sendJson(res, 405, { error: 'Método não permitido.' });
   try {
-    const { supabase, user: admin } = await requireAdmin(req);
+    const { supabase, user: admin, hasServiceRole } = await requireAdmin(req);
+    requireServiceRole(hasServiceRole);
     const body = await readJson(req);
     const { userId, name, role, assigned_gc } = body;
     if (!userId || userId === SPECIAL_CONFIG_ID) throw Object.assign(new Error('Usuário inválido.'), { status: 400 });
@@ -30,4 +31,3 @@ export default async function handler(req, res) {
     return handleApiError(res, error);
   }
 }
-

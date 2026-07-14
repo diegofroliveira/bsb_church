@@ -1,5 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
+const DEFAULT_SUPABASE_URL = 'https://vadufkgbluisdamgkbln.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZhZHVma2dibHVpc2RhbWdrYmxuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4NjE2NDksImV4cCI6MjA5MjQzNzY0OX0.40XwaADEKukkhuLqcQQnNpx-6a1ipKnz_4Fy8DJdrao';
+
 export function sendJson(res, status, payload) {
   res.status(status).setHeader('Content-Type', 'application/json; charset=utf-8');
   return res.end(JSON.stringify(payload));
@@ -20,13 +23,25 @@ function getBearerToken(req) {
   return header.startsWith('Bearer ') ? header.slice(7).trim() : '';
 }
 
+function getSupabaseUrl() {
+  return process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL;
+}
+
 function getAdminClient() {
-  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const url = getSupabaseUrl();
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !serviceRoleKey) {
-    throw new Error('SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY precisam estar configurados na Vercel.');
+    throw Object.assign(new Error('SUPABASE_SERVICE_ROLE_KEY precisa estar configurada na Vercel para operações administrativas.'), { status: 503 });
   }
   return createClient(url, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false }
+  });
+}
+
+function getSessionClient(token) {
+  const anonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY;
+  return createClient(getSupabaseUrl(), anonKey, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
     auth: { persistSession: false, autoRefreshToken: false }
   });
 }
@@ -35,7 +50,8 @@ export async function requireAdmin(req) {
   const token = getBearerToken(req);
   if (!token) throw Object.assign(new Error('Sessão administrativa não informada.'), { status: 401 });
 
-  const supabase = getAdminClient();
+  const hasServiceRole = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
+  const supabase = hasServiceRole ? getAdminClient() : getSessionClient(token);
   const { data: authData, error: authError } = await supabase.auth.getUser(token);
   if (authError || !authData.user) {
     throw Object.assign(new Error('Sessão expirada ou inválida.'), { status: 401 });
@@ -52,7 +68,13 @@ export async function requireAdmin(req) {
     throw Object.assign(new Error('Apenas administradores podem executar esta operação.'), { status: 403 });
   }
 
-  return { supabase, user: authData.user, profile };
+  return { supabase, user: authData.user, profile, hasServiceRole };
+}
+
+export function requireServiceRole(hasServiceRole) {
+  if (!hasServiceRole) {
+    throw Object.assign(new Error('SUPABASE_SERVICE_ROLE_KEY precisa estar configurada na Vercel para esta operação.'), { status: 503 });
+  }
 }
 
 export function handleApiError(res, error) {
@@ -80,4 +102,3 @@ export async function upsertProfile(supabase, user, values) {
   if (result.error) throw result.error;
   return result.data || record;
 }
-

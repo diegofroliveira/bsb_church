@@ -1,9 +1,10 @@
-import { handleApiError, readJson, requireAdmin, sendJson, upsertProfile } from './_admin-auth.js';
+import { handleApiError, readJson, requireAdmin, requireServiceRole, sendJson, upsertProfile } from './_admin-auth.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return sendJson(res, 405, { error: 'Método não permitido.' });
   try {
-    const { supabase } = await requireAdmin(req);
+    const { supabase, hasServiceRole } = await requireAdmin(req);
+    requireServiceRole(hasServiceRole);
     const { email, password, name, role, assigned_gc } = await readJson(req);
     if (!email || !password || !name) throw Object.assign(new Error('E-mail, senha e nome são obrigatórios.'), { status: 400 });
     if (String(password).length < 6) throw Object.assign(new Error('A senha precisa ter pelo menos 6 caracteres.'), { status: 400 });
@@ -18,4 +19,3 @@ export default async function handler(req, res) {
     return handleApiError(res, error);
   }
 }
-

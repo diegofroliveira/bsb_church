@@ -3,7 +3,25 @@ import { handleApiError, requireAdmin, sendJson } from './_admin-auth.js';
 export default async function handler(req, res) {
   if (req.method !== 'GET') return sendJson(res, 405, { error: 'Método não permitido.' });
   try {
-    const { supabase } = await requireAdmin(req);
+    const { supabase, hasServiceRole } = await requireAdmin(req);
+    if (!hasServiceRole) {
+      const { data: profiles, error } = await supabase.from('profiles').select('*');
+      if (error) throw error;
+      return sendJson(res, 200, {
+        users: (profiles || [])
+          .filter(profile => profile.id !== '00000000-0000-0000-0000-000000000000')
+          .map(profile => ({
+            id: profile.id,
+            email: profile.email || '',
+            name: profile.name || profile.email?.split('@')[0] || '',
+            role: profile.role || 'pastor',
+            avatar: profile.avatar,
+            assigned_gc: profile.assigned_gc,
+            created_at: profile.created_at || profile.updated_at,
+            updated_at: profile.updated_at
+          }))
+      });
+    }
     const users = [];
     for (let page = 1; page <= 100; page += 1) {
       const { data, error } = await supabase.auth.admin.listUsers({ page, perPage: 1000 });
@@ -35,4 +53,3 @@ export default async function handler(req, res) {
     return handleApiError(res, error);
   }
 }
-

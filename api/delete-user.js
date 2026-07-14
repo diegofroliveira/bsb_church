@@ -1,11 +1,12 @@
-import { handleApiError, readJson, requireAdmin, sendJson } from './_admin-auth.js';
+import { handleApiError, readJson, requireAdmin, requireServiceRole, sendJson } from './_admin-auth.js';
 
 const SPECIAL_CONFIG_ID = '00000000-0000-0000-0000-000000000000';
 
 export default async function handler(req, res) {
   if (!['POST', 'DELETE'].includes(req.method)) return sendJson(res, 405, { error: 'Método não permitido.' });
   try {
-    const { supabase, user: admin } = await requireAdmin(req);
+    const { supabase, user: admin, hasServiceRole } = await requireAdmin(req);
+    requireServiceRole(hasServiceRole);
     const { userId } = await readJson(req);
     if (!userId || userId === SPECIAL_CONFIG_ID) throw Object.assign(new Error('Usuário inválido.'), { status: 400 });
     if (userId === admin.id) throw Object.assign(new Error('Não é permitido excluir o próprio usuário.'), { status: 400 });
@@ -16,4 +17,3 @@ export default async function handler(req, res) {
     return handleApiError(res, error);
   }
 }
-
