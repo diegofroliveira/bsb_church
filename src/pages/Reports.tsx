@@ -4,6 +4,8 @@ import { Filter, Download, Loader2, Search, FileText, ArrowUpDown, ChevronUp, Ch
 import clsx from 'clsx';
 import * as XLSX from 'xlsx';
 import { filterOperationalMembers } from '../lib/operationalScope';
+import { matchesPopulationMode, type PopulationMode } from '../lib/populationScope';
+import { PopulationFlags } from '../components/PopulationFlags';
 
 const normalizeStr = (s: string | null | undefined): string => {
   if (!s) return '';
@@ -109,6 +111,7 @@ export const Reports: React.FC = () => {
   const [filterNoChildren, setFilterNoChildren] = useState(false);
   const [filterCellRoles, setFilterCellRoles] = useState<string[]>([]);
   const [filterIsDiscipulador, setFilterIsDiscipulador] = useState(false);
+  const [populationMode, setPopulationMode] = useState<PopulationMode>('todos');
   
   const [sortField, setSortField] = useState<string>('nome');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -487,6 +490,7 @@ export const Reports: React.FC = () => {
 
   const filteredMembers = useMemo(() => {
     return members.filter(m => {
+      if (!matchesPopulationMode(m, populationMode)) return false;
       if (filterQuery) {
         const queryLower = filterQuery.toLowerCase();
         const nome = (m.nome || m.name || '').toLowerCase();
@@ -551,7 +555,7 @@ export const Reports: React.FC = () => {
       if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [members, filterQuery, filterType, filterGC, filterGender, filterAgeCategory, filterMinAge, filterMaxAge, filterMaritalStatus, filterState, filterSetor, filterSetorEcl, filterMestre, filterPersonType, filterStatusPessoa, filterNoChildren, filterCellRoles, filterIsDiscipulador, allParentsNames, sortField, sortDirection]);
+  }, [members, populationMode, filterQuery, filterType, filterGC, filterGender, filterAgeCategory, filterMinAge, filterMaxAge, filterMaritalStatus, filterState, filterSetor, filterSetorEcl, filterMestre, filterPersonType, filterStatusPessoa, filterNoChildren, filterCellRoles, filterIsDiscipulador, allParentsNames, sortField, sortDirection]);
 
   // Real-time mini dashboard calculations
   const chartsData = useMemo(() => {
@@ -845,6 +849,7 @@ export const Reports: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-4">
+          <PopulationFlags value={populationMode} onChange={setPopulationMode} className="md:col-span-3 xl:col-span-4 border-b border-gray-100 pb-3" />
           <div className="xl:col-span-1">
              <label className="block text-xs font-medium text-gray-500 mb-1">Buscar por Nome</label>
              <div className="relative">

@@ -3,6 +3,8 @@ import { supabaseReader } from '../lib/supabase';
 import { Home, Users, MapPin, Search, Filter, Loader2, Shield, X, Phone, MessageSquare, ExternalLink } from 'lucide-react';
 import clsx from 'clsx';
 import { filterOperationalCells, filterOperationalMembers } from '../lib/operationalScope';
+import { matchesPopulationMode, type PopulationMode } from '../lib/populationScope';
+import { PopulationFlags } from '../components/PopulationFlags';
 
 interface CellInfo {
   id: number;
@@ -23,6 +25,7 @@ export const Cells: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSetor, setSelectedSetor] = useState<string>('Todos');
+  const [populationMode, setPopulationMode] = useState<PopulationMode>('todos');
 
   const [selectedCell, setSelectedCell] = useState<CellInfo | null>(null);
   const [cellMembers, setCellMembers] = useState<any[]>([]);
@@ -48,12 +51,12 @@ export const Cells: React.FC = () => {
       try {
         const [celulasRes, membrosRes, discipuladoRes] = await Promise.all([
           supabaseReader.from('celulas').select('*'),
-          supabaseReader.from('membros').select('grupos_caseiros, latitude, longitude').eq('status', 'Ativo'),
+          supabaseReader.from('membros').select('grupos_caseiros, latitude, longitude, status, tipo_de_pessoa, tipo_cadastro').eq('status', 'Ativo'),
           supabaseReader.from('discipulado').select('discipulador')
         ]);
 
         const celulas = filterOperationalCells(celulasRes.data || []);
-        const membros = filterOperationalMembers(membrosRes.data || []);
+        const membros = filterOperationalMembers(membrosRes.data || []).filter(m => matchesPopulationMode(m, populationMode));
         const discipuladoData = discipuladoRes.data || [];
 
         const discNames = new Set<string>();
@@ -127,7 +130,7 @@ export const Cells: React.FC = () => {
     };
 
     fetchData();
-  }, []);
+  }, [populationMode]);
 
   const setores = useMemo(() => {
     const s = new Set(cells.map(c => c.setor).filter(Boolean));
@@ -152,12 +155,12 @@ export const Cells: React.FC = () => {
     try {
       const { data, error } = await supabaseReader
         .from('membros')
-        .select('id, nome, sexo, nascimento, celular_principal_sms, tipo_cadastro, tipo_de_pessoa')
+        .select('id, nome, sexo, nascimento, celular_principal_sms, tipo_cadastro, tipo_de_pessoa, status')
         .eq('status', 'Ativo')
         .ilike('grupos_caseiros', `%${cell.grupo_caseiro}%`);
 
       if (error) throw error;
-      setCellMembers(data || []);
+      setCellMembers((data || []).filter(m => matchesPopulationMode(m, populationMode)));
     } catch (err) {
       console.error('Error fetching cell members:', err);
     } finally {
@@ -263,6 +266,7 @@ export const Cells: React.FC = () => {
       </header>
 
       <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col sm:flex-row gap-4">
+        <PopulationFlags value={populationMode} onChange={setPopulationMode} className="sm:col-span-2 border-b border-gray-100 pb-2" />
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
           <input

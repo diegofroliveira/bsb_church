@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { supabase, supabaseReader } from '../lib/supabase';
 import { filterOperationalMembers } from '../lib/operationalScope';
+import { matchesPopulationMode, type PopulationMode } from '../lib/populationScope';
+import { PopulationFlags } from '../components/PopulationFlags';
 import { 
   Calendar, 
   Copy, 
@@ -115,6 +117,7 @@ export const Birthdays: React.FC = () => {
   const [filterMinAge, setFilterMinAge] = useState<number>(0);
   const [filterMaxAge, setFilterMaxAge] = useState<number>(120);
   const [filterMaritalStatus, setFilterMaritalStatus] = useState('Todos');
+  const [populationMode, setPopulationMode] = useState<PopulationMode>('todos');
 
   const [editedMessage, setEditedMessage] = useState<string | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -207,6 +210,7 @@ export const Birthdays: React.FC = () => {
     const currentMonth = now.getMonth() + 1;
 
     return members.filter(m => {
+      if (!matchesPopulationMode(m, populationMode)) return false;
       if (m.status !== 'Ativo') return false;
       if (!m.nascimento) return false;
 
@@ -323,7 +327,7 @@ export const Birthdays: React.FC = () => {
       }
       return matchDate;
     }).sort((a, b) => a.nome.localeCompare(b.nome));
-  }, [members, filterMode, specificDate, filterGender, filterGC, filterMinAge, filterMaxAge, filterMaritalStatus]);
+  }, [members, populationMode, filterMode, specificDate, filterGender, filterGC, filterMinAge, filterMaxAge, filterMaritalStatus]);
 
   const birthdayRows = useMemo(() => {
     const total = getBirthdays.length;
@@ -629,6 +633,7 @@ export const Birthdays: React.FC = () => {
       </div>
 
       <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-wrap gap-3 items-center">
+        <PopulationFlags value={populationMode} onChange={setPopulationMode} className="mr-2" />
         <select value={filterGender} onChange={e => setFilterGender(e.target.value)} className="text-xs border-gray-200 rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-pink-500 bg-gray-50/50">
           <option value="Todos">Todos os Sexos</option>
           <option value="Masculino">Masculino</option>

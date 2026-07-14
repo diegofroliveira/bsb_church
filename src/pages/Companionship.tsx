@@ -9,6 +9,8 @@ import {
 } from 'lucide-react';
 import clsx from 'clsx';
 import { filterOperationalMembers } from '../lib/operationalScope';
+import { matchesPopulationMode, type PopulationMode } from '../lib/populationScope';
+import { PopulationFlags } from '../components/PopulationFlags';
 
 const formatName = (fullName: string) => {
   if (!fullName) return '';
@@ -80,6 +82,7 @@ export const Companionship: React.FC = () => {
   // Assistant States
   const [searchTerm, setSearchTerm] = useState('');
   const [sexFilter, setSexFilter] = useState<'Todos' | 'Masculino' | 'Feminino'>('Todos');
+  const [populationMode, setPopulationMode] = useState<PopulationMode>('todos');
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [trioSecondMember, setTrioSecondMember] = useState<Member | null>(null);
 
@@ -1613,6 +1616,7 @@ export const Companionship: React.FC = () => {
   const unlinkedMembers = members.filter(m => !isMemberLinked(m.id));
   
   const filteredUnlinked = unlinkedMembers.filter(m => {
+    if (!matchesPopulationMode(m, populationMode)) return false;
     const matchesSearch = m.nome.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           (m.bairro || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesSex = sexFilter === 'Todos' || m.sexo === sexFilter;
@@ -2105,6 +2109,7 @@ export const Companionship: React.FC = () => {
                       
                       {/* Busca e Sexo */}
                       <div className="space-y-2">
+                        <PopulationFlags value={populationMode} onChange={setPopulationMode} />
                         <div className="relative">
                           <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
                           <input

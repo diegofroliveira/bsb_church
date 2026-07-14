@@ -8,6 +8,8 @@ import { Home, Users, Navigation, Search, Filter, X, ClipboardList } from 'lucid
 import { differenceInYears, parseISO } from 'date-fns';
 import clsx from 'clsx';
 import { isTechnicalGroup } from '../lib/operationalScope';
+import { matchesPopulationMode, type PopulationMode } from '../lib/populationScope';
+import { PopulationFlags } from '../components/PopulationFlags';
 
 // Fix para ícones do Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -140,6 +142,7 @@ const Georeferencing: React.FC = () => {
 
   const [selectedCellRoles, setSelectedCellRoles] = useState<string[]>([]);
   const [filterIsDiscipulador, setFilterIsDiscipulador] = useState<string>('Todos');
+  const [populationMode, setPopulationMode] = useState<PopulationMode>('todos');
   const [isRolesOpen, setIsRolesOpen] = useState(false);
   const [isAdvancedFiltersOpen, setIsAdvancedFiltersOpen] = useState(false);
   const rolesDropdownRef = useRef<HTMLDivElement>(null);
@@ -352,6 +355,7 @@ const Georeferencing: React.FC = () => {
             metadata: { 
               grupo: m.grupos_caseiros, 
               status: m.estado_civil,
+              populationStatus: m.status || 'Ativo',
               genero: m.sexo,
               faixaEtaria: idade,
               vinculo: m.tipo_de_pessoa,
@@ -407,6 +411,7 @@ const Georeferencing: React.FC = () => {
 
     const filteredMembros = allLocations.filter(loc => {
       if (loc.tipo !== 'membro') return false;
+      if (!matchesPopulationMode({ status: loc.metadata.populationStatus, tipo_de_pessoa: loc.metadata.vinculo }, populationMode)) return false;
       
       // Membros que devem aparecer:
       // 1. O membro selecionado (clicado)
@@ -491,7 +496,7 @@ const Georeferencing: React.FC = () => {
     });
 
     return [...filteredMembros, ...gruposParaMostrar];
-  }, [allLocations, filters, selectedLocation, selectedCellRoles, filterIsDiscipulador]);
+  }, [allLocations, filters, selectedLocation, selectedCellRoles, filterIsDiscipulador, populationMode]);
 
   const clearFilters = () => {
     setFilters({
@@ -677,6 +682,7 @@ const Georeferencing: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+          <PopulationFlags value={populationMode} onChange={setPopulationMode} className="lg:col-span-5 border-b border-gray-100 pb-3" />
           <div className="space-y-2">
             <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Buscar Membro</label>
             <div className="relative">

@@ -9,6 +9,8 @@ import {
   getSectorByResidence
 } from '../lib/geoUtils';
 import { filterOperationalCells, filterOperationalMembers } from '../lib/operationalScope';
+import { matchesPopulationMode, type PopulationMode } from '../lib/populationScope';
+import { PopulationFlags } from '../components/PopulationFlags';
 import { 
   Heart, Search, Users, MapPin, AlertCircle, Phone, 
   TrendingUp, Map as MapIcon, Filter, CheckCircle2, AlertTriangle, 
@@ -37,6 +39,7 @@ export const Families: React.FC = () => {
   const [filterSector, setFilterSector] = useState('Todos');
   const [filterSectorEcl, setFilterSectorEcl] = useState('Todos');
   const [filterStatus, setFilterStatus] = useState('Todos');
+  const [populationMode, setPopulationMode] = useState<PopulationMode>('todos');
   const [activeTab, setActiveTab] = useState<'nucleos' | 'parentelas' | 'exportador'>('nucleos');
 
   const [selectedExporterColumns, setSelectedExporterColumns] = useState<string[]>([
@@ -469,6 +472,7 @@ export const Families: React.FC = () => {
     const searchVal = cleanSearch(searchTerm);
 
     return familyData.list.filter(fam => {
+      if (!fam.familyMembers.some((m: Member) => matchesPopulationMode(m, populationMode))) return false;
       // 1. Text search
       const matchesSearch = searchVal === '' || 
         cleanSearch(fam.headName).includes(searchVal) ||
@@ -494,7 +498,7 @@ export const Families: React.FC = () => {
 
       return matchesSearch && matchesSector && matchesSectorEcl && matchesStatus;
     });
-  }, [familyData, searchTerm, filterSector, filterSectorEcl, filterStatus, cells]);
+  }, [familyData, populationMode, searchTerm, filterSector, filterSectorEcl, filterStatus, cells]);
 
   // Filtering and sorting the flattened family members for the exportable table
   const filteredFlattenedMembers = useMemo(() => {
@@ -502,6 +506,7 @@ export const Families: React.FC = () => {
     const searchVal = cleanSearch(searchTerm);
 
     return flattenedFamilyMembers.filter(m => {
+      if (!matchesPopulationMode(m, populationMode)) return false;
       // Skip minors as family heads and their dependents
       const headMember = members.find(h => h.id.toString() === m.titular_id);
       if (headMember) {
@@ -551,7 +556,7 @@ export const Families: React.FC = () => {
 
       return matchesSearch && matchesSector && matchesSectorEcl && matchesStatus;
     });
-  }, [flattenedFamilyMembers, searchTerm, filterSector, filterSectorEcl, filterStatus, cells]);
+  }, [flattenedFamilyMembers, populationMode, searchTerm, filterSector, filterSectorEcl, filterStatus, cells]);
 
   const handleExportExporterExcel = () => {
     if (filteredFlattenedMembers.length === 0) return;
@@ -685,6 +690,7 @@ export const Families: React.FC = () => {
         <>
           {/* Search & Filters */}
           <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col md:flex-row items-center gap-3">
+            <PopulationFlags value={populationMode} onChange={setPopulationMode} className="w-full md:w-auto shrink-0" />
             {/* Search Input */}
             <div className="relative flex-1 w-full">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />

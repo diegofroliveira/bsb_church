@@ -5,6 +5,8 @@ import { supabaseReader } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import clsx from 'clsx';
 import { filterOperationalMembers } from '../lib/operationalScope';
+import { matchesPopulationMode, type PopulationMode } from '../lib/populationScope';
+import { PopulationFlags } from '../components/PopulationFlags';
 
 const getNormalizedSectorName = (dbSector: string | null | undefined): string => {
   if (!dbSector) return 'Sem Setor';
@@ -37,6 +39,7 @@ export const Members: React.FC = () => {
   const [filterMinAge, setFilterMinAge] = useState<number>(0);
   const [filterMaxAge, setFilterMaxAge] = useState<number>(120);
   const [showInactive, setShowInactive] = useState(false);
+  const [populationMode, setPopulationMode] = useState<PopulationMode>('todos');
 
   useEffect(() => {
     const fetchAllData = async () => {
@@ -133,6 +136,7 @@ export const Members: React.FC = () => {
   const filteredMembers = useMemo(() => {
     return members.filter(m => {
       if (!showInactive && m.status !== 'Ativo') return false;
+      if (!matchesPopulationMode(m, populationMode)) return false;
       if (filterQuery) {
         const queryLower = filterQuery.toLowerCase();
         if (!(m.nome || '').toLowerCase().includes(queryLower)) return false;
@@ -152,7 +156,7 @@ export const Members: React.FC = () => {
       
       return true;
     });
-  }, [members, showInactive, filterQuery, filterType, filterGC, filterGender, filterAgeCategory, filterMinAge, filterMaxAge, filterMaritalStatus, filterState, filterSetor, filterSetorEcl, filterMestre]);
+  }, [members, showInactive, populationMode, filterQuery, filterType, filterGC, filterGender, filterAgeCategory, filterMinAge, filterMaxAge, filterMaritalStatus, filterState, filterSetor, filterSetorEcl, filterMestre]);
 
   const totalCount = filteredMembers.length;
   const paginatedMembers = filteredMembers.slice((page - 1) * pageSize, page * pageSize);
@@ -187,7 +191,7 @@ export const Members: React.FC = () => {
               setFilterQuery(''); setFilterType('Todos'); setFilterGC('Todos'); setFilterGender('Todos');
               setFilterAgeCategory('Todas'); setFilterState('Todos'); setFilterSetor('Todos'); setFilterSetorEcl('Todos'); setFilterMestre('Todos');
               setFilterMinAge(0); setFilterMaxAge(120); setFilterMaritalStatus('Todos');
-              setShowInactive(false);
+              setShowInactive(false); setPopulationMode('todos');
             }}
             className="text-xs text-red-600 font-medium hover:underline"
           >
@@ -196,6 +200,7 @@ export const Members: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <PopulationFlags value={populationMode} onChange={setPopulationMode} className="md:col-span-4 border-b border-gray-100 pb-3" />
           <div>
              <label className="block text-xs font-medium text-gray-500 mb-1">Buscar por Nome</label>
              <div className="relative">
