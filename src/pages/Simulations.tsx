@@ -98,6 +98,13 @@ const isMemberRecord = (member: Member): boolean =>
 const formatTerritorialCount = (linkedCount: number, aggregateCount = 0): string =>
   `${linkedCount} membros${aggregateCount > 0 ? ` (${aggregateCount} agregados)` : ''}`;
 
+const normalizeDiscipleshipName = (value: unknown): string => String(value || '')
+  .trim()
+  .toUpperCase()
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .replace(/\s+/g, ' ');
+
 const getTerritorialAlertKey = (insight: { type: string; ra: string }): string =>
   `territory_v2_${insight.type}_${insight.ra}`;
 
@@ -1763,24 +1770,33 @@ export const Simulations: React.FC = () => {
     const activeMembersByName = new Map<string, Member>();
     draftMembers.forEach(m => {
       if (m.status === 'Ativo') {
-        activeMembersByName.set(m.nome, m);
+        activeMembersByName.set(normalizeDiscipleshipName(m.nome), m);
       }
     });
 
+    const normalizedLinks = Array.from(new Map(
+      draftLinks
+        .filter(link => link.discipulador && link.discipulo)
+        .map(link => {
+          const discipler = normalizeDiscipleshipName(link.discipulador);
+          const disciple = normalizeDiscipleshipName(link.discipulo);
+          return [`${discipler}->${disciple}`, { discipler, disciple }];
+        })
+    ).values());
     const disciplesCountByDiscipler: Record<string, string[]> = {};
-    draftLinks.forEach(link => {
-      const dName = link.discipulador;
+    normalizedLinks.forEach(link => {
+      const dName = link.discipler;
       if (!disciplesCountByDiscipler[dName]) {
         disciplesCountByDiscipler[dName] = [];
       }
-      disciplesCountByDiscipler[dName].push(link.discipulo);
+      disciplesCountByDiscipler[dName].push(link.disciple);
     });
 
     // A discipler with more than six active links is flagged for review.
     const overloadedDisciplers = Object.entries(disciplesCountByDiscipler)
       .filter(([_, disciples]) => disciples.length > 6)
       .map(([discipler, disciples]) => ({
-        name: discipler,
+        name: activeMembersByName.get(discipler)?.nome || discipler,
         count: disciples.length,
         disciples
       }))
@@ -1790,12 +1806,12 @@ export const Simulations: React.FC = () => {
     const displacedDisciples: any[] = [];
 
     // Only active leadership without a registered discipleship link is an alert.
-    const disciplesSet = new Set(draftLinks.map(l => l.discipulo));
+    const disciplesSet = new Set(normalizedLinks.map(link => link.disciple));
     const isolatedMembers: any[] = [];
     const unassignedMembers: any[] = [];
     
     draftMembers.forEach(m => {
-      if (m.status === 'Ativo' && !disciplesSet.has(m.nome)) {
+      if (m.status === 'Ativo' && !disciplesSet.has(normalizeDiscipleshipName(m.nome))) {
         const typeStr = (m.tipo_de_pessoa || '').trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
         const isLeadership = ['LIDER', 'DISCIPULADOR', 'DIACONO', 'PASTOR', 'PRESBITERO'].includes(typeStr) ||
                              (m.nome || '').toUpperCase().includes('LIDER') ||
@@ -1817,7 +1833,7 @@ export const Simulations: React.FC = () => {
         const recommendations: { name: string; count: number; distance: number | null }[] = [];
         
         activeMembersByName.forEach((otherMem, otherName) => {
-          if (otherName === m.nome) return;
+          if (otherName === normalizeDiscipleshipName(m.nome)) return;
           const currentDisciplesCount = disciplesCountByDiscipler[otherName]?.length || 0;
           if (currentDisciplesCount >= 6) return;
 
@@ -1829,7 +1845,7 @@ export const Simulations: React.FC = () => {
               distNum = distStr ? parseFloat(distStr) : null;
             }
             recommendations.push({
-              name: otherName,
+              name: otherMem.nome,
               count: currentDisciplesCount,
               distance: distNum
             });
