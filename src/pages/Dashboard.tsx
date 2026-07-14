@@ -773,7 +773,7 @@ export const Dashboard: React.FC = () => {
           { label: 'Total de Cadastros', value: dashboardData?.stats.totalMembros, icon: Users, color: 'text-slate-700', bg: 'bg-slate-100/70' },
           { label: 'Membros Ativos Globais', value: dashboardData?.stats.ativos, sub: 'Status: Ativo', icon: TrendingUp, color: 'text-indigo-600', bg: 'bg-indigo-50' },
           { label: 'Membros Localidade', value: dashboardData?.stats.membrosLocalidade, icon: MapPin, color: 'text-violet-600', bg: 'bg-violet-50' },
-          { label: 'Membros Localidade Vinculados', value: dashboardData?.stats.membrosLocalidadeVinculados, icon: MapPin, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+          { label: 'Localidade Vinculados', value: dashboardData?.stats.membrosLocalidadeVinculados, icon: MapPin, color: 'text-emerald-600', bg: 'bg-emerald-50' },
           { label: 'Visitantes', value: dashboardData?.stats.visitantes, icon: UserPlus, color: 'text-amber-600', bg: 'bg-amber-50' },
           { label: 'Grupos Caseiros', value: dashboardData?.stats.totalCelulas, icon: Home, color: 'text-indigo-600', bg: 'bg-indigo-50' },
           { label: 'Discipuladores', value: dashboardData?.stats.totalDiscipuladores, icon: UserCheck, color: 'text-teal-600', bg: 'bg-teal-50' },
