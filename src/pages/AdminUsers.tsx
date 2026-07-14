@@ -46,6 +46,7 @@ interface AppUser {
   avatar?: string;
   created_at: string;
   assigned_gc?: string;
+  assigned_sector?: string;
 }
 
 export const AdminUsers: React.FC = () => {
@@ -60,6 +61,7 @@ export const AdminUsers: React.FC = () => {
   const [newRoleName, setNewRoleName] = useState('');
   const [selectedRoleForEdit, setSelectedRoleForEdit] = useState<string>('admin');
   const [optionsGC, setOptionsGC] = useState<string[]>([]);
+  const sectorOptions = ['BSB_NORTE', 'BSB_CENTRAL', 'BSB_SUL', 'BSB_ÁGUAS CLARAS'];
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Edit User State
@@ -67,6 +69,7 @@ export const AdminUsers: React.FC = () => {
   const [editRole, setEditRole] = useState<string>('secretaria');
   const [editName, setEditName] = useState('');
   const [editAssignedGC, setEditAssignedGC] = useState('');
+  const [editAssignedSector, setEditAssignedSector] = useState('');
   const [savingId, setSavingId] = useState<string | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
   const [resettingId, setResettingId] = useState<string | null>(null);
@@ -78,6 +81,7 @@ export const AdminUsers: React.FC = () => {
   const [newName, setNewName] = useState('');
   const [newRole, setNewRole] = useState<string>('secretaria');
   const [newAssignedGC, setNewAssignedGC] = useState('');
+  const [newAssignedSector, setNewAssignedSector] = useState('');
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
 
@@ -347,11 +351,11 @@ export const AdminUsers: React.FC = () => {
       const res = await fetch('/api/update-user', {
         method: 'POST',
         headers: await getAuthHeaders(),
-        body: JSON.stringify({ userId, name: editName, role: editRole, assigned_gc: editAssignedGC })
+        body: JSON.stringify({ userId, name: editName, role: editRole, assigned_gc: editAssignedGC, assigned_sector: editAssignedSector })
       });
       await parseApiResponse(res);
 
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, name: editName, role: editRole, assigned_gc: editAssignedGC } : u));
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, name: editName, role: editRole, assigned_gc: editAssignedGC, assigned_sector: editAssignedSector } : u));
       setSavedId(userId); setTimeout(() => setSavedId(null), 2000);
       
       if (userId === currentUser?.id) {
@@ -372,12 +376,12 @@ export const AdminUsers: React.FC = () => {
       const response = await fetch('/api/create-user', {
         method: 'POST',
         headers: await getAuthHeaders(),
-        body: JSON.stringify({ email: newEmail, password: newPassword, name: newName, role: newRole, assigned_gc: newAssignedGC })
+        body: JSON.stringify({ email: newEmail, password: newPassword, name: newName, role: newRole, assigned_gc: newAssignedGC, assigned_sector: newAssignedSector })
       });
       await parseApiResponse(response);
 
       fetchUsers();
-      setShowNewForm(false); setNewEmail(''); setNewPassword(''); setNewName(''); setNewRole('secretaria'); setNewAssignedGC('');
+      setShowNewForm(false); setNewEmail(''); setNewPassword(''); setNewName(''); setNewRole('secretaria'); setNewAssignedGC(''); setNewAssignedSector('');
       alert('Usuário ' + newName + ' criado!');
     } catch (err: any) {
       setCreateError(err.message || 'Falha ao criar usuário.');
@@ -546,6 +550,14 @@ export const AdminUsers: React.FC = () => {
                   </select>
                   <p className="text-[10px] text-gray-400 mt-1">Isola o acesso deste usuário para ver apenas os dados deste GC.</p>
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Vincular Setor</label>
+                  <select value={newAssignedSector} onChange={e => setNewAssignedSector(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white font-medium">
+                    <option value="">Acesso geral (sem setor)</option>
+                    {sectorOptions.map(sector => <option key={sector} value={sector}>{sector}</option>)}
+                  </select>
+                  <p className="text-[10px] text-gray-400 mt-1">Autoriza a visão restrita do setor selecionado.</p>
+                </div>
               </div>
               {createError && <p className="mt-3 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">{createError}</p>}
               <div className="flex gap-3 mt-4">
@@ -603,12 +615,18 @@ export const AdminUsers: React.FC = () => {
                                   <option key={gc} value={gc}>{gc}</option>
                                 ))}
                               </select>
+                              <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mt-1">Setor autorizado</div>
+                              <select value={editAssignedSector} onChange={e => setEditAssignedSector(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white shadow-sm font-medium">
+                                <option value="">Acesso geral (sem setor)</option>
+                                {sectorOptions.map(sector => <option key={sector} value={sector}>{sector}</option>)}
+                              </select>
                             </div>
                           ) : (
                             <div className="flex flex-col">
                               <div className="font-medium text-gray-900 text-sm">{u.name || u.email.split('@')[0]}</div>
                               <div className="text-xs text-gray-400">{u.email}</div>
                               {u.assigned_gc && <div className="text-[10px] text-purple-600 font-bold bg-purple-50 border border-purple-100 rounded px-1.5 py-0.5 mt-1 w-max">GC: {u.assigned_gc}</div>}
+                              {u.assigned_sector && <div className="text-[10px] text-indigo-600 font-bold bg-indigo-50 border border-indigo-100 rounded px-1.5 py-0.5 mt-1 w-max">Setor: {u.assigned_sector}</div>}
                             </div>
                           )}
                         </td>
@@ -644,6 +662,7 @@ export const AdminUsers: React.FC = () => {
                                     setEditRole(u.role); 
                                     setEditName(u.name || ''); 
                                     setEditAssignedGC(u.assigned_gc || '');
+                                    setEditAssignedSector(u.assigned_sector || '');
                                   }}
                                     className="text-xs text-primary-600 hover:text-primary-800 font-bold border border-primary-100 px-3 py-1.5 rounded-lg bg-primary-50/30 hover:bg-primary-50 transition-all w-full text-center">
                                     Editar perfil

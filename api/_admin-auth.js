@@ -91,13 +91,14 @@ export async function upsertProfile(supabase, user, values) {
     role: values.role ?? user.user_metadata?.role ?? 'pastor',
     avatar: values.avatar ?? user.user_metadata?.avatar ?? null,
     assigned_gc: values.assigned_gc ?? user.user_metadata?.assigned_gc ?? null,
+    assigned_sector: values.assigned_sector ?? user.user_metadata?.assigned_sector ?? null,
     updated_at: new Date().toISOString()
   };
 
   let result = await supabase.from('profiles').upsert(record).select().maybeSingle();
-  if (result.error && /assigned_gc|column/i.test(result.error.message)) {
-    const { assigned_gc: _assignedGc, ...withoutAssignedGc } = record;
-    result = await supabase.from('profiles').upsert(withoutAssignedGc).select().maybeSingle();
+  if (result.error && /assigned_gc|assigned_sector|column/i.test(result.error.message)) {
+    const { assigned_gc: _assignedGc, assigned_sector: _assignedSector, ...withoutScope } = record;
+    result = await supabase.from('profiles').upsert(withoutScope).select().maybeSingle();
   }
   if (result.error) throw result.error;
   return result.data || record;

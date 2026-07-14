@@ -27,6 +27,7 @@ import { LabVision } from './pages/LabVision';
 import { LabVisits } from './pages/LabVisits';
 import { LabQuery } from './pages/LabQuery';
 import { Sectors } from './pages/Sectors';
+import { LeaderViews } from './pages/LeaderViews';
 
 function App() {
   return (
@@ -69,6 +70,7 @@ function App() {
               </Route>
               <Route path="/companionship" element={<Companionship />} />
               <Route path="/my-group" element={<MyGroup />} />
+              <Route path="/leader-views" element={<LeaderViews />} />
               <Route path="/ai-consultant" element={<AiConsultant />} />
               <Route path="/ai-insights" element={<AiInsights />} />
             </Route>

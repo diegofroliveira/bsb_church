@@ -117,6 +117,7 @@ export const MainLayout: React.FC = () => {
 
     { id: 'GCs/Localidades', name: 'GCs/Localidades', path: '/cells',        icon: Home,            group: 'Comunidade' },
     { id: 'Setores',         name: 'Setores',         path: '/sectors',      icon: Compass,         group: 'Comunidade' },
+    { id: 'Visões de Liderança', name: 'Visões de Liderança', path: '/leader-views', icon: Users, group: 'Comunidade' },
     { id: 'Rede',            name: 'Rede',            path: '/network',      icon: Network,         group: 'Comunidade' },
 
     { id: 'Discipulado',     name: 'Discipulado',     path: '/discipleship', icon: BookOpen,        group: 'Pastoreio' },
@@ -138,7 +139,10 @@ export const MainLayout: React.FC = () => {
     { id: 'Gestão & Ferramentas', name: 'Gestão & Ferramentas' },
   ];
 
-  const authorizedNavItems = navItems.filter(item => allowedModules.includes(item.id));
+  const authorizedNavItems = navItems.filter(item =>
+    allowedModules.includes(item.id) ||
+    (item.id === 'Visões de Liderança' && ['admin', 'pastor', 'leader'].includes(user?.role || ''))
+  );
 
   const FamilyLogo = ({ className }: { className?: string }) => (
     <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>

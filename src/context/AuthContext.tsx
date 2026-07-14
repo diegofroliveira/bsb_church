@@ -12,6 +12,7 @@ export interface User {
   avatar?: string;
   groupId?: string; 
   assigned_gc?: string;
+  assigned_sector?: string;
   forcePasswordReset?: boolean;
 }
 
@@ -39,6 +40,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       avatar: sbUser.user_metadata?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${sbUser.id}`,
       groupId: sbUser.user_metadata?.groupId,
       assigned_gc: sbUser.user_metadata?.assigned_gc,
+      assigned_sector: sbUser.user_metadata?.assigned_sector,
     };
   };
 
