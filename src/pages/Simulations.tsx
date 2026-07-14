@@ -86,6 +86,18 @@ const isCountableGCMember = (member: Member): boolean => {
   return type !== 'AGREGADO' && type !== 'AGREGADOS';
 };
 
+const isAggregateMember = (member: Member): boolean => {
+  const type = String(member.tipo_de_pessoa || member.tipo_cadastro || '')
+    .trim()
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+  return type === 'AGREGADO' || type === 'AGREGADOS';
+};
+
+const formatTerritorialCount = (linkedCount: number, aggregateCount = 0): string =>
+  `${linkedCount} membros${aggregateCount > 0 ? ` (${aggregateCount} agregados)` : ''}`;
+
 const getTerritorialAlertKey = (insight: { type: string; ra: string }): string =>
   `territory_v2_${insight.type}_${insight.ra}`;
 
@@ -1283,6 +1295,8 @@ export const Simulations: React.FC = () => {
         return type === 'MEMBRO';
       });
       const countableCount = countableMembersList.length;
+      const aggregateMembersList = residents.filter(m => isAggregateMember(m));
+      const aggregateCount = aggregateMembersList.length;
       
       const gcList = gcsByRA[ra] || [];
       const actualGCs = gcList.length;
@@ -1296,6 +1310,11 @@ export const Simulations: React.FC = () => {
         m.grupos_caseiros !== 'COBERTURA - VIX' &&
         !exactLocalGCNames.has(m.grupos_caseiros!)
       );
+      const externalAggregateCandidates = aggregateMembersList.filter(m =>
+        Boolean(m.grupos_caseiros) &&
+        m.grupos_caseiros !== 'COBERTURA - VIX' &&
+        !exactLocalGCNames.has(m.grupos_caseiros!)
+      );
       const externalResidentRegionCounts = externalResidentCandidates.reduce<Record<string, number>>((acc, member) => {
         const region = getAdministrativeRegion(member.bairro);
         acc[region] = (acc[region] || 0) + 1;
@@ -1305,9 +1324,13 @@ export const Simulations: React.FC = () => {
         if (member.grupos_caseiros) acc[member.grupos_caseiros] = (acc[member.grupos_caseiros] || 0) + 1;
         return acc;
       }, {});
+      const residentAggregateGroupCounts = aggregateMembersList.reduce<Record<string, number>>((acc, member) => {
+        if (member.grupos_caseiros) acc[member.grupos_caseiros] = (acc[member.grupos_caseiros] || 0) + 1;
+        return acc;
+      }, {});
       const residentGroupSummary = Object.entries(residentGroupCounts)
         .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-        .map(([group, count]) => `${group} (${count})`)
+        .map(([group, count]) => `${group} (${formatTerritorialCount(count, residentAggregateGroupCounts[group])})`)
         .join(', ');
       
       // Only emit the two proposals that have a clear pastoral rationale:
@@ -1322,6 +1345,9 @@ export const Simulations: React.FC = () => {
           insights.push({
             type: 'expansion',
             ra: ra,
+            displayDescription: `A base identifica ${formatTerritorialCount(countableCount, aggregateCount)} ativos residentes em ${ra}. Nao ha GC proprio cadastrado na localidade; hoje essas pessoas estao distribuidas em ${residentGroupSummary || 'outros grupos'}. Esse cenario justifica avaliar a criacao de um GC em ${ra}, sem recomendar mudanca automatica de vinculos.`,
+            displayMemberCount: countableCount,
+            displayAggregateCount: aggregateCount,
             title: `Proposta de criação: GC ${ra}`,
             description: `A base identifica ${countableCount} membros ativos residentes em ${ra}. Não há GC próprio cadastrado na localidade; hoje essas pessoas estão distribuídas em ${residentGroupSummary || 'outros grupos'}. Esse cenário justifica levar à avaliação a criação de um GC em ${ra}, sem recomendar mudança automática de vínculos.`,
             action: 'AÇÃO SUGERIDA: CONSIDERAR A CRIAÇÃO DE UM GC EM ARNIQUEIRA',
@@ -1332,6 +1358,9 @@ export const Simulations: React.FC = () => {
           insights.push({
             type: 'expansion_next',
             ra: ra,
+            displayDescription: `A base identifica ${formatTerritorialCount(countableCount, aggregateCount)} ativos residentes em SAMAMBAIA. ${formatTerritorialCount(externalResidentCandidates.length, externalAggregateCandidates.length)} estao hoje fora do GC local, distribuidos em ${residentGroupSummary}. Em vez de concentrar todos em um unico grupo que ficaria grande, a proposta e avaliar um segundo GC em Samambaia para acolher esse nucleo com mais equilibrio.`,
+            displayMemberCount: shouldSuggestSecondGroup ? externalResidentCandidates.length : countableCount,
+            displayAggregateCount: shouldSuggestSecondGroup ? externalAggregateCandidates.length : aggregateCount,
             title: 'Proposta de expansão: SAMAMBAIA II',
             description: `A base identifica ${countableCount} membros ativos residentes em SAMAMBAIA. ${externalResidentCandidates.length} estão hoje fora do GC local, distribuídos em ${residentGroupSummary}. Em vez de concentrar todos em um único grupo que ficaria grande, a proposta é avaliar um segundo GC em Samambaia para acolher esse núcleo com mais equilíbrio.`,
             action: 'AÇÃO SUGERIDA: CONSIDERAR UM SEGUNDO GC EM SAMAMBAIA',
@@ -1418,11 +1447,22 @@ export const Simulations: React.FC = () => {
           )
         : [];
       const namingParticipants = recantoExternalParticipants;
+      const recantoExternalAggregates = currentRecanto
+        ? draftMembers.filter(m =>
+            m.status === 'Ativo' &&
+            isAggregateMember(m) &&
+            m.grupos_caseiros === currentRecanto.grupo_caseiro &&
+            getAdministrativeRegion(m.bairro) !== ra
+          )
+        : [];
 
       if (currentRecanto && namingParticipants.length >= 3) {
         insights.push({
           type: 'renaming',
           ra: 'RECANTO-ENTORNO',
+          displayDescription: `O grupo caseiro atualmente chamado ${currentRecanto.grupo_caseiro} reune ${formatTerritorialCount(namingParticipants.length, recantoExternalAggregates.length)} ativos residentes em outras regioes. A proposta e renomear o grupo para RECANTO-ENTORNO para refletir sua cobertura territorial atual, sem criar um novo grupo e sem alterar vinculos automaticamente.`,
+          displayMemberCount: namingParticipants.length,
+          displayAggregateCount: recantoExternalAggregates.length,
           title: 'Proposta de nome: RECANTO-ENTORNO',
           description: `O grupo caseiro atualmente chamado ${currentRecanto.grupo_caseiro} reúne ${namingParticipants.length} membros ativos residentes em outras regiões, incluindo ${Array.from(new Set(namingParticipants.map(m => getAdministrativeRegion(m.bairro)))).sort().join(', ')}. A proposta é renomear o grupo para RECANTO-ENTORNO para refletir sua cobertura territorial atual, sem criar um novo grupo e sem alterar vínculos automaticamente.`,
           action: 'AÇÃO SUGERIDA: AVALIAR RENOMEAÇÃO ADMINISTRATIVA',
@@ -1676,16 +1716,23 @@ export const Simulations: React.FC = () => {
       return a.memberName.localeCompare(b.memberName);
     });
 
+    const aggregateCountByGC: Record<string, number> = {};
+    draftMembers.filter(m => m.status === 'Ativo' && m.grupos_caseiros && isAggregateMember(m)).forEach(m => {
+      const gc = m.grupos_caseiros!;
+      if (gc === 'COBERTURA - VIX') return;
+      aggregateCountByGC[gc] = (aggregateCountByGC[gc] || 0) + 1;
+    });
+
     // 4. Overcrowded GCs (> 25 linked members)
     const overcrowdedGCs = Object.entries(membersCountByGC)
       .filter(([gc, count]) => count > 25 && gc !== 'COBERTURA - VIX')
-      .map(([gc, count]) => ({ gc, count }))
+      .map(([gc, count]) => ({ gc, count, aggregateCount: aggregateCountByGC[gc] || 0 }))
       .sort((a, b) => b.count - a.count);
 
     // 5. Critical GCs (< 5 members)
     const criticalGCs = Object.entries(membersCountByGC)
       .filter(([gc, count]) => count < 5 && gc !== 'COBERTURA - VIX')
-      .map(([gc, count]) => ({ gc, count }))
+      .map(([gc, count]) => ({ gc, count, aggregateCount: aggregateCountByGC[gc] || 0 }))
       .sort((a, b) => a.count - b.count);
 
     return { allocationMismatches, overcrowdedGCs, criticalGCs };
@@ -2778,7 +2825,7 @@ export const Simulations: React.FC = () => {
 
                                 {expandedDescriptions[key] && (
                                   <p className="text-xs text-gray-300 leading-relaxed mb-3 animate-in fade-in slide-in-from-top-1 duration-200">
-                                    {insight.description}
+                                    {insight.displayDescription || insight.description}
                                   </p>
                                 )}
 
@@ -2828,7 +2875,7 @@ export const Simulations: React.FC = () => {
                                        }}
                                        className="text-[10px] font-bold text-indigo-300 hover:text-indigo-200 hover:underline flex items-center gap-1 cursor-pointer transition-all"
                                      >
-                                       {expandedInsightIndex === i ? 'Ocultar Residentes' : `Listar Residentes (${insight.memberNames.length})`}
+                                       {expandedInsightIndex === i ? 'Ocultar Residentes' : `Listar Residentes (${formatTerritorialCount(insight.displayMemberCount ?? insight.memberNames.length, insight.displayAggregateCount)})`}
                                        <ChevronDown className={clsx("w-3 h-3 transition-transform", expandedInsightIndex === i && "rotate-180")} />
                                      </button>
                                    )
@@ -3275,7 +3322,7 @@ export const Simulations: React.FC = () => {
                               <div key={key} className="pt-2 first:pt-0 flex items-center justify-between text-xs animate-in fade-in duration-150">
                                 <div className="flex items-center gap-1.5 min-w-0">
                                   <span className="font-semibold text-gray-700 truncate">{gc.gc}</span>
-                                  <span className="font-black text-rose-600 shrink-0">{gc.count} membros</span>
+                                  <span className="font-black text-rose-600 shrink-0">{formatTerritorialCount(gc.count, gc.aggregateCount)}</span>
                                   <span className="text-[8px] bg-gray-100 text-gray-500 px-1 py-0.2 rounded font-bold uppercase shrink-0">Minimizado</span>
                                 </div>
                                 <div className="flex items-center gap-1 shrink-0 opacity-60 hover:opacity-100 transition-opacity">
@@ -3302,7 +3349,7 @@ export const Simulations: React.FC = () => {
                             <div key={key} className="pt-2 first:pt-0 space-y-2 text-xs group relative animate-in fade-in duration-150">
                               <div className="flex items-center justify-between gap-3 min-w-0">
                                 <span className="font-semibold text-gray-700 truncate min-w-0">{gc.gc}</span>
-                                <span className="font-black text-rose-600 whitespace-nowrap">{gc.count} membros</span>
+                                <span className="font-black text-rose-600 whitespace-nowrap">{formatTerritorialCount(gc.count, gc.aggregateCount)}</span>
                               </div>
                               <div className="flex items-center gap-x-3 gap-y-1.5 flex-wrap pl-1">
                                 <button
@@ -3389,7 +3436,7 @@ export const Simulations: React.FC = () => {
                               <div key={key} className="pt-2 first:pt-0 flex items-center justify-between text-xs animate-in fade-in duration-150">
                                 <div className="flex items-center gap-1.5 min-w-0">
                                   <span className="font-semibold text-gray-700 truncate">{gc.gc}</span>
-                                  <span className="font-black text-amber-600 shrink-0">{gc.count} membros</span>
+                                  <span className="font-black text-amber-600 shrink-0">{formatTerritorialCount(gc.count, gc.aggregateCount)}</span>
                                   <span className="text-[8px] bg-gray-100 text-gray-500 px-1 py-0.2 rounded font-bold uppercase shrink-0">Minimizado</span>
                                 </div>
                                 <div className="flex items-center gap-1 shrink-0 opacity-60 hover:opacity-100 transition-opacity">
@@ -3416,7 +3463,7 @@ export const Simulations: React.FC = () => {
                             <div key={key} className="pt-2 first:pt-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs group relative animate-in fade-in duration-150">
                               <div className="flex items-center gap-2 min-w-0">
                                 <span className="font-semibold text-gray-700 truncate">{gc.gc}</span>
-                                <span className="font-black text-amber-600 shrink-0">{gc.count} membros</span>
+                                <span className="font-black text-amber-600 shrink-0">{formatTerritorialCount(gc.count, gc.aggregateCount)}</span>
                               </div>
                               <div className="flex items-center gap-1.5 flex-wrap shrink-0">
                                 <button
