@@ -3395,7 +3395,7 @@ export const Simulations: React.FC = () => {
                 </div>
 
                 {/* 3. Collapsible: Strategic Suggestions */}
-                <div className="border border-slate-100 rounded-2xl overflow-hidden bg-slate-50/50">
+                <div className="hidden border border-slate-100 rounded-2xl overflow-hidden bg-slate-50/50">
                   <button 
                     onClick={() => setIsAuditSuggestionsExpanded(!isAuditSuggestionsExpanded)}
                     className="w-full flex items-center justify-between p-3.5 bg-slate-100/30 hover:bg-slate-100/50 text-left transition-all cursor-pointer"
