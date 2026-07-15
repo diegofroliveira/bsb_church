@@ -31,6 +31,9 @@ jobs:
         run: playwright install --with-deps chromium
         
       - name: Executar Script de Sincronização
+        env:
+          PROVER_EMAIL: ${{ secrets.PROVER_EMAIL }}
+          PROVER_PASSWORD: ${{ secrets.PROVER_PASSWORD }}
         run: |
           python run_sync.py
 

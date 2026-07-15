@@ -23,8 +23,8 @@ sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 # ─────────────────────────────────────────────
 #  CONFIGURAÇÕES — edite aqui
 # ─────────────────────────────────────────────
-PROVER_EMAIL = "diego.fjddf@gmail.com"
-PROVER_SENHA = "07011988"
+PROVER_EMAIL = os.environ.get("PROVER_EMAIL", "").strip()
+PROVER_SENHA = os.environ.get("PROVER_PASSWORD", "").strip()
 PROVER_BASE_URL = "https://sis.sistemaprover.com.br"
 
 # Pasta onde os CSVs serão salvos localmente
@@ -84,16 +84,10 @@ def salvar_diagnostico(page, label):
     except Exception as exc:
         title = f"<erro ao ler title: {exc}>"
 
-    try:
-        body_text = page.locator("body").inner_text(timeout=3000)
-    except Exception as exc:
-        body_text = f"<erro ao ler body: {exc}>"
-
     with open(path, "w", encoding="utf-8") as f:
         f.write(f"label: {label}\n")
         f.write(f"url: {page.url}\n")
-        f.write(f"title: {title}\n\n")
-        f.write(body_text[:8000])
+        f.write(f"title: {title}\n")
 
     print(f"  [diagnostico] Snapshot textual salvo em: {path}")
 
@@ -230,6 +224,11 @@ def salvar_estrutura_json(dados: dict):
     print(f"\n📋 Estrutura salva em {path}")
 
 def main():
+    if not PROVER_EMAIL or not PROVER_SENHA:
+        raise RuntimeError(
+            "Defina PROVER_EMAIL e PROVER_PASSWORD no ambiente antes de executar a sincronizacao."
+        )
+
     print("=" * 60)
     print("  EXTRATOR SISTEMA PROVER (PLAYWRIGHT)")
     print(f"  {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")

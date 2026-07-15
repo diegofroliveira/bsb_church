@@ -27,6 +27,9 @@ desktop.ini
 
 .vercel
 .env*.local
+.env
+.env.*
+!.env.example
 
 # Scratch / temp scripts (never commit these - may contain tokens)
 scratch/
@@ -38,4 +41,7 @@ inspect_*.py
 test_membros.*
 importador_supabase.py
 dados_exportados/
+temp_restore*
+__pycache__/
+*.py[cod]
 .npmrc

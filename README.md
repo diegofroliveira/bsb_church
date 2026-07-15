@@ -28,6 +28,18 @@ VITE_SUPABASE_URL=https://vadufkgbluisdamgkbln.supabase.co
 VITE_SUPABASE_ANON_KEY=SUA_ANON_KEY_AQUI
 ```
 
+Para executar a sincronização local sem gravar a senha no código, defina as
+credenciais apenas na sessão do terminal:
+
+```powershell
+$env:PROVER_EMAIL="seu-email"
+$env:PROVER_PASSWORD="sua-senha"
+.\venv\Scripts\python.exe run_sync.py
+```
+
+No GitHub Actions, cadastre `PROVER_EMAIL` e `PROVER_PASSWORD` como secrets do
+repositório. Nunca adicione essas credenciais a arquivos versionados.
+
 ---
 
 ## 🔄 Sincronização de Dados
