@@ -1,12 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, Circle, Polygon, Tooltip } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { Home, Brain, Filter, EyeOff } from 'lucide-react';
+import { Home, Brain, Filter } from 'lucide-react';
 import clsx from 'clsx';
 import type { Member, Cell, DiscipleshipLink } from '../../hooks/useFamilyEngine';
 import { ChangeMapView } from './ChangeMapView';
-import { BairroTag } from './BairroTag';
 import { 
   calculateDistance, 
   regionCoordinates, 

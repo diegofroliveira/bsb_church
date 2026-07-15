@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
-import { supabase, supabaseReader } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { filterOperationalMembers } from '../lib/operationalScope';
 import { matchesPopulationMode, type PopulationMode } from '../lib/populationScope';
 import { PopulationFlags } from '../components/PopulationFlags';
@@ -18,12 +18,6 @@ import {
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import clsx from 'clsx';
-
-const formatName = (fullName: string) => {
-  if (!fullName) return '';
-  const parts = fullName.trim().split(' ');
-  return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1]}` : parts[0];
-};
 
 const getFirstName = (fullName: string) => {
   if (!fullName) return '';
@@ -181,17 +175,6 @@ export const Birthdays: React.FC = () => {
     let age = now.getFullYear() - birth.getFullYear();
     if (now.getMonth() < birth.getMonth() || (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate())) age--;
     return age;
-  };
-
-  const getAgeRange = (age: number) => {
-    if (age < 0) return 'Indefinida';
-    if (age <= 12) return '0-12';
-    if (age <= 17) return '13-17';
-    if (age <= 25) return '18-25';
-    if (age <= 35) return '26-35';
-    if (age <= 45) return '36-45';
-    if (age <= 60) return '46-60';
-    return '60+';
   };
 
   const uniqueGCs = useMemo(() => Array.from(new Set(members.map(m => m.grupos_caseiros).filter(Boolean))).sort(), [members]);

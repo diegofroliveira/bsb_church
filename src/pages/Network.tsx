@@ -84,7 +84,7 @@ const TreeNode: React.FC<{
   searchTerm: string; 
   isAncestorMatched?: boolean; 
 }> = ({ node, level = 0, searchTerm, isAncestorMatched = false }) => {
-  const matchesSearch = searchTerm && node.name.toLowerCase().includes(searchTerm.toLowerCase());
+  const matchesSearch = Boolean(searchTerm) && node.name.toLowerCase().includes(searchTerm.toLowerCase());
   const hasMatchingDescendant = useMemo(() => {
     if (!searchTerm) return false;
     const check = (n: TreeNodeData): boolean => {

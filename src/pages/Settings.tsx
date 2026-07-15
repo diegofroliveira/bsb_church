@@ -14,7 +14,7 @@ export const Settings: React.FC = () => {
   const [currentStepText, setCurrentStepText] = useState('');
 
   useEffect(() => {
-    let interval;
+    let interval: ReturnType<typeof setInterval> | undefined;
     if (syncStatus === 'success') {
       setSyncProgress(0);
       setCurrentStepText('Iniciando servidores na nuvem...');

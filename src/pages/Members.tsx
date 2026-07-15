@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Filter, Mail, Phone, MoreVertical, Loader2, Eye, SlidersHorizontal } from 'lucide-react';
+import { Search, Filter, Mail, Phone, Loader2, Eye, SlidersHorizontal } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabaseReader } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';

@@ -6,7 +6,7 @@ import {
   Search, Sparkles, Filter,
   Download, Copy, RefreshCw, GraduationCap, AlertCircle,
   Database, ArrowRight, ShieldCheck,
-  Clock, Play, Terminal, Code, ExternalLink, History, Trash2, ChevronDown, ChevronUp, Table2
+  Clock, Play, Terminal, Code, ExternalLink, History, ChevronDown, ChevronUp, Table2
 } from 'lucide-react';
 import clsx from 'clsx';
 import { filterOperationalMembers } from '../lib/operationalScope';
@@ -124,7 +124,7 @@ export const LabQuery: React.FC = () => {
 
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
-  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [, setFetchError] = useState<string | null>(null);
 
   // Mode Selector: 'visual', 'playground', or 'sql'
   const [queryMode, setQueryMode] = useState<'visual' | 'playground' | 'sql'>('visual');

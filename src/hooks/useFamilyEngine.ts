@@ -1,10 +1,5 @@
 import { useMemo } from 'react';
-import { 
-  normalizeName, 
-  normalizePhone, 
-  normalizeAddress, 
-  calculateAge 
-} from '../lib/geoUtils';
+import { calculateAge } from '../lib/geoUtils';
 
 export interface Member {
   id: number;
@@ -35,6 +30,7 @@ export interface Cell {
   id: string;
   grupo_caseiro: string;
   lider: string;
+  auxiliar?: string | null;
   setor: string;
   latitude?: number | null;
   longitude?: number | null;
@@ -145,7 +141,7 @@ export const useFamilyEngine = (
 
     // Build Family definitions
     const result: Record<string, Family> = {};
-    Object.entries(components).forEach(([rootId, mIds]) => {
+    Object.entries(components).forEach(([, mIds]) => {
       const familyMembers = mIds.map(id => memberById.get(id)!);
       
       // Determine Head of Family

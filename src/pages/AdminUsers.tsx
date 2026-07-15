@@ -6,8 +6,6 @@ import clsx from 'clsx';
 import { filterOperationalCells } from '../lib/operationalScope';
 
 // UUID especial para armazenar a configuração global de perfis
-const SPECIAL_CONFIG_ID = '00000000-0000-0000-0000-000000000000';
-
 const AVAILABLE_MODULES = [
   { id: 'Dashboard',       label: 'Dashboard',       path: '/' },
   { id: 'Mapa',            label: 'Mapa',            path: '/georeferencing' },
