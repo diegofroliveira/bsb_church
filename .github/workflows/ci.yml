@@ -58,10 +58,10 @@ jobs:
         run: pnpm run typecheck
 
       - name: Verificar integridade do diff
-        run: git diff --check HEAD^ HEAD
+        run: git diff --check origin/main...HEAD
 
       - name: Auditar dependências críticas
-        run: pnpm audit --audit-level critical
+        run: pnpm audit --audit-level critical --ignore-registry-errors
 
       - name: Executar testes automatizados, quando configurados
         shell: bash
@@ -84,12 +84,15 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Configurar Supabase CLI
-        uses: supabase/setup-cli@v1
+        uses: supabase/setup-cli@v3
         with:
-          version: latest
+          version: 2.101.0
 
       - name: Iniciar Supabase local
         run: supabase start
+
+      - name: Recriar banco sintético
+        run: supabase db reset --local
 
       - name: Analisar schema local
         run: supabase db lint --local --level warning

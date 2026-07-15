@@ -1,8 +1,7 @@
-import { readFileSync, statSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { extname } from 'node:path'
 import { spawnSync } from 'node:child_process'
 
-const MAX_TEXT_FILE_BYTES = 2 * 1024 * 1024
 const TEXT_EXTENSIONS = new Set([
   '', '.cjs', '.css', '.env', '.example', '.html', '.ini', '.js', '.json',
   '.jsx', '.md', '.mjs', '.properties', '.py', '.sh', '.sql', '.toml',
@@ -83,16 +82,13 @@ for (const path of trackedFiles()) {
   if (forbiddenPath) continue
   if (!isTextCandidate(path)) continue
 
-  let size
+  let content
   try {
-    size = statSync(path).size
+    content = readFileSync(path, 'utf8')
   } catch {
     violations.push({ path, rule: 'arquivo versionado não pôde ser lido' })
     continue
   }
-  if (size > MAX_TEXT_FILE_BYTES) continue
-
-  const content = readFileSync(path, 'utf8')
   if (content.includes('\0')) continue
 
   if (/^public\/data\//i.test(path) && content.trim() !== '[]') {
