@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "typecheck": "tsc -b",
     "lint": "eslint .",
+    "check:sensitive": "node scripts/check-sensitive-files.mjs",
+    "check:rls": "node scripts/check-rls-coverage.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
