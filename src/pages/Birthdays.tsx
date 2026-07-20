@@ -65,6 +65,12 @@ const formatGCName = (gcName?: string): string => {
   return `GC ${name}`;
 };
 
+const toTitleCase = (str: string): string => {
+  if (!str) return '';
+  const trimmed = str.trim();
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase();
+};
+
 interface Member {
   id: any;
   nome: string;
@@ -87,14 +93,15 @@ export const Birthdays: React.FC = () => {
   const [, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<{id: any, status: 'idle' | 'uploading' | 'success' | 'error'}>({id: null, status: 'idle'});
-  const [customNames, setCustomNames] = useState<Record<any, { msgName: string, photoName: string }>>({});
+  const [customNames, setCustomNames] = useState<Record<any, { msgName: string, photoName: string, yOffset?: number }>>({});
   const [storageError, setStorageError] = useState<string | null>(null);
 
-  const handleUpdateCustomName = (memberId: any, field: 'msgName' | 'photoName', value: string) => {
+  const handleUpdateCustomName = (memberId: any, field: 'msgName' | 'photoName' | 'yOffset', value: any) => {
     setCustomNames(prev => {
       const current = prev[memberId] || { 
         msgName: getFirstName(members.find(m => m.id === memberId)?.nome ?? ''), 
-        photoName: getFirstName(members.find(m => m.id === memberId)?.nome ?? '') 
+        photoName: getFirstName(members.find(m => m.id === memberId)?.nome ?? ''),
+        yOffset: 50
       };
       return {
         ...prev,
@@ -391,6 +398,8 @@ export const Birthdays: React.FC = () => {
       const customMsgName = customNames[m.id]?.msgName;
       const firstName = (customMsgName !== undefined ? customMsgName : getFirstName(m.nome)).trim().toUpperCase();
 
+      const flower = m.sexo === 'Feminino' ? ' 🌷' : '';
+
       if (age >= 0 && age <= 15) {
         // Até 15 anos: Nome, idade, pais e GC
         const genderWord = m.sexo === 'Feminino' ? 'Filha' : m.sexo === 'Masculino' ? 'Filho' : 'Filho(a)';
@@ -407,12 +416,12 @@ export const Birthdays: React.FC = () => {
           parentsText = ` - ${genderWord} de ${getFirstName(mother).toUpperCase()}`;
         }
 
-        return `*${firstName}* (${age} anos)${parentsText} - ${gcText} 🌷`;
+        return `*${firstName}* (${age} anos)${parentsText} - ${gcText}${flower}`;
       } else {
         // Depois dos 15 anos: Nome, @mention (se tem telefone) e GC
         const hasPhone = m.celular_principal_sms && m.celular_principal_sms.trim() !== '';
-        const mention = hasPhone ? ` (@${firstName})` : '';
-        return `*${firstName}*${mention} - ${gcText} 🌷`;
+        const mention = hasPhone ? ` (@${toTitleCase(firstName)})` : '';
+        return `*${firstName}*${mention} - ${gcText}${flower}`;
       }
     }).join('\n');
     
@@ -689,6 +698,7 @@ export const Birthdays: React.FC = () => {
                             src={avatarUrl} 
                             alt={m.nome}
                             className="w-full h-full object-cover"
+                            style={{ objectPosition: `center ${customNames[m.id]?.yOffset ?? 50}%` }}
                             onError={(e) => {
                               (e.target as HTMLImageElement).src = '';
                               (e.target as HTMLImageElement).classList.add('hidden');
@@ -734,6 +744,21 @@ export const Birthdays: React.FC = () => {
                             placeholder="Nome Foto"
                           />
                         </div>
+                      </div>
+
+                      <div className="pt-1">
+                        <label className="block text-[8px] font-bold text-gray-400 uppercase mb-1 tracking-wider flex justify-between">
+                          <span>Ajuste Vertical da Foto</span>
+                          <span className="text-pink-650 font-extrabold">{customNames[m.id]?.yOffset ?? 50}%</span>
+                        </label>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={customNames[m.id]?.yOffset ?? 50}
+                          onChange={(e) => handleUpdateCustomName(m.id, 'yOffset', parseInt(e.target.value))}
+                          className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-pink-600 focus:outline-none"
+                        />
                       </div>
                     </div>
                   );
@@ -886,6 +911,7 @@ export const Birthdays: React.FC = () => {
                                     src={avatarUrl} 
                                     alt={m.nome}
                                     className="w-full h-full object-cover"
+                                    style={{ objectPosition: `center ${customNames[m.id]?.yOffset ?? 50}%` }}
                                     onError={(e) => {
                                       (e.target as HTMLImageElement).src = '';
                                       (e.target as HTMLImageElement).classList.add('hidden');
