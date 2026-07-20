@@ -39,17 +39,13 @@ select extensions.throws_ok(
   'administrador A não insere pessoa no tenant B'
 );
 
-select extensions.is(
-  (
-    with updated as (
-      update public.people
-      set display_name = 'Alteração indevida'
-      where id = 'b1000000-0000-4000-8000-000000000001'
-      returning 1
-    )
-    select count(*)::integer from updated
-  ),
-  0,
+select extensions.is_empty(
+  $$
+    update public.people
+    set display_name = 'Alteração indevida'
+    where id = 'b1000000-0000-4000-8000-000000000001'
+    returning 1
+  $$,
   'administrador A não altera pessoa do tenant B mesmo conhecendo o ID'
 );
 
@@ -121,16 +117,12 @@ select extensions.is(
   'override negativo prevalece sobre módulo incluído no plano'
 );
 
-select extensions.is(
-  (
-    with deleted as (
-      delete from public.people
-      where id = 'a1000000-0000-4000-8000-000000000001'
-      returning 1
-    )
-    select count(*)::integer from deleted
-  ),
-  0,
+select extensions.is_empty(
+  $$
+    delete from public.people
+    where id = 'a1000000-0000-4000-8000-000000000001'
+    returning 1
+  $$,
   'override negativo também bloqueia exclusão'
 );
 
