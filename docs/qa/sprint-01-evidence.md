@@ -1,6 +1,6 @@
 # Sprint 01 — Evidências de QA
 
-Data da execução local: 20/07/2026  
+Data da execução local: 20/07/2026
 Branch: `feature/sprint-01-core-operacional`
 
 ## Resultado
