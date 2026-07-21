@@ -1,86 +1,153 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
-import { ProtectedRoute } from './components/ProtectedRoute';
-import { MainLayout } from './layouts/MainLayout';
-import { Login } from './pages/Login';
-import { ResetPassword } from './pages/ResetPassword';
-import { Dashboard } from './pages/Dashboard';
-import { Members } from './pages/Members';
-import { MyGroup } from './pages/MyGroup';
-import { Discipleship } from './pages/Discipleship';
-import { Network } from './pages/Network';
-import { Finance } from './pages/Finance';
-import { Settings } from './pages/Settings';
-import { Reports } from './pages/Reports';
-import { QA } from './pages/QA';
-import { Cells } from './pages/Cells';
-import { MemberProfile } from './pages/MemberProfile';
-import { AdminUsers } from './pages/AdminUsers';
-import Georeferencing from './pages/Georeferencing';
-import { AiConsultant } from './pages/AiConsultant';
-import { AiInsights } from './pages/AiInsights';
-import { Birthdays } from './pages/Birthdays';
-import { Simulations } from './pages/Simulations';
-import { Families } from './pages/Families';
-import { Companionship } from './pages/Companionship';
-import { LabVision } from './pages/LabVision';
-import { LabVisits } from './pages/LabVisits';
-import { LabQuery } from './pages/LabQuery';
-import { Sectors } from './pages/Sectors';
-import { LeaderViews } from './pages/LeaderViews';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { ContextRequiredRoute } from './components/ContextRequiredRoute'
+import { ProtectedRoute } from './components/ProtectedRoute'
+import { AuthProvider } from './context/AuthContext'
+import { OrganizationProvider } from './context/OrganizationContext'
+import { MainLayout } from './layouts/MainLayout'
+import { Birthdays } from './pages/Birthdays'
+import { AcceptInvitation } from './pages/AcceptInvitation'
+import { Cells } from './pages/Cells'
+import { Companionship } from './pages/Companionship'
+import { CoreAdministration } from './pages/CoreAdministration'
+import { Dashboard } from './pages/Dashboard'
+import { Discipleship } from './pages/Discipleship'
+import { Families } from './pages/Families'
+import { Finance } from './pages/Finance'
+import Georeferencing from './pages/Georeferencing'
+import { LabQuery } from './pages/LabQuery'
+import { LabVision } from './pages/LabVision'
+import { LabVisits } from './pages/LabVisits'
+import { LeaderViews } from './pages/LeaderViews'
+import { Login } from './pages/Login'
+import { MemberProfile } from './pages/MemberProfile'
+import { Members } from './pages/Members'
+import { MyGroup } from './pages/MyGroup'
+import { Network } from './pages/Network'
+import { Onboarding } from './pages/Onboarding'
+import { QA } from './pages/QA'
+import { Reports } from './pages/Reports'
+import { ResetPassword } from './pages/ResetPassword'
+import { Sectors } from './pages/Sectors'
+import { Simulations } from './pages/Simulations'
 
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
+      <OrganizationProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
 
-          <Route element={<ProtectedRoute />}>
-            <Route element={<MainLayout />}>
-              {/* All authenticated users */}
-              {/* All authenticated users */}
-              <Route path="/" element={<Dashboard />} />
+            <Route element={<ProtectedRoute />}>
+              <Route path="/onboarding" element={<Onboarding />} />
+              <Route path="/accept-invite" element={<AcceptInvitation />} />
 
-              {/* Dynamic accessible routes */}
-              <Route path="/georeferencing" element={<Georeferencing />} />
-              <Route path="/members" element={<Members />} />
-              <Route path="/families" element={<Families />} />
-              <Route path="/birthdays" element={<Birthdays />} />
-              <Route path="/cells" element={<Cells />} />
-              <Route path="/sectors" element={<Sectors />} />
-              <Route path="/reports" element={<Reports />} />
-              <Route path="/qa" element={<QA />} />
-              <Route path="/discipleship" element={<Discipleship />} />
-              <Route path="/network" element={<Network />} />
-              <Route path="/membro/:name" element={<MemberProfile />} />
-              <Route element={<ProtectedRoute allowedRoles={['admin', 'pastor', 'financeiro']} />}>
-                <Route path="/finance" element={<Finance />} />
+              <Route element={<ContextRequiredRoute />}>
+                <Route element={<MainLayout />}>
+                  <Route path="/" element={<Dashboard />} />
+
+                  <Route
+                    element={
+                      <ProtectedRoute
+                        requiredModule="people"
+                        requiredPermission="people.read"
+                      />
+                    }
+                  >
+                    <Route path="/georeferencing" element={<Georeferencing />} />
+                    <Route path="/members" element={<Members />} />
+                    <Route path="/families" element={<Families />} />
+                    <Route path="/birthdays" element={<Birthdays />} />
+                    <Route path="/membro/:name" element={<MemberProfile />} />
+                  </Route>
+
+                  <Route
+                    element={
+                      <ProtectedRoute
+                        requiredModule="groups"
+                        requiredPermission="groups.read"
+                      />
+                    }
+                  >
+                    <Route path="/cells" element={<Cells />} />
+                    <Route path="/sectors" element={<Sectors />} />
+                    <Route path="/network" element={<Network />} />
+                    <Route path="/my-group" element={<MyGroup />} />
+                    <Route path="/leader-views" element={<LeaderViews />} />
+                  </Route>
+
+                  <Route
+                    element={
+                      <ProtectedRoute
+                        requiredModule="care"
+                        requiredPermission="care.read"
+                      />
+                    }
+                  >
+                    <Route path="/discipleship" element={<Discipleship />} />
+                    <Route path="/companionship" element={<Companionship />} />
+                  </Route>
+
+                  <Route
+                    element={
+                      <ProtectedRoute
+                        requiredModule="finance"
+                        requiredPermission="finance.read"
+                      />
+                    }
+                  >
+                    <Route path="/finance" element={<Finance />} />
+                  </Route>
+
+                  <Route
+                    element={
+                      <ProtectedRoute
+                        requiredModule="analytics"
+                        requiredPermission="analytics.read"
+                      />
+                    }
+                  >
+                    <Route path="/reports" element={<Reports />} />
+                    <Route path="/qa" element={<QA />} />
+                  </Route>
+
+                  <Route
+                    element={
+                      <ProtectedRoute
+                        requiredModule="analytics"
+                        requiredPermission="analytics.manage"
+                      />
+                    }
+                  >
+                    <Route path="/simulations" element={<Simulations />} />
+                    <Route path="/lab/vision" element={<LabVision />} />
+                    <Route path="/lab/visits" element={<LabVisits />} />
+                    <Route path="/lab/queries" element={<LabQuery />} />
+                  </Route>
+
+                  <Route
+                    element={
+                      <ProtectedRoute
+                        requiredModule="foundation"
+                        requiredPermission="tenant.manage"
+                      />
+                    }
+                  >
+                    <Route path="/settings" element={<CoreAdministration />} />
+                  </Route>
+
+                  <Route path="/admin/users" element={<Navigate to="/settings" replace />} />
+                </Route>
               </Route>
-              <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
-                <Route path="/admin/users" element={<AdminUsers />} />
-              </Route>
-              <Route path="/settings" element={<Settings />} />
-              <Route element={<ProtectedRoute allowedRoles={['admin', 'pastor']} />}>
-                <Route path="/simulations" element={<Simulations />} />
-                <Route path="/lab/vision" element={<LabVision />} />
-                <Route path="/lab/visits" element={<LabVisits />} />
-                <Route path="/lab/queries" element={<LabQuery />} />
-              </Route>
-              <Route path="/companionship" element={<Companionship />} />
-              <Route path="/my-group" element={<MyGroup />} />
-              <Route path="/leader-views" element={<LeaderViews />} />
-              <Route path="/ai-consultant" element={<AiConsultant />} />
-              <Route path="/ai-insights" element={<AiInsights />} />
             </Route>
-          </Route>
 
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </OrganizationProvider>
     </AuthProvider>
-  );
+  )
 }
 
-export default App;
+export default App

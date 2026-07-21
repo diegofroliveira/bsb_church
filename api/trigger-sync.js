@@ -1,4 +1,4 @@
-import { handleApiError, requireAdmin } from './_admin-auth.js';
+import { handleApiError, requirePermission } from './_admin-auth.js';
 
 const GITHUB_API_VERSION = '2022-11-28';
 const WORKFLOW_OWNER = 'diegofroliveira';
@@ -50,7 +50,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    await requireAdmin(req);
+    await requirePermission(req, 'integrations.manage');
   } catch (error) {
     return handleApiError(res, error);
   }
