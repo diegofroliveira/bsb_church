@@ -29,15 +29,15 @@ select extensions.is(
   'administrador A recebe somente seu contexto'
 );
 select extensions.ok(
-  'users.manage' = any((select permissions from public.get_my_capabilities())),
+  array_position((select permissions from public.get_my_capabilities()), 'users.manage') is not null,
   'capabilities do administrador A incluem gestao de usuarios'
 );
 select extensions.ok(
-  'foundation' = any((select modules from public.get_my_capabilities())),
+  array_position((select modules from public.get_my_capabilities()), 'foundation') is not null,
   'capabilities incluem o modulo foundation'
 );
 select extensions.ok(
-  'people' = any((select modules from public.get_my_capabilities())),
+  array_position((select modules from public.get_my_capabilities()), 'people') is not null,
   'capabilities incluem modulo contratado pelo tenant A'
 );
 select extensions.throws_ok(
@@ -70,11 +70,11 @@ select extensions.throws_ok(
   'lider nao ativa unidade ancestral fora do seu escopo'
 );
 select extensions.ok(
-  'people.read' = any((select permissions from public.get_my_capabilities())),
+  array_position((select permissions from public.get_my_capabilities()), 'people.read') is not null,
   'lider recebe permissao de leitura no contexto ativo'
 );
 select extensions.ok(
-  not ('users.manage' = any((select permissions from public.get_my_capabilities()))),
+  array_position((select permissions from public.get_my_capabilities()), 'users.manage') is null,
   'lider nao recebe capability administrativa'
 );
 
@@ -189,11 +189,11 @@ select extensions.is(
   'aceite seleciona o contexto autorizado'
 );
 select extensions.ok(
-  'people.read' = any((select permissions from public.get_my_capabilities())),
+  array_position((select permissions from public.get_my_capabilities()), 'people.read') is not null,
   'novo usuario recebe capabilities da role convidada'
 );
 select extensions.ok(
-  not ('users.manage' = any((select permissions from public.get_my_capabilities()))),
+  array_position((select permissions from public.get_my_capabilities()), 'users.manage') is null,
   'convite de lider nao eleva usuario a administrador'
 );
 select extensions.throws_ok(
@@ -425,7 +425,7 @@ select extensions.is(
   'onboarding simplificado normaliza slug legivel'
 );
 select extensions.ok(
-  'iam.role.manage' = any((select permissions from public.get_my_capabilities())),
+  array_position((select permissions from public.get_my_capabilities()), 'iam.role.manage') is not null,
   'responsavel recebe capability IAM no tenant criado'
 );
 
