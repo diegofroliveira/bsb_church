@@ -240,8 +240,8 @@ set local role authenticated;
 select set_config('request.jwt.claim.sub', 'dddddddd-dddd-4ddd-8ddd-ddddddddddd1', true);
 select extensions.is(
   (select count(*)::integer from public.people),
-  3,
-  'usuário multitenant enxerga somente os tenants em que possui acesso'
+  2,
+  'usuário multitenant enxerga somente o tenant ativo'
 );
 
 select extensions.throws_ok(

@@ -138,4 +138,32 @@ insert into public.people(id, tenant_id, org_unit_id, display_name, status, crea
   ('d1000000-0000-4000-8000-000000000001', '40000000-0000-4000-8000-000000000004', '41000000-0000-4000-8000-000000000004', 'Pessoa Sintética do Tenant Suspenso', 'active', 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1')
 on conflict (id) do nothing;
 
+insert into public.user_active_contexts(
+  user_id, tenant_id, membership_id, org_unit_id
+) values
+  ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1', '10000000-0000-4000-8000-000000000001', '51000000-0000-4000-8000-000000000001', null),
+  ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2', '10000000-0000-4000-8000-000000000001', '51000000-0000-4000-8000-000000000002', '11100000-0000-4000-8000-000000000001'),
+  ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1', '20000000-0000-4000-8000-000000000002', '52000000-0000-4000-8000-000000000001', null),
+  ('dddddddd-dddd-4ddd-8ddd-ddddddddddd1', '10000000-0000-4000-8000-000000000001', '55000000-0000-4000-8000-000000000001', null)
+on conflict (user_id) do update set
+  tenant_id = excluded.tenant_id,
+  membership_id = excluded.membership_id,
+  org_unit_id = excluded.org_unit_id,
+  selected_at = now();
+
+insert into public.tenant_invitations(
+  id, tenant_id, email, token_hash, role_id, org_unit_id,
+  invited_by, expires_at
+) values (
+  'a9000000-0000-4000-8000-000000000001',
+  '10000000-0000-4000-8000-000000000001',
+  'prospect-synthetic@example.invalid',
+  extensions.digest('synthetic-invitation-token', 'sha256'),
+  '61000000-0000-4000-8000-000000000002',
+  '11110000-0000-4000-8000-000000000001',
+  'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1',
+  now() + interval '7 days'
+)
+on conflict (id) do nothing;
+
 commit;
