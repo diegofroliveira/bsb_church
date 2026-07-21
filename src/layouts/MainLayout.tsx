@@ -1,33 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, Users, Home, DollarSign, Settings, LogOut,
   Menu, BookOpen, FileText, Network, AlertTriangle, MapPin,
   Brain, Calendar, Play, Heart, Handshake, Compass, Sparkles, RefreshCw, X
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../lib/supabase';
+import { useOrganization } from '../context/OrganizationContext';
+import { ContextSwitcher } from '../components/ContextSwitcher';
 import clsx from 'clsx';
 import { useLabShortcut } from '../hooks/useLabShortcut';
 import { LabLauncher } from '../components/LabLauncher';
 
-const DEFAULT_ROLES: Record<string, string[]> = {
-  admin: ['Dashboard', 'Aniversariantes', 'Mapa', 'Membros', 'Famílias', 'GCs/Localidades', 'Setores', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Financeiro', 'Consultor IA', 'Insights IA', 'Configurações', 'Simulações', 'Companheirismo', 'Lab: Visão da Plenitude', 'Lab: Gestão de Visitas', 'Lab: Consultas & Estudos'],
-  pastor: ['Dashboard', 'Aniversariantes', 'Mapa', 'Membros', 'Famílias', 'GCs/Localidades', 'Setores', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Financeiro', 'Consultor IA', 'Insights IA', 'Simulações', 'Companheirismo', 'Lab: Visão da Plenitude', 'Lab: Gestão de Visitas', 'Lab: Consultas & Estudos'],
-  secretaria: ['Dashboard', 'Aniversariantes', 'Membros', 'Famílias', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Consultor IA'],
-  financeiro: ['Dashboard', 'Financeiro']
-};
-
 export const MainLayout: React.FC = () => {
   const { user, logout } = useAuth();
+  const { activeContext, can, hasModule } = useOrganization();
   const navigate = useNavigate();
-  const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [allowedModules, setAllowedModules] = useState<string[]>([]);
   const [isLabOpen, setIsLabOpen] = useState(false);
   const [hasNewVersion, setHasNewVersion] = useState(false);
 
-  const hasAccessToAnyLab = allowedModules.some(m => m.startsWith('Lab:'));
+  const hasAccessToAnyLab = hasModule('analytics') && can('analytics.manage');
 
   useEffect(() => {
     let initialVersion: string | null = null;
@@ -59,27 +52,10 @@ export const MainLayout: React.FC = () => {
 
   // Secret lab access: type L → A → B on keyboard (not in input fields)
   useLabShortcut(() => {
-    if (user?.role === 'admin' || hasAccessToAnyLab) {
+    if (hasAccessToAnyLab) {
       setIsLabOpen(true);
     }
   });
-
-  // Dynamic route security protection for Lab routes
-  useEffect(() => {
-    const currentPath = location.pathname;
-    const labRouteMap: Record<string, string> = {
-      '/lab/vision': 'Lab: Visão da Plenitude',
-      '/lab/visits': 'Lab: Gestão de Visitas',
-      '/lab/queries': 'Lab: Consultas & Estudos',
-    };
-
-    const requiredModule = labRouteMap[currentPath];
-    if (requiredModule && user?.role !== 'admin' && allowedModules.length > 0) {
-      if (!allowedModules.includes(requiredModule)) {
-        navigate('/');
-      }
-    }
-  }, [location.pathname, allowedModules, navigate, user]);
 
   useEffect(() => {
     if (user?.forcePasswordReset) {
@@ -87,77 +63,31 @@ export const MainLayout: React.FC = () => {
     }
   }, [user, navigate]);
 
-  useEffect(() => {
-    const fetchAllowedModules = async () => {
-      const userRole = user?.role || 'guest';
-      
-      if (userRole === 'admin') {
-        setAllowedModules(DEFAULT_ROLES['admin']);
-        return;
-      }
-
-      try {
-        const stored = localStorage.getItem('church_dynamic_roles');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (parsed[userRole]) {
-            setAllowedModules(parsed[userRole].modules);
-          }
-        }
-
-        // Busca a configuração global do Supabase para sincronia em tempo real
-        const { data } = await supabase
-          .from('profiles')
-          .select('avatar')
-          .eq('role', 'admin');
-
-        if (data && data.length > 0) {
-          const rowWithConfig = data.find(r => r.avatar && r.avatar.startsWith('{"'));
-          if (rowWithConfig && rowWithConfig.avatar) {
-            const parsed = JSON.parse(rowWithConfig.avatar);
-            if (parsed[userRole]) {
-              setAllowedModules(parsed[userRole].modules);
-              localStorage.setItem('church_dynamic_roles', rowWithConfig.avatar);
-              return;
-            }
-          }
-        }
-      } catch (_) {}
-
-      // Fallback para os perfis padrão do sistema
-      setAllowedModules(DEFAULT_ROLES[userRole] || ['Dashboard']);
-    };
-
-    if (user) {
-      fetchAllowedModules();
-    }
-  }, [user]);
-
   const handleLogout = () => { logout(); navigate('/login'); };
 
   const navItems = [
-    { id: 'Dashboard',       name: 'Dashboard',       path: '/',             icon: LayoutDashboard, group: 'Geral' },
-    { id: 'Mapa',            name: 'Mapa',            path: '/georeferencing', icon: MapPin,         group: 'Geral' },
-    { id: 'Relatórios',      name: 'Relatórios',      path: '/reports',      icon: FileText,        group: 'Geral' },
+    { id: 'Dashboard', name: 'Dashboard', path: '/', icon: LayoutDashboard, group: 'Geral', module: 'foundation' },
+    { id: 'Mapa', name: 'Mapa', path: '/georeferencing', icon: MapPin, group: 'Geral', module: 'people', permission: 'people.read' },
+    { id: 'Relatórios', name: 'Relatórios', path: '/reports', icon: FileText, group: 'Geral', module: 'analytics', permission: 'analytics.read' },
 
-    { id: 'Membros',         name: 'Membros',         path: '/members',      icon: Users,           group: 'Pessoas' },
-    { id: 'Famílias',        name: 'Famílias',        path: '/families',     icon: Heart,           group: 'Pessoas' },
-    { id: 'Aniversariantes', name: 'Aniversariantes', path: '/birthdays',    icon: Calendar,        group: 'Pessoas' },
+    { id: 'Membros', name: 'Membros', path: '/members', icon: Users, group: 'Pessoas', module: 'people', permission: 'people.read' },
+    { id: 'Famílias', name: 'Famílias', path: '/families', icon: Heart, group: 'Pessoas', module: 'people', permission: 'people.read' },
+    { id: 'Aniversariantes', name: 'Aniversariantes', path: '/birthdays', icon: Calendar, group: 'Pessoas', module: 'people', permission: 'people.read' },
 
-    { id: 'GCs/Localidades', name: 'GCs/Localidades', path: '/cells',        icon: Home,            group: 'Comunidade' },
-    { id: 'Setores',         name: 'Setores',         path: '/sectors',      icon: Compass,         group: 'Comunidade' },
-    { id: 'Visões de Liderança', name: 'Visões de Liderança', path: '/leader-views', icon: Users, group: 'Comunidade' },
-    { id: 'Rede',            name: 'Rede',            path: '/network',      icon: Network,         group: 'Comunidade' },
+    { id: 'GCs/Localidades', name: 'GCs/Localidades', path: '/cells', icon: Home, group: 'Comunidade', module: 'groups', permission: 'groups.read' },
+    { id: 'Setores', name: 'Setores', path: '/sectors', icon: Compass, group: 'Comunidade', module: 'groups', permission: 'groups.read' },
+    { id: 'Visões de Liderança', name: 'Visões de Liderança', path: '/leader-views', icon: Users, group: 'Comunidade', module: 'groups', permission: 'groups.read' },
+    { id: 'Rede', name: 'Rede', path: '/network', icon: Network, group: 'Comunidade', module: 'groups', permission: 'groups.read' },
 
-    { id: 'Discipulado',     name: 'Discipulado',     path: '/discipleship', icon: BookOpen,        group: 'Pastoreio' },
-    { id: 'Companheirismo',  name: 'Companheirismo',  path: '/companionship', icon: Handshake,       group: 'Pastoreio' },
-    { id: 'Simulações',      name: 'Simulações',      path: '/simulations',  icon: Play,            group: 'Pastoreio' },
+    { id: 'Discipulado', name: 'Discipulado', path: '/discipleship', icon: BookOpen, group: 'Pastoreio', module: 'care', permission: 'care.read' },
+    { id: 'Companheirismo', name: 'Companheirismo', path: '/companionship', icon: Handshake, group: 'Pastoreio', module: 'care', permission: 'care.read' },
+    { id: 'Simulações', name: 'Simulações', path: '/simulations', icon: Play, group: 'Pastoreio', module: 'analytics', permission: 'analytics.manage' },
 
-    { id: 'Financeiro',      name: 'Financeiro',      path: '/finance',      icon: DollarSign,      group: 'Gestão & Ferramentas' },
-    { id: 'Consultor IA',    name: 'IA',              path: '/ai-consultant', icon: Brain,           group: 'Gestão & Ferramentas' },
-    { id: 'Insights IA',     name: 'Insights IA',     path: '/ai-insights',   icon: Sparkles,        group: 'Gestão & Ferramentas' },
-    { id: 'QA',              name: 'QA',              path: '/qa',           icon: AlertTriangle,   group: 'Gestão & Ferramentas' },
-    { id: 'Configurações',   name: 'Configurações',   path: '/admin/users',  icon: Settings,        group: 'Gestão & Ferramentas' },
+    { id: 'Financeiro', name: 'Financeiro', path: '/finance', icon: DollarSign, group: 'Gestão & Ferramentas', module: 'finance', permission: 'finance.read' },
+    { id: 'Consultor IA', name: 'IA', path: '/ai-consultant', icon: Brain, group: 'Gestão & Ferramentas', module: 'ai', permission: 'ai.use' },
+    { id: 'Insights IA', name: 'Insights IA', path: '/ai-insights', icon: Sparkles, group: 'Gestão & Ferramentas', module: 'ai', permission: 'ai.use' },
+    { id: 'QA', name: 'QA', path: '/qa', icon: AlertTriangle, group: 'Gestão & Ferramentas', module: 'analytics', permission: 'analytics.read' },
+    { id: 'Configurações', name: 'Configurações', path: '/settings', icon: Settings, group: 'Gestão & Ferramentas', module: 'foundation', permission: 'tenant.manage' },
   ];
 
   const GROUPS = [
@@ -168,9 +98,8 @@ export const MainLayout: React.FC = () => {
     { id: 'Gestão & Ferramentas', name: 'Gestão & Ferramentas' },
   ];
 
-  const authorizedNavItems = navItems.filter(item =>
-    allowedModules.includes(item.id) ||
-    (item.id === 'Visões de Liderança' && ['admin', 'pastor', 'leader'].includes(user?.role || ''))
+  const authorizedNavItems = navItems.filter(
+    (item) => hasModule(item.module) && (!item.permission || can(item.permission)),
   );
 
   const FamilyLogo = ({ className }: { className?: string }) => (
@@ -218,6 +147,9 @@ export const MainLayout: React.FC = () => {
           <span className="text-2xl font-bold text-gray-900 tracking-tight">Igreja<span className="text-blue-600">Pro</span></span>
         </div>
         <nav className="flex flex-1 flex-col px-4 py-4 overflow-y-auto">
+          <div className="mb-2 px-2">
+            <ContextSwitcher />
+          </div>
           <div className="space-y-6">
             {groupsMap.map((group) => (
               <div key={group.id} className="space-y-1">
@@ -251,7 +183,9 @@ export const MainLayout: React.FC = () => {
 
         <div className="border-t border-gray-100 p-4">
           <div className="text-sm font-semibold text-gray-900 truncate">{user?.name}</div>
-          <div className="text-xs text-primary-600 font-medium capitalize">{user?.role}</div>
+          <div className="truncate text-xs font-medium text-primary-600">
+            {activeContext?.roleCode ?? 'membro'} · {activeContext?.tenantName}
+          </div>
           <button onClick={handleLogout}
             className="mt-4 flex w-full items-center gap-x-3 rounded-md p-2 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors">
             <LogOut className="h-5 w-5 shrink-0" /> Sair
@@ -264,7 +198,11 @@ export const MainLayout: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50/50">
       {/* Secret Lab Launcher — activated only by typing L-A-B. */}
-      {isLabOpen && <LabLauncher onClose={() => setIsLabOpen(false)} allowedModules={allowedModules} />}
+      {isLabOpen && <LabLauncher onClose={() => setIsLabOpen(false)} allowedModules={[
+        'Lab: Visão da Plenitude',
+        'Lab: Gestão de Visitas',
+        'Lab: Consultas & Estudos',
+      ]} />}
       {isMobileMenuOpen && (
         <div className="fixed inset-0 z-50 flex lg:hidden">
           <div className="fixed inset-0 bg-gray-900/80 transition-opacity" onClick={() => setIsMobileMenuOpen(false)} />
