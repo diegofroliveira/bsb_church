@@ -14,7 +14,7 @@ Branch: `feature/sprint-01-core-operacional`
 | Lint | Aprovado com avisos preexistentes | 0 erros e 16 avisos de hooks em legado |
 | Build de produção | Aprovado | Vite 8.1.5; bundle JS 505,83 kB (gzip 150,88 kB) |
 | SQL estático | Aprovado | Migração, seed e testes parseados; planos pgTAP 40 + 71 consistentes |
-| Testes reais do banco | Pendente do CI | Supabase local será iniciado pela esteira do PR |
+| Testes reais do banco | Aprovado no CI | 2 arquivos pgTAP, 111 asserções aprovadas |
 | Dependências críticas | Aprovado | 0 vulnerabilidades críticas |
 
 ## Segurança de dependências
@@ -25,4 +25,4 @@ O pacote é usado apenas para gerar planilhas no navegador em telas autenticadas
 
 ## Critério de promoção
 
-A Sprint 01 somente poderá ser integrada depois que os jobs remotos de qualidade e banco estiverem verdes e o Pull Request for aprovado. A integração na `main` permanece manual por poder acionar a produção.
+Os jobs remotos de qualidade e banco estão verdes. A Sprint 01 somente poderá ser integrada depois que o Pull Request for aprovado. A integração na `main` permanece manual por poder acionar a produção.
