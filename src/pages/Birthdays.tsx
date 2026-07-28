@@ -266,6 +266,7 @@ export const Birthdays: React.FC = () => {
     const currentMonth = now.getMonth() + 1;
 
     return members.filter(m => {
+      if (excludedMemberIds.has(m.id)) return false;
       if (!matchesPopulationMode(m, populationMode)) return false;
       if (m.status !== 'Ativo') return false;
       if (!m.nascimento) return false;
@@ -383,7 +384,7 @@ export const Birthdays: React.FC = () => {
       }
       return matchDate;
     }).sort((a, b) => a.nome.localeCompare(b.nome));
-  }, [members, populationMode, filterMode, specificDate, filterGender, filterGC, filterMinAge, filterMaxAge, filterMaritalStatus]);
+  }, [members, populationMode, filterMode, specificDate, filterGender, filterGC, filterMinAge, filterMaxAge, filterMaritalStatus, excludedMemberIds]);
 
   const birthdayRows = useMemo(() => {
     const activeBirthdays = getBirthdays.filter(m => !excludedMemberIds.has(m.id));
@@ -782,36 +783,16 @@ export const Birthdays: React.FC = () => {
                             </p>
                           </div>
                         </div>
-
-                        {/* Card Actions: Hide from Collage & Exclude Photo */}
+                        {/* Card Actions: Remove from Today's List */}
                         <div className="flex items-center gap-1 shrink-0">
                           <button
                             type="button"
                             onClick={() => toggleExcludeMember(m.id)}
-                            title={excludedMemberIds.has(m.id) ? "Mostrar na colagem" : "Ocultar da colagem"}
-                            className={clsx(
-                              "p-1 rounded-lg transition-colors border",
-                              excludedMemberIds.has(m.id)
-                                ? "bg-red-100 text-red-700 border-red-300 hover:bg-red-200"
-                                : "bg-white text-gray-500 border-gray-250 hover:bg-gray-100"
-                            )}
+                            title="Remover da lista de hoje (excluir da mensagem e colagem)"
+                            className="p-1 rounded-lg bg-white text-gray-500 border border-gray-250 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors"
                           >
-                            {excludedMemberIds.has(m.id) ? (
-                              <EyeOff className="h-3.5 w-3.5" />
-                            ) : (
-                              <Eye className="h-3.5 w-3.5" />
-                            )}
+                            <Trash2 className="h-3.5 w-3.5" />
                           </button>
-                          {m.foto && (
-                            <button
-                              type="button"
-                              onClick={() => handleDeletePhoto(m.id)}
-                              title="Excluir foto (voltar para inicial)"
-                              className="p-1 rounded-lg bg-white text-gray-500 border border-gray-250 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          )}
                         </div>
                       </div>
 
@@ -824,8 +805,7 @@ export const Birthdays: React.FC = () => {
                             type="text"
                             value={currentMsgVal}
                             onChange={(e) => handleUpdateCustomName(m.id, 'msgName', e.target.value)}
-                            disabled={excludedMemberIds.has(m.id)}
-                            className="w-full text-xs bg-white disabled:bg-gray-100 border border-gray-250 rounded-lg px-2 py-1.5 outline-none focus:border-pink-300 focus:ring-1 focus:ring-pink-300/30 transition-all font-medium text-gray-700"
+                            className="w-full text-xs bg-white border border-gray-250 rounded-lg px-2 py-1.5 outline-none focus:border-pink-300 focus:ring-1 focus:ring-pink-300/30 transition-all font-medium text-gray-700"
                             placeholder="Nome Msg"
                           />
                         </div>
@@ -837,68 +817,101 @@ export const Birthdays: React.FC = () => {
                             type="text"
                             value={currentPhotoVal}
                             onChange={(e) => handleUpdateCustomName(m.id, 'photoName', e.target.value)}
-                            disabled={excludedMemberIds.has(m.id)}
-                            className="w-full text-xs bg-white disabled:bg-gray-100 border border-gray-250 rounded-lg px-2 py-1.5 outline-none focus:border-pink-300 focus:ring-1 focus:ring-pink-300/30 transition-all font-medium text-gray-700"
+                            className="w-full text-xs bg-white border border-gray-250 rounded-lg px-2 py-1.5 outline-none focus:border-pink-300 focus:ring-1 focus:ring-pink-300/30 transition-all font-medium text-gray-700"
                             placeholder="Nome Foto"
                           />
                         </div>
                       </div>
 
                       {/* Photo Zoom and Crop Adjustments */}
-                      {!excludedMemberIds.has(m.id) && (
-                        <div className="pt-1.5 space-y-1.5 border-t border-gray-100 mt-1">
+                      <div className="pt-1.5 space-y-1.5 border-t border-gray-100 mt-1">
+                        <div>
+                          <label className="block text-[8px] font-bold text-gray-400 uppercase mb-0.5 tracking-wider flex justify-between">
+                            <span>Zoom (Escala)</span>
+                            <span className="text-pink-650 font-extrabold">{(customNames[m.id]?.zoom ?? 1.0).toFixed(1)}x</span>
+                          </label>
+                          <input
+                            type="range"
+                            min="1"
+                            max="3"
+                            step="0.1"
+                            value={customNames[m.id]?.zoom ?? 1.0}
+                            onChange={(e) => handleUpdateCustomName(m.id, 'zoom', parseFloat(e.target.value))}
+                            className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-pink-600 focus:outline-none"
+                          />
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-2">
                           <div>
                             <label className="block text-[8px] font-bold text-gray-400 uppercase mb-0.5 tracking-wider flex justify-between">
-                              <span>Zoom (Escala)</span>
-                              <span className="text-pink-650 font-extrabold">{(customNames[m.id]?.zoom ?? 1.0).toFixed(1)}x</span>
+                              <span>Horizontal (X)</span>
+                              <span className="text-pink-650 font-extrabold">{customNames[m.id]?.xOffset ?? 50}%</span>
                             </label>
                             <input
                               type="range"
-                              min="1"
-                              max="3"
-                              step="0.1"
-                              value={customNames[m.id]?.zoom ?? 1.0}
-                              onChange={(e) => handleUpdateCustomName(m.id, 'zoom', parseFloat(e.target.value))}
+                              min="0"
+                              max="100"
+                              value={customNames[m.id]?.xOffset ?? 50}
+                              onChange={(e) => handleUpdateCustomName(m.id, 'xOffset', parseInt(e.target.value))}
                               className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-pink-600 focus:outline-none"
                             />
                           </div>
-                          
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <label className="block text-[8px] font-bold text-gray-400 uppercase mb-0.5 tracking-wider flex justify-between">
-                                <span>Horizontal (X)</span>
-                                <span className="text-pink-650 font-extrabold">{customNames[m.id]?.xOffset ?? 50}%</span>
-                              </label>
-                              <input
-                                type="range"
-                                min="0"
-                                max="100"
-                                value={customNames[m.id]?.xOffset ?? 50}
-                                onChange={(e) => handleUpdateCustomName(m.id, 'xOffset', parseInt(e.target.value))}
-                                className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-pink-600 focus:outline-none"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-[8px] font-bold text-gray-400 uppercase mb-0.5 tracking-wider flex justify-between">
-                                <span>Vertical (Y)</span>
-                                <span className="text-pink-650 font-extrabold">{customNames[m.id]?.yOffset ?? 50}%</span>
-                              </label>
-                              <input
-                                type="range"
-                                min="0"
-                                max="100"
-                                value={customNames[m.id]?.yOffset ?? 50}
-                                onChange={(e) => handleUpdateCustomName(m.id, 'yOffset', parseInt(e.target.value))}
-                                className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-pink-600 focus:outline-none"
-                              />
-                            </div>
+                          <div>
+                            <label className="block text-[8px] font-bold text-gray-400 uppercase mb-0.5 tracking-wider flex justify-between">
+                              <span>Vertical (Y)</span>
+                              <span className="text-pink-650 font-extrabold">{customNames[m.id]?.yOffset ?? 50}%</span>
+                            </label>
+                            <input
+                              type="range"
+                              min="0"
+                              max="100"
+                              value={customNames[m.id]?.yOffset ?? 50}
+                              onChange={(e) => handleUpdateCustomName(m.id, 'yOffset', parseInt(e.target.value))}
+                              className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-pink-600 focus:outline-none"
+                            />
                           </div>
                         </div>
-                      )}
+
+                        {m.foto && (
+                          <div className="text-right pt-1">
+                            <button
+                              type="button"
+                              onClick={() => handleDeletePhoto(m.id)}
+                              className="text-[8px] text-red-500 hover:text-red-700 font-bold uppercase transition-colors"
+                            >
+                              Limpar Foto do Cadastro
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
               </div>
+
+              {/* Opcional: Mostrar aniversariantes removidos para desfazer exclusão */}
+              {excludedMemberIds.size > 0 && (
+                <div className="border-t border-gray-100 pt-3 mt-1">
+                  <h4 className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+                    Removidos da Lista ({excludedMemberIds.size})
+                  </h4>
+                  <div className="flex flex-wrap gap-1.5 max-h-[80px] overflow-y-auto">
+                    {members
+                      .filter(m => excludedMemberIds.has(m.id))
+                      .map(m => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => toggleExcludeMember(m.id)}
+                          className="inline-flex items-center gap-1.5 px-2 py-1 bg-red-55/10 hover:bg-red-55/20 border border-red-200/50 rounded-lg text-[9px] font-medium text-red-650 transition-colors"
+                        >
+                          <span>{getFirstName(m.nome)}</span>
+                          <span className="text-[8px] font-extrabold">↺ desfazer</span>
+                        </button>
+                      ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
