@@ -1074,8 +1074,33 @@ export const Birthdays: React.FC = () => {
                                  </div>
 
                                  {/* Hover Overlay */}
-                                 <div className="absolute inset-0 bg-pink-600/0 group-hover:bg-pink-600/20 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
-                                    <Upload className="h-8 w-8 text-white drop-shadow-md" />
+                                 <div className="absolute inset-0 bg-black/40 transition-all flex items-center justify-center gap-4 opacity-0 group-hover:opacity-100">
+                                    <button
+                                      type="button"
+                                      title="Alterar Foto"
+                                      className="p-2 rounded-full bg-white/20 hover:bg-white/40 text-white transition-colors"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        e.preventDefault();
+                                        const label = e.currentTarget.closest('label');
+                                        const input = label?.querySelector('input[type="file"]') as HTMLInputElement;
+                                        input?.click();
+                                      }}
+                                    >
+                                      <Upload className="h-6 w-6" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      title="Excluir Foto (Voltar para inicial)"
+                                      className="p-2 rounded-full bg-red-600/80 hover:bg-red-650 text-white transition-colors"
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
+                                        e.preventDefault();
+                                        await handleDeletePhoto(m.id);
+                                      }}
+                                    >
+                                      <Trash2 className="h-6 w-6" />
+                                    </button>
                                  </div>
 
                                  {/* Uploading State */}
