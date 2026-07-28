@@ -14,7 +14,10 @@ import {
   AlertTriangle,
   Lock,
   Check,
-  X
+  X,
+  Eye,
+  EyeOff,
+  Trash2
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import clsx from 'clsx';
@@ -93,14 +96,60 @@ export const Birthdays: React.FC = () => {
   const [, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<{id: any, status: 'idle' | 'uploading' | 'success' | 'error'}>({id: null, status: 'idle'});
-  const [customNames, setCustomNames] = useState<Record<any, { msgName: string, photoName: string, yOffset?: number }>>({});
+  const [customNames, setCustomNames] = useState<Record<any, { 
+    msgName: string; 
+    photoName: string; 
+    zoom?: number; 
+    xOffset?: number; 
+    yOffset?: number; 
+  }>>({});
   const [storageError, setStorageError] = useState<string | null>(null);
+  const [excludedMemberIds, setExcludedMemberIds] = useState<Set<any>>(new Set());
 
-  const handleUpdateCustomName = (memberId: any, field: 'msgName' | 'photoName' | 'yOffset', value: any) => {
+  const toggleExcludeMember = (memberId: any) => {
+    setExcludedMemberIds(prev => {
+      const next = new Set(prev);
+      if (next.has(memberId)) {
+        next.delete(memberId);
+      } else {
+        next.add(memberId);
+      }
+      return next;
+    });
+  };
+
+  const handleDeletePhoto = async (memberId: any) => {
+    if (!window.confirm('Deseja realmente remover a foto deste membro? O cadastro voltará a exibir a inicial do nome.')) return;
+    setUploadStatus({ id: memberId, status: 'uploading' });
+    try {
+      const { error: dbError } = await supabase
+        .from('membros')
+        .update({ foto: null })
+        .eq('id', memberId);
+
+      if (dbError) throw dbError;
+
+      const filePath = `avatars/${memberId}.jpg`;
+      await supabase.storage.from('avatars').remove([filePath]);
+
+      setAvatarCacheBuster(Date.now());
+      fetchMembers();
+      setUploadStatus({ id: memberId, status: 'success' });
+      setTimeout(() => setUploadStatus({ id: null, status: 'idle' }), 3000);
+    } catch (err: any) {
+      console.error('Error deleting photo:', err);
+      setUploadStatus({ id: memberId, status: 'error' });
+      alert(`Erro ao excluir foto: ${err.message}`);
+    }
+  };
+
+  const handleUpdateCustomName = (memberId: any, field: 'msgName' | 'photoName' | 'zoom' | 'xOffset' | 'yOffset', value: any) => {
     setCustomNames(prev => {
       const current = prev[memberId] || { 
         msgName: getFirstName(members.find(m => m.id === memberId)?.nome ?? ''), 
         photoName: getFirstName(members.find(m => m.id === memberId)?.nome ?? ''),
+        zoom: 1.0,
+        xOffset: 50,
         yOffset: 50
       };
       return {
@@ -337,7 +386,8 @@ export const Birthdays: React.FC = () => {
   }, [members, populationMode, filterMode, specificDate, filterGender, filterGC, filterMinAge, filterMaxAge, filterMaritalStatus]);
 
   const birthdayRows = useMemo(() => {
-    const total = getBirthdays.length;
+    const activeBirthdays = getBirthdays.filter(m => !excludedMemberIds.has(m.id));
+    const total = activeBirthdays.length;
     if (total === 0) return [];
     
     // Determine row sizes
@@ -376,20 +426,21 @@ export const Birthdays: React.FC = () => {
       }
     }
 
-    // Partition getBirthdays into rows
+    // Partition activeBirthdays into rows
     const rows: Member[][] = [];
     let index = 0;
     for (const size of rowSizes) {
-      rows.push(getBirthdays.slice(index, index + size));
+      rows.push(activeBirthdays.slice(index, index + size));
       index += size;
     }
     return rows;
-  }, [getBirthdays]);
+  }, [getBirthdays, excludedMemberIds]);
 
   const generateAutomaticMessage = () => {
-    if (getBirthdays.length === 0) return "Nenhum aniversariante encontrado.";
+    const activeBirthdays = getBirthdays.filter(m => !excludedMemberIds.has(m.id));
+    if (activeBirthdays.length === 0) return "Nenhum aniversariante encontrado.";
     
-    const names = getBirthdays.map(m => {
+    const names = activeBirthdays.map(m => {
       const age = calculateAge(m.nascimento);
       const isExterno = (m.tipo_de_pessoa || '').trim().toUpperCase() === 'EXTERNO' || (m.tipo_cadastro || '').trim().toUpperCase() === 'EXTERNO';
       const citySuffix = isExterno && m.cidade ? ` (${m.cidade})` : '';
@@ -425,8 +476,8 @@ export const Birthdays: React.FC = () => {
       }
     }).join('\n');
     
-    const isPlural = getBirthdays.length > 1;
-    const isFemale = !isPlural && getBirthdays[0]?.sexo === 'Feminino';
+    const isPlural = activeBirthdays.length > 1;
+    const isFemale = !isPlural && activeBirthdays[0]?.sexo === 'Feminino';
     
     let timeLabel = "de hoje";
     if (filterMode === 'tomorrow') {
@@ -522,7 +573,8 @@ export const Birthdays: React.FC = () => {
   };
 
   const handleDownloadCollage = async () => {
-    if (!collageRef.current || getBirthdays.length === 0) return;
+    const activeBirthdays = getBirthdays.filter(m => !excludedMemberIds.has(m.id));
+    if (!collageRef.current || activeBirthdays.length === 0) return;
     
     setIsExporting(true);
     try {
@@ -691,31 +743,75 @@ export const Birthdays: React.FC = () => {
                   const avatarUrl = `${supabase.storage.from('avatars').getPublicUrl(`avatars/${m.id}.jpg`).data.publicUrl}?t=${avatarCacheBuster}`;
                   
                   return (
-                    <div key={m.id} className="p-3 bg-gray-50/50 rounded-xl border border-gray-100 space-y-2.5">
-                      <div className="flex items-center gap-2.5">
-                        <div className="h-8 w-8 rounded-full bg-pink-100 overflow-hidden flex items-center justify-center shrink-0 border border-pink-200">
-                          <img 
-                            src={avatarUrl} 
-                            alt={m.nome}
-                            className="w-full h-full object-cover"
-                            style={{ objectPosition: `center ${customNames[m.id]?.yOffset ?? 50}%` }}
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = '';
-                              (e.target as HTMLImageElement).classList.add('hidden');
-                              (e.target as HTMLImageElement).parentElement?.querySelector('.fallback-icon')?.classList.remove('hidden');
-                            }}
-                          />
-                          <div className="fallback-icon hidden text-pink-650 font-bold text-xs uppercase">
-                            {m.nome.charAt(0)}
+                    <div 
+                      key={m.id} 
+                      className={clsx(
+                        "p-3 rounded-xl border transition-all space-y-2.5",
+                        excludedMemberIds.has(m.id) 
+                          ? "bg-red-50/20 border-red-100 opacity-60" 
+                          : "bg-gray-50/50 border-gray-100"
+                      )}
+                    >
+                      <div className="flex items-center justify-between gap-2.5">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="h-8 w-8 rounded-full bg-pink-100 overflow-hidden flex items-center justify-center shrink-0 border border-pink-200">
+                            <img 
+                              src={avatarUrl} 
+                              alt={m.nome}
+                              className="w-full h-full object-cover animate-none"
+                              style={{ 
+                                transform: `scale(${customNames[m.id]?.zoom ?? 1.0}) translate(${(customNames[m.id]?.xOffset ?? 50) - 50}%, ${(customNames[m.id]?.yOffset ?? 50) - 50}%)`, 
+                                transformOrigin: 'center' 
+                              }}
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = '';
+                                (e.target as HTMLImageElement).classList.add('hidden');
+                                (e.target as HTMLImageElement).parentElement?.querySelector('.fallback-icon')?.classList.remove('hidden');
+                              }}
+                            />
+                            <div className="fallback-icon hidden text-pink-650 font-bold text-xs uppercase">
+                              {m.nome.charAt(0)}
+                            </div>
+                          </div>
+                          <div className="min-w-0">
+                            <h4 className={clsx("text-xs font-bold text-gray-800 truncate", excludedMemberIds.has(m.id) && "line-through text-gray-400")} title={m.nome}>
+                              {m.nome}
+                            </h4>
+                            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">
+                              {m.grupos_caseiros || 'Sem GC'}
+                            </p>
                           </div>
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <h4 className="text-xs font-bold text-gray-800 truncate" title={m.nome}>
-                            {m.nome}
-                          </h4>
-                          <p className="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">
-                            {m.grupos_caseiros || 'Sem GC'}
-                          </p>
+
+                        {/* Card Actions: Hide from Collage & Exclude Photo */}
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => toggleExcludeMember(m.id)}
+                            title={excludedMemberIds.has(m.id) ? "Mostrar na colagem" : "Ocultar da colagem"}
+                            className={clsx(
+                              "p-1 rounded-lg transition-colors border",
+                              excludedMemberIds.has(m.id)
+                                ? "bg-red-100 text-red-700 border-red-300 hover:bg-red-200"
+                                : "bg-white text-gray-500 border-gray-250 hover:bg-gray-100"
+                            )}
+                          >
+                            {excludedMemberIds.has(m.id) ? (
+                              <EyeOff className="h-3.5 w-3.5" />
+                            ) : (
+                              <Eye className="h-3.5 w-3.5" />
+                            )}
+                          </button>
+                          {m.foto && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeletePhoto(m.id)}
+                              title="Excluir foto (voltar para inicial)"
+                              className="p-1 rounded-lg bg-white text-gray-500 border border-gray-250 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
                         </div>
                       </div>
 
@@ -728,7 +824,8 @@ export const Birthdays: React.FC = () => {
                             type="text"
                             value={currentMsgVal}
                             onChange={(e) => handleUpdateCustomName(m.id, 'msgName', e.target.value)}
-                            className="w-full text-xs bg-white border border-gray-250 rounded-lg px-2 py-1.5 outline-none focus:border-pink-300 focus:ring-1 focus:ring-pink-300/30 transition-all font-medium text-gray-700"
+                            disabled={excludedMemberIds.has(m.id)}
+                            className="w-full text-xs bg-white disabled:bg-gray-100 border border-gray-250 rounded-lg px-2 py-1.5 outline-none focus:border-pink-300 focus:ring-1 focus:ring-pink-300/30 transition-all font-medium text-gray-700"
                             placeholder="Nome Msg"
                           />
                         </div>
@@ -740,26 +837,64 @@ export const Birthdays: React.FC = () => {
                             type="text"
                             value={currentPhotoVal}
                             onChange={(e) => handleUpdateCustomName(m.id, 'photoName', e.target.value)}
-                            className="w-full text-xs bg-white border border-gray-250 rounded-lg px-2 py-1.5 outline-none focus:border-pink-300 focus:ring-1 focus:ring-pink-300/30 transition-all font-medium text-gray-700"
+                            disabled={excludedMemberIds.has(m.id)}
+                            className="w-full text-xs bg-white disabled:bg-gray-100 border border-gray-250 rounded-lg px-2 py-1.5 outline-none focus:border-pink-300 focus:ring-1 focus:ring-pink-300/30 transition-all font-medium text-gray-700"
                             placeholder="Nome Foto"
                           />
                         </div>
                       </div>
 
-                      <div className="pt-1">
-                        <label className="block text-[8px] font-bold text-gray-400 uppercase mb-1 tracking-wider flex justify-between">
-                          <span>Ajuste Vertical da Foto</span>
-                          <span className="text-pink-650 font-extrabold">{customNames[m.id]?.yOffset ?? 50}%</span>
-                        </label>
-                        <input
-                          type="range"
-                          min="0"
-                          max="100"
-                          value={customNames[m.id]?.yOffset ?? 50}
-                          onChange={(e) => handleUpdateCustomName(m.id, 'yOffset', parseInt(e.target.value))}
-                          className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-pink-600 focus:outline-none"
-                        />
-                      </div>
+                      {/* Photo Zoom and Crop Adjustments */}
+                      {!excludedMemberIds.has(m.id) && (
+                        <div className="pt-1.5 space-y-1.5 border-t border-gray-100 mt-1">
+                          <div>
+                            <label className="block text-[8px] font-bold text-gray-400 uppercase mb-0.5 tracking-wider flex justify-between">
+                              <span>Zoom (Escala)</span>
+                              <span className="text-pink-650 font-extrabold">{(customNames[m.id]?.zoom ?? 1.0).toFixed(1)}x</span>
+                            </label>
+                            <input
+                              type="range"
+                              min="1"
+                              max="3"
+                              step="0.1"
+                              value={customNames[m.id]?.zoom ?? 1.0}
+                              onChange={(e) => handleUpdateCustomName(m.id, 'zoom', parseFloat(e.target.value))}
+                              className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-pink-600 focus:outline-none"
+                            />
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-[8px] font-bold text-gray-400 uppercase mb-0.5 tracking-wider flex justify-between">
+                                <span>Horizontal (X)</span>
+                                <span className="text-pink-650 font-extrabold">{customNames[m.id]?.xOffset ?? 50}%</span>
+                              </label>
+                              <input
+                                type="range"
+                                min="0"
+                                max="100"
+                                value={customNames[m.id]?.xOffset ?? 50}
+                                onChange={(e) => handleUpdateCustomName(m.id, 'xOffset', parseInt(e.target.value))}
+                                className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-pink-600 focus:outline-none"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[8px] font-bold text-gray-400 uppercase mb-0.5 tracking-wider flex justify-between">
+                                <span>Vertical (Y)</span>
+                                <span className="text-pink-650 font-extrabold">{customNames[m.id]?.yOffset ?? 50}%</span>
+                              </label>
+                              <input
+                                type="range"
+                                min="0"
+                                max="100"
+                                value={customNames[m.id]?.yOffset ?? 50}
+                                onChange={(e) => handleUpdateCustomName(m.id, 'yOffset', parseInt(e.target.value))}
+                                className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-pink-600 focus:outline-none"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -857,7 +992,7 @@ export const Birthdays: React.FC = () => {
               >
               <div className="text-center mb-10">
                 <h2 className="text-4xl font-black text-gray-900 tracking-tight">
-                  {getBirthdays.length === 1 ? "Aniversariante" : "Aniversariantes"}
+                  {birthdayRows.flat().length === 1 ? "Aniversariante" : "Aniversariantes"}
                 </h2>
                 <p className="text-pink-500 font-bold tracking-widest text-sm mt-2 uppercase">Parabéns!</p>
               </div>
@@ -906,12 +1041,14 @@ export const Birthdays: React.FC = () => {
                                 "aspect-square w-full rounded-2xl bg-gray-50 border-2 border-dashed flex items-center justify-center overflow-hidden relative group-hover:border-pink-300 transition-colors",
                                 draggedOverMemberId === m.id ? "border-pink-500 bg-pink-50/30" : "border-gray-200"
                               )}>
-                                 {/* Tenta carregar a imagem, se falhar mostra placeholder */}
                                  <img 
                                     src={avatarUrl} 
                                     alt={m.nome}
-                                    className="w-full h-full object-cover"
-                                    style={{ objectPosition: `center ${customNames[m.id]?.yOffset ?? 50}%` }}
+                                    className="w-full h-full object-cover animate-none"
+                                    style={{ 
+                                      transform: `scale(${customNames[m.id]?.zoom ?? 1.0}) translate(${(customNames[m.id]?.xOffset ?? 50) - 50}%, ${(customNames[m.id]?.yOffset ?? 50) - 50}%)`, 
+                                      transformOrigin: 'center' 
+                                    }}
                                     onError={(e) => {
                                       (e.target as HTMLImageElement).src = '';
                                       (e.target as HTMLImageElement).classList.add('hidden');
