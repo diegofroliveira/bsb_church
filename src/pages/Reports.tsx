@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabaseReader } from '../lib/supabase';
-import { Filter, Download, Loader2, Search, FileText, ArrowUpDown, ChevronUp, ChevronDown, Home, ShieldAlert, Users, Heart } from 'lucide-react';
+import { Filter, Download, Loader2, Search, FileText, ArrowUpDown, ChevronUp, ChevronDown, Home, ShieldAlert, Users, Heart, Plus, X, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
 import * as XLSX from 'xlsx';
 import { filterOperationalMembers } from '../lib/operationalScope';
@@ -112,7 +112,16 @@ export const Reports: React.FC = () => {
   const [filterCellRoles, setFilterCellRoles] = useState<string[]>([]);
   const [filterIsDiscipulador, setFilterIsDiscipulador] = useState(false);
   const [populationMode, setPopulationMode] = useState<PopulationMode>('todos');
-  const [numGroups, setNumGroups] = useState(2);
+
+  // Manual group builder: each group accumulates members added from whatever filters/search
+  // are active at the time, so different criteria (e.g. singles, then their disciplers) can be
+  // combined into the same group across multiple add actions.
+  type GroupBucket = { id: string; name: string; membersById: Record<string, any> };
+  const [groups, setGroups] = useState<GroupBucket[]>([
+    { id: 'g1', name: 'Grupo 1', membersById: {} },
+    { id: 'g2', name: 'Grupo 2', membersById: {} },
+  ]);
+  const [groupSearchTerm, setGroupSearchTerm] = useState<Record<string, string>>({});
   
   const [sortField, setSortField] = useState<string>('nome');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -767,59 +776,65 @@ export const Reports: React.FC = () => {
     XLSX.writeFile(workbook, `setores_distintos_${new Date().getTime()}.xlsx`);
   };
 
-  const applySinglesPreset = () => {
-    const singleStatuses = uniqueMaritalStatuses.filter(s => normalizeStr(s).includes('SOLTEIR'));
-    setFilterMaritalStatus(singleStatuses.length > 0 ? singleStatuses : ['Solteiro(a)']);
-    setFilterMinAge(18);
-    setFilterMaxAge(120);
-    setFilterAgeCategory('Todas');
+  const addFilteredToGroup = (groupId: string) => {
+    setGroups(prev => prev.map(g => {
+      if (g.id !== groupId) return g;
+      const membersById = { ...g.membersById };
+      filteredMembers.forEach(m => { membersById[String(m.id)] = m; });
+      return { ...g, membersById };
+    }));
   };
 
-  // Groups filtered members by discipulador, so whole discipler+disciples clusters can be
-  // kept together when splitting into meeting groups.
-  const discipuladorClusters = useMemo(() => {
-    const map = new Map<string, any[]>();
-    filteredMembers.forEach(m => {
-      const key = m.discipulador || 'Sem Discipulador';
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(m);
-    });
-    return Array.from(map.entries())
-      .map(([discipulador, list]) => ({ discipulador, members: list, count: list.length }))
-      .sort((a, b) => b.count - a.count);
-  }, [filteredMembers]);
+  const addMemberToGroup = (groupId: string, member: any) => {
+    setGroups(prev => prev.map(g => g.id === groupId
+      ? { ...g, membersById: { ...g.membersById, [String(member.id)]: member } }
+      : g));
+  };
 
-  // Largest-first greedy bin packing: assigns each discipulador cluster to the currently
-  // smallest group, so groups stay balanced without splitting a discipler from their disciples.
-  const suggestedGroups = useMemo(() => {
-    const groups = Array.from({ length: Math.max(1, numGroups) }, (_, i) => ({
-      label: `Grupo ${i + 1}`,
-      members: [] as any[],
-      clusters: [] as string[],
+  const removeMemberFromGroup = (groupId: string, memberId: string) => {
+    setGroups(prev => prev.map(g => {
+      if (g.id !== groupId) return g;
+      const membersById = { ...g.membersById };
+      delete membersById[memberId];
+      return { ...g, membersById };
     }));
-    discipuladorClusters.forEach(cluster => {
-      const target = groups.reduce((min, g) => g.members.length < min.members.length ? g : min, groups[0]);
-      target.members.push(...cluster.members);
-      target.clusters.push(cluster.discipulador);
-    });
-    return groups;
-  }, [discipuladorClusters, numGroups]);
+  };
+
+  const clearGroup = (groupId: string) => {
+    setGroups(prev => prev.map(g => g.id === groupId ? { ...g, membersById: {} } : g));
+  };
+
+  const addGroup = () => {
+    setGroups(prev => [...prev, { id: `g${Date.now()}`, name: `Grupo ${prev.length + 1}`, membersById: {} }]);
+  };
+
+  const removeGroup = (groupId: string) => {
+    setGroups(prev => prev.filter(g => g.id !== groupId));
+    setGroupSearchTerm(prev => { const next = { ...prev }; delete next[groupId]; return next; });
+  };
+
+  const renameGroup = (groupId: string, name: string) => {
+    setGroups(prev => prev.map(g => g.id === groupId ? { ...g, name } : g));
+  };
 
   const handleExportGroups = () => {
-    if (filteredMembers.length === 0) return;
+    const nonEmptyGroups = groups.filter(g => Object.keys(g.membersById).length > 0);
+    if (nonEmptyGroups.length === 0) return;
     const workbook = XLSX.utils.book_new();
-    suggestedGroups.forEach(g => {
-      const rows = g.members.map(m => ({
-        'Nome': m.nome || '-',
-        'Idade': calculateAge(m.nascimento || m.data_nascimento || m.birth_date),
-        'Sexo': m.sexo || '-',
-        'Estado Civil': m.estado_civil || '-',
-        'Discipulador': m.discipulador || '-',
-        'Telefone': m.celular_principal_sms || m.celular || '-',
-        'GC': m.grupos_caseiros || '-',
-      }));
+    nonEmptyGroups.forEach(g => {
+      const rows = Object.values(g.membersById)
+        .sort((a: any, b: any) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR'))
+        .map((m: any) => ({
+          'Nome': m.nome || '-',
+          'Idade': calculateAge(m.nascimento || m.data_nascimento || m.birth_date),
+          'Sexo': m.sexo || '-',
+          'Estado Civil': m.estado_civil || '-',
+          'Discipulador': m.discipulador || '-',
+          'Telefone': m.celular_principal_sms || m.celular || '-',
+          'GC': m.grupos_caseiros || '-',
+        }));
       const worksheet = XLSX.utils.json_to_sheet(rows);
-      XLSX.utils.book_append_sheet(workbook, worksheet, g.label.slice(0, 31));
+      XLSX.utils.book_append_sheet(workbook, worksheet, (g.name || 'Grupo').slice(0, 31));
     });
     XLSX.writeFile(workbook, `divisao_grupos_${new Date().getTime()}.xlsx`);
   };
@@ -857,23 +872,13 @@ export const Reports: React.FC = () => {
           </p>
         </div>
         {activeTab === 'members' && (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={applySinglesPreset}
-              disabled={isLoading}
-              className="flex items-center gap-2 bg-white border border-primary-200 hover:bg-primary-50 text-primary-700 px-4 py-2 rounded-lg font-medium shadow-sm transition-colors disabled:opacity-50 text-sm"
-              title="Filtra solteiros(as) com 18 anos ou mais"
-            >
-              <Heart className="h-4 w-4" /> Solteiros 18+
-            </button>
-            <button
-              onClick={handleExportExcel}
-              disabled={isLoading || filteredMembers.length === 0}
-              className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors disabled:opacity-50"
-            >
-              <Download className="h-4 w-4" /> Exportar Planilha ({filteredMembers.length})
-            </button>
-          </div>
+          <button
+            onClick={handleExportExcel}
+            disabled={isLoading || filteredMembers.length === 0}
+            className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors disabled:opacity-50"
+          >
+            <Download className="h-4 w-4" /> Exportar Planilha ({filteredMembers.length})
+          </button>
         )}
       </header>
 
@@ -1119,58 +1124,119 @@ export const Reports: React.FC = () => {
         </section>
       )}
 
-      {/* Group Splitting Helper */}
-      {filteredMembers.length > 0 && (
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-4 animate-in fade-in zoom-in-95 duration-500">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-4">
-            <div>
-              <h3 className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                <Users className="h-4 w-4 text-primary-500" /> Sugestão de Divisão em Grupos
-              </h3>
-              <p className="text-[11px] text-gray-400 mt-0.5 max-w-xl">
-                Distribui os {filteredMembers.length} registros filtrados em grupos balanceados, mantendo cada discipulador junto com seus discípulos no mesmo grupo.
-              </p>
-            </div>
-            <div className="flex items-center gap-3 shrink-0">
-              <label className="text-xs font-medium text-gray-500">Nº de grupos</label>
-              <input
-                type="number" min={1} max={10} value={numGroups}
-                onChange={e => setNumGroups(Math.max(1, parseInt(e.target.value) || 1))}
-                className="w-16 py-1.5 px-2 text-sm border border-gray-200 rounded-lg text-center focus:ring-2 focus:ring-primary-500 outline-none"
-              />
-              <button
-                onClick={handleExportGroups}
-                className="flex items-center gap-1.5 bg-primary-600 hover:bg-primary-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm transition-colors"
-              >
-                <Download className="h-3.5 w-3.5" /> Exportar Divisão
-              </button>
-            </div>
+      {/* Manual Group Builder */}
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-4">
+          <div>
+            <h3 className="text-sm font-bold text-gray-700 flex items-center gap-2">
+              <Users className="h-4 w-4 text-primary-500" /> Montar Grupos
+            </h3>
+            <p className="text-[11px] text-gray-400 mt-0.5 max-w-xl">
+              Ajuste os filtros acima e clique em "Add filtrados" no grupo desejado. Repita quantas vezes precisar, inclusive com outros filtros, para complementar o mesmo grupo (ex.: solteiros 18+ e depois os discipuladores deles, mesmo que casados). Também dá para adicionar uma pessoa específica pelo nome.
+            </p>
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {suggestedGroups.map(g => (
-              <div key={g.label} className="p-4 rounded-2xl border border-gray-100 bg-gray-50/50">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-bold text-gray-800">{g.label}</span>
-                  <span className="text-xs font-black text-primary-700 bg-primary-50 px-2 py-0.5 rounded-full">{g.members.length} pessoas</span>
-                </div>
-                <p className="text-[10px] text-gray-400 mb-2">{g.clusters.length} discipulador(es)</p>
-                <div className="max-h-32 overflow-y-auto space-y-1 pr-1">
-                  {g.clusters.map(c => {
-                    const count = g.members.filter(m => (m.discipulador || 'Sem Discipulador') === c).length;
-                    return (
-                      <div key={c} className="flex justify-between gap-2 text-[11px] text-gray-600">
-                        <span className="truncate">{c}</span>
-                        <span className="font-semibold shrink-0">{count}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={addGroup}
+              className="flex items-center gap-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
+            >
+              <Plus className="h-3.5 w-3.5" /> Novo Grupo
+            </button>
+            <button
+              onClick={handleExportGroups}
+              className="flex items-center gap-1.5 bg-primary-600 hover:bg-primary-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm transition-colors"
+            >
+              <Download className="h-3.5 w-3.5" /> Exportar Grupos
+            </button>
           </div>
         </div>
-      )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {groups.map(g => {
+            const memberList = Object.values(g.membersById).sort((a: any, b: any) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR'));
+            const term = groupSearchTerm[g.id] || '';
+            const searchResults = term.trim().length >= 2
+              ? members.filter(m => normalizeStr(m.nome).includes(normalizeStr(term)) && !g.membersById[String(m.id)]).slice(0, 6)
+              : [];
+
+            return (
+              <div key={g.id} className="p-4 rounded-2xl border border-gray-100 bg-gray-50/50 flex flex-col gap-3">
+                <div className="flex items-center gap-2">
+                  <input
+                    value={g.name}
+                    onChange={e => renameGroup(g.id, e.target.value)}
+                    className="text-sm font-bold text-gray-800 bg-transparent border-b border-transparent hover:border-gray-200 focus:border-primary-400 outline-none min-w-0 flex-1"
+                  />
+                  <span className="text-xs font-black text-primary-700 bg-primary-50 px-2 py-0.5 rounded-full shrink-0">{memberList.length} pessoas</span>
+                  {groups.length > 1 && (
+                    <button onClick={() => removeGroup(g.id)} className="text-gray-300 hover:text-red-500 transition-colors shrink-0" title="Remover grupo">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => addFilteredToGroup(g.id)}
+                    disabled={filteredMembers.length === 0}
+                    className="flex-1 flex items-center justify-center gap-1.5 bg-primary-600 hover:bg-primary-700 disabled:opacity-40 text-white px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-colors"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Add filtrados ({filteredMembers.length})
+                  </button>
+                  <button
+                    onClick={() => clearGroup(g.id)}
+                    disabled={memberList.length === 0}
+                    className="text-[11px] font-bold text-gray-400 hover:text-red-500 disabled:opacity-30 transition-colors px-2 shrink-0"
+                  >
+                    Limpar
+                  </button>
+                </div>
+
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+                  <input
+                    type="text"
+                    value={term}
+                    onChange={e => setGroupSearchTerm(prev => ({ ...prev, [g.id]: e.target.value }))}
+                    placeholder="Adicionar pessoa pelo nome..."
+                    className="w-full pl-8 pr-2 py-1.5 text-xs border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
+                  />
+                  {searchResults.length > 0 && (
+                    <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                      {searchResults.map(m => (
+                        <button
+                          key={m.id}
+                          onClick={() => { addMemberToGroup(g.id, m); setGroupSearchTerm(prev => ({ ...prev, [g.id]: '' })); }}
+                          className="w-full text-left px-3 py-1.5 text-xs hover:bg-primary-50 flex items-center justify-between gap-2"
+                        >
+                          <span className="truncate">{m.nome}</span>
+                          <span className="text-[10px] text-gray-400 truncate shrink-0 ml-2">{m.discipulador}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="max-h-40 overflow-y-auto space-y-1 pr-1">
+                  {memberList.length === 0 ? (
+                    <p className="text-[11px] text-gray-400 italic py-2 text-center">Nenhuma pessoa neste grupo ainda.</p>
+                  ) : memberList.map((m: any) => (
+                    <div key={m.id} className="flex items-center justify-between gap-2 text-[11px] text-gray-600 bg-white rounded-lg px-2 py-1 border border-gray-100">
+                      <div className="min-w-0">
+                        <span className="block truncate font-medium text-gray-800">{m.nome}</span>
+                        <span className="block truncate text-[10px] text-gray-400">{m.discipulador}</span>
+                      </div>
+                      <button onClick={() => removeMemberFromGroup(g.id, String(m.id))} className="text-gray-300 hover:text-red-500 shrink-0">
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="bg-gray-50/50 px-6 py-3 border-b border-gray-100 flex items-center justify-between">
