@@ -160,7 +160,7 @@ export const Login: React.FC = () => {
               </div>
               <h3 className="text-lg font-bold text-gray-900">E-mail Enviado!</h3>
               <p className="text-sm text-gray-500">
-                Enviamos um link de redefinição de senha para <strong>{email}</strong>. Por favor, verifique sua caixa de entrada.
+                Enviamos um link de redefinição de senha para <strong>{email}</strong>. Verifique sua caixa de entrada e também a caixa de spam/lixo eletrônico — o link expira em pouco tempo.
               </p>
               <button 
                 onClick={() => { setIsReset(false); setResetSuccess(false); }}

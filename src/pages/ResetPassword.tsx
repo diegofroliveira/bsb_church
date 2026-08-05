@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Church, Lock, ArrowRight, CheckCircle, AlertCircle } from 'lucide-react';
+import { Church, Lock, ArrowRight, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+
+type SessionState = 'checking' | 'ready' | 'invalid';
 
 export const ResetPassword: React.FC = () => {
   const [password, setPassword] = useState('');
@@ -9,7 +11,32 @@ export const ResetPassword: React.FC = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [sessionState, setSessionState] = useState<SessionState>('checking');
   const navigate = useNavigate();
+
+  useEffect(() => {
+    let active = true;
+
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!active) return;
+      setSessionState(session ? 'ready' : 'invalid');
+    };
+
+    checkSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!active) return;
+      if (event === 'PASSWORD_RECOVERY' || session) {
+        setSessionState('ready');
+      }
+    });
+
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,9 +54,9 @@ export const ResetPassword: React.FC = () => {
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.updateUser({ 
-        password, 
-        data: { force_password_reset: false } 
+      const { error } = await supabase.auth.updateUser({
+        password,
+        data: { force_password_reset: false }
       });
       if (error) throw error;
       setSuccess(true);
@@ -55,7 +82,28 @@ export const ResetPassword: React.FC = () => {
           <p className="text-gray-500 mt-2 text-sm text-center">Defina sua nova senha de acesso.</p>
         </div>
 
-        {success ? (
+        {sessionState === 'checking' ? (
+          <div className="flex flex-col items-center gap-3 py-6 text-gray-500">
+            <Loader2 className="w-6 h-6 animate-spin" />
+            <p className="text-sm">Validando seu link de acesso...</p>
+          </div>
+        ) : sessionState === 'invalid' ? (
+          <div className="text-center space-y-4 animate-in zoom-in-50 duration-500">
+            <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+              <AlertCircle className="h-6 w-6 text-red-600" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900">Link inválido ou expirado</h3>
+            <p className="text-sm text-gray-500">
+              Este link de redefinição de senha não é mais válido. Volte para a tela de login e peça um novo link, ou fale com o administrador do sistema para resetar sua senha.
+            </p>
+            <button
+              onClick={() => navigate('/login')}
+              className="mt-2 w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-500 px-4 py-3 text-sm font-semibold text-white shadow-md hover:from-primary-500 hover:to-primary-400 transition-all"
+            >
+              Voltar para o Login
+            </button>
+          </div>
+        ) : success ? (
           <div className="text-center space-y-4 animate-in zoom-in-50 duration-500">
             <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100">
               <CheckCircle className="h-6 w-6 text-green-600" />
@@ -71,7 +119,7 @@ export const ResetPassword: React.FC = () => {
                 <span>{error}</span>
               </div>
             )}
-            
+
             <div>
               <label className="block text-sm font-medium leading-6 text-gray-900 mb-2">Nova Senha</label>
               <div className="relative">
