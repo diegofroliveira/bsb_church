@@ -112,6 +112,7 @@ export const Reports: React.FC = () => {
   const [filterCellRoles, setFilterCellRoles] = useState<string[]>([]);
   const [filterIsDiscipulador, setFilterIsDiscipulador] = useState(false);
   const [populationMode, setPopulationMode] = useState<PopulationMode>('todos');
+  const [numGroups, setNumGroups] = useState(2);
   
   const [sortField, setSortField] = useState<string>('nome');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -766,6 +767,63 @@ export const Reports: React.FC = () => {
     XLSX.writeFile(workbook, `setores_distintos_${new Date().getTime()}.xlsx`);
   };
 
+  const applySinglesPreset = () => {
+    const singleStatuses = uniqueMaritalStatuses.filter(s => normalizeStr(s).includes('SOLTEIR'));
+    setFilterMaritalStatus(singleStatuses.length > 0 ? singleStatuses : ['Solteiro(a)']);
+    setFilterMinAge(18);
+    setFilterMaxAge(120);
+    setFilterAgeCategory('Todas');
+  };
+
+  // Groups filtered members by discipulador, so whole discipler+disciples clusters can be
+  // kept together when splitting into meeting groups.
+  const discipuladorClusters = useMemo(() => {
+    const map = new Map<string, any[]>();
+    filteredMembers.forEach(m => {
+      const key = m.discipulador || 'Sem Discipulador';
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(m);
+    });
+    return Array.from(map.entries())
+      .map(([discipulador, list]) => ({ discipulador, members: list, count: list.length }))
+      .sort((a, b) => b.count - a.count);
+  }, [filteredMembers]);
+
+  // Largest-first greedy bin packing: assigns each discipulador cluster to the currently
+  // smallest group, so groups stay balanced without splitting a discipler from their disciples.
+  const suggestedGroups = useMemo(() => {
+    const groups = Array.from({ length: Math.max(1, numGroups) }, (_, i) => ({
+      label: `Grupo ${i + 1}`,
+      members: [] as any[],
+      clusters: [] as string[],
+    }));
+    discipuladorClusters.forEach(cluster => {
+      const target = groups.reduce((min, g) => g.members.length < min.members.length ? g : min, groups[0]);
+      target.members.push(...cluster.members);
+      target.clusters.push(cluster.discipulador);
+    });
+    return groups;
+  }, [discipuladorClusters, numGroups]);
+
+  const handleExportGroups = () => {
+    if (filteredMembers.length === 0) return;
+    const workbook = XLSX.utils.book_new();
+    suggestedGroups.forEach(g => {
+      const rows = g.members.map(m => ({
+        'Nome': m.nome || '-',
+        'Idade': calculateAge(m.nascimento || m.data_nascimento || m.birth_date),
+        'Sexo': m.sexo || '-',
+        'Estado Civil': m.estado_civil || '-',
+        'Discipulador': m.discipulador || '-',
+        'Telefone': m.celular_principal_sms || m.celular || '-',
+        'GC': m.grupos_caseiros || '-',
+      }));
+      const worksheet = XLSX.utils.json_to_sheet(rows);
+      XLSX.utils.book_append_sheet(workbook, worksheet, g.label.slice(0, 31));
+    });
+    XLSX.writeFile(workbook, `divisao_grupos_${new Date().getTime()}.xlsx`);
+  };
+
   const handleExportExcel = () => {
     if (filteredMembers.length === 0) return;
     
@@ -799,13 +857,23 @@ export const Reports: React.FC = () => {
           </p>
         </div>
         {activeTab === 'members' && (
-          <button
-            onClick={handleExportExcel}
-            disabled={isLoading || filteredMembers.length === 0}
-            className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors disabled:opacity-50"
-          >
-            <Download className="h-4 w-4" /> Exportar Planilha ({filteredMembers.length})
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={applySinglesPreset}
+              disabled={isLoading}
+              className="flex items-center gap-2 bg-white border border-primary-200 hover:bg-primary-50 text-primary-700 px-4 py-2 rounded-lg font-medium shadow-sm transition-colors disabled:opacity-50 text-sm"
+              title="Filtra solteiros(as) com 18 anos ou mais"
+            >
+              <Heart className="h-4 w-4" /> Solteiros 18+
+            </button>
+            <button
+              onClick={handleExportExcel}
+              disabled={isLoading || filteredMembers.length === 0}
+              className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm transition-colors disabled:opacity-50"
+            >
+              <Download className="h-4 w-4" /> Exportar Planilha ({filteredMembers.length})
+            </button>
+          </div>
         )}
       </header>
 
@@ -1049,6 +1117,59 @@ export const Reports: React.FC = () => {
             </div>
           </div>
         </section>
+      )}
+
+      {/* Group Splitting Helper */}
+      {filteredMembers.length > 0 && (
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-4 animate-in fade-in zoom-in-95 duration-500">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-4">
+            <div>
+              <h3 className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                <Users className="h-4 w-4 text-primary-500" /> Sugestão de Divisão em Grupos
+              </h3>
+              <p className="text-[11px] text-gray-400 mt-0.5 max-w-xl">
+                Distribui os {filteredMembers.length} registros filtrados em grupos balanceados, mantendo cada discipulador junto com seus discípulos no mesmo grupo.
+              </p>
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              <label className="text-xs font-medium text-gray-500">Nº de grupos</label>
+              <input
+                type="number" min={1} max={10} value={numGroups}
+                onChange={e => setNumGroups(Math.max(1, parseInt(e.target.value) || 1))}
+                className="w-16 py-1.5 px-2 text-sm border border-gray-200 rounded-lg text-center focus:ring-2 focus:ring-primary-500 outline-none"
+              />
+              <button
+                onClick={handleExportGroups}
+                className="flex items-center gap-1.5 bg-primary-600 hover:bg-primary-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm transition-colors"
+              >
+                <Download className="h-3.5 w-3.5" /> Exportar Divisão
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {suggestedGroups.map(g => (
+              <div key={g.label} className="p-4 rounded-2xl border border-gray-100 bg-gray-50/50">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-bold text-gray-800">{g.label}</span>
+                  <span className="text-xs font-black text-primary-700 bg-primary-50 px-2 py-0.5 rounded-full">{g.members.length} pessoas</span>
+                </div>
+                <p className="text-[10px] text-gray-400 mb-2">{g.clusters.length} discipulador(es)</p>
+                <div className="max-h-32 overflow-y-auto space-y-1 pr-1">
+                  {g.clusters.map(c => {
+                    const count = g.members.filter(m => (m.discipulador || 'Sem Discipulador') === c).length;
+                    return (
+                      <div key={c} className="flex justify-between gap-2 text-[11px] text-gray-600">
+                        <span className="truncate">{c}</span>
+                        <span className="font-semibold shrink-0">{count}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
