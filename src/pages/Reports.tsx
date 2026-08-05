@@ -836,8 +836,31 @@ export const Reports: React.FC = () => {
     setGroups(prev => prev.map(g => g.id === groupId ? { ...g, membersById: {} } : g));
   };
 
+  const generateGroupNameFromFilters = (currentGroupsLength: number) => {
+    const parts: string[] = [];
+    if (filterQuery) parts.push(`Busca: ${filterQuery}`);
+    if (filterType.length > 0) parts.push(filterType.join('/'));
+    if (filterAgeCategory !== 'Todas') parts.push(filterAgeCategory);
+    if (filterGender.length > 0) parts.push(filterGender.join('/'));
+    if (filterSetor.length > 0) parts.push(filterSetor.join('/'));
+    if (filterSetorEcl.length > 0) parts.push(`Setor GC: ${filterSetorEcl.join('/')}`);
+    if (filterGC.length > 0) parts.push(filterGC.join('/'));
+    if (filterMestre.length > 0) parts.push(`Disc: ${filterMestre.join('/')}`);
+    if (filterCellRoles.length > 0) parts.push(filterCellRoles.join('/'));
+    if (filterMinAge > 0 || filterMaxAge < 120) parts.push(`Idade ${filterMinAge}-${filterMaxAge}`);
+    if (filterIsDiscipulador) parts.push('Discipuladores');
+    
+    if (parts.length === 0) {
+      return `Grupo ${currentGroupsLength + 1}`;
+    }
+    
+    const name = parts.join(' - ');
+    return name.length > 50 ? name.substring(0, 47) + '...' : name;
+  };
+
   const addGroup = () => {
-    setGroups(prev => [...prev, { id: `g${Date.now()}`, name: `Grupo ${prev.length + 1}`, membersById: {} }]);
+    const name = generateGroupNameFromFilters(groups.length);
+    setGroups(prev => [...prev, { id: `g${Date.now()}`, name, membersById: {} }]);
   };
 
   const removeGroup = (groupId: string) => {
@@ -866,7 +889,21 @@ export const Reports: React.FC = () => {
           'GC': m.grupos_caseiros || '-',
         }));
       const worksheet = XLSX.utils.json_to_sheet(rows);
-      XLSX.utils.book_append_sheet(workbook, worksheet, (g.name || 'Grupo').slice(0, 31));
+      
+      let sheetName = (g.name || 'Grupo')
+        .replace(/[\\*?:/[\]]/g, '') // remove illegal characters
+        .trim();
+      if (!sheetName) sheetName = 'Grupo';
+      sheetName = sheetName.substring(0, 30);
+      
+      let finalName = sheetName;
+      let counter = 1;
+      while (workbook.SheetNames.includes(finalName)) {
+        finalName = `${sheetName.substring(0, 25)} (${counter})`;
+        counter++;
+      }
+      
+      XLSX.utils.book_append_sheet(workbook, worksheet, finalName);
     });
     XLSX.writeFile(workbook, `divisao_grupos_${new Date().getTime()}.xlsx`);
   };
