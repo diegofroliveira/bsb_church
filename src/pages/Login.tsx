@@ -48,7 +48,7 @@ export const Login: React.FC = () => {
     setLoading(true);
     
     try {
-      await login(email, password);
+      await login(email.trim(), password.trim());
       if (rememberAccess) {
         localStorage.setItem(savedAccessKey, JSON.stringify({
           email,
@@ -73,7 +73,7 @@ export const Login: React.FC = () => {
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
         redirectTo: window.location.origin + '/reset-password',
       });
       if (error) throw error;

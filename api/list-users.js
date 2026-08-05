@@ -17,6 +17,7 @@ export default async function handler(req, res) {
             role: profile.role || 'pastor',
             avatar: profile.avatar,
             assigned_gc: profile.assigned_gc,
+            assigned_sector: profile.assigned_sector,
             created_at: profile.created_at || profile.updated_at,
             updated_at: profile.updated_at
           }))
@@ -44,6 +45,7 @@ export default async function handler(req, res) {
           role: profile.role || user.user_metadata?.role || 'pastor',
           avatar: profile.avatar || user.user_metadata?.avatar,
           assigned_gc: profile.assigned_gc ?? user.user_metadata?.assigned_gc,
+          assigned_sector: profile.assigned_sector ?? user.user_metadata?.assigned_sector,
           created_at: user.created_at,
           updated_at: profile.updated_at || user.updated_at
         };
