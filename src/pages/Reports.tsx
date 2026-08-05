@@ -117,10 +117,7 @@ export const Reports: React.FC = () => {
   // are active at the time, so different criteria (e.g. singles, then their disciplers) can be
   // combined into the same group across multiple add actions.
   type GroupBucket = { id: string; name: string; membersById: Record<string, any> };
-  const [groups, setGroups] = useState<GroupBucket[]>([
-    { id: 'g1', name: 'Grupo 1', membersById: {} },
-    { id: 'g2', name: 'Grupo 2', membersById: {} },
-  ]);
+  const [groups, setGroups] = useState<GroupBucket[]>([]);
   const [groupSearchTerm, setGroupSearchTerm] = useState<Record<string, string>>({});
   
   const [sortField, setSortField] = useState<string>('nome');
@@ -779,9 +776,17 @@ export const Reports: React.FC = () => {
   const addFilteredToGroup = (groupId: string) => {
     setGroups(prev => prev.map(g => {
       if (g.id !== groupId) return g;
+      
+      const isDefaultName = g.name.startsWith('Grupo ') && /^\d+$/.test(g.name.replace('Grupo ', '').trim());
+      const hasNoMembersYet = Object.keys(g.membersById).length === 0;
+      let name = g.name;
+      if (isDefaultName || hasNoMembersYet) {
+        name = generateGroupNameFromFilters(prev.length);
+      }
+      
       const membersById = { ...g.membersById };
       filteredMembers.forEach(m => { membersById[String(m.id)] = m; });
-      return { ...g, membersById };
+      return { ...g, name, membersById };
     }));
   };
 
