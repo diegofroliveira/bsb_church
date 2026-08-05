@@ -41,6 +41,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       groupId: sbUser.user_metadata?.groupId,
       assigned_gc: sbUser.user_metadata?.assigned_gc,
       assigned_sector: sbUser.user_metadata?.assigned_sector,
+      forcePasswordReset: Boolean(sbUser.user_metadata?.force_password_reset),
     };
   };
 

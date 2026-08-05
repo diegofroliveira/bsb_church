@@ -10,7 +10,7 @@ export default async function handler(req, res) {
     if (String(password).length < 6) throw Object.assign(new Error('A senha precisa ter pelo menos 6 caracteres.'), { status: 400 });
     const { data, error } = await supabase.auth.admin.createUser({
       email: String(email).trim().toLowerCase(), password, email_confirm: true,
-      user_metadata: { name: String(name).trim(), role, assigned_gc: assigned_gc || null, assigned_sector: assigned_sector || null }
+      user_metadata: { name: String(name).trim(), role, assigned_gc: assigned_gc || null, assigned_sector: assigned_sector || null, force_password_reset: true }
     });
     if (error || !data?.user) throw error || new Error('Não foi possível criar o usuário.');
     const profile = await upsertProfile(supabase, data.user, { name, role, assigned_gc, assigned_sector });

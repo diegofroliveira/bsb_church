@@ -380,9 +380,17 @@ export const AdminUsers: React.FC = () => {
       });
       await parseApiResponse(response);
 
+      const createdEmail = newEmail;
+      const createdPassword = newPassword;
       fetchUsers();
       setShowNewForm(false); setNewEmail(''); setNewPassword(''); setNewName(''); setNewRole('secretaria'); setNewAssignedGC(''); setNewAssignedSector('');
-      alert('Usuário ' + newName + ' criado!');
+
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(createdPassword);
+        alert(`Usuário ${newName} criado!\n\n📧 ${createdEmail}\n🔑 ${createdPassword}\n\nA senha já foi COPIADA para a área de transferência. Nenhum e-mail é enviado automaticamente — envie essas credenciais para o usuário por fora (WhatsApp, etc). Ele será obrigado a trocar a senha no primeiro acesso.`);
+      } else {
+        alert(`Usuário ${newName} criado!\n\n📧 ${createdEmail}\n🔑 ${createdPassword}\n\nNenhum e-mail é enviado automaticamente — envie essas credenciais para o usuário por fora (WhatsApp, etc). Ele será obrigado a trocar a senha no primeiro acesso.`);
+      }
     } catch (err: any) {
       setCreateError(err.message || 'Falha ao criar usuário.');
     } finally { setCreating(false); }
