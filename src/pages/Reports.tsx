@@ -785,6 +785,38 @@ export const Reports: React.FC = () => {
     }));
   };
 
+  // Resolves the discipulador names of whoever is already in the group into their own member
+  // records (matched by name against the full roster) and adds those disciplers to the same
+  // group. Since it only looks at disciplers of members already present, narrowing the group
+  // first (e.g. by age) automatically narrows which disciplers get pulled in.
+  const getGroupDisciplerNames = (g: GroupBucket): Set<string> => {
+    const names = new Set<string>();
+    Object.values(g.membersById).forEach((m: any) => {
+      const d = (m.discipulador || '').trim();
+      if (d && d !== 'Sem Discipulador') names.add(normalizeStr(d));
+    });
+    return names;
+  };
+
+  const countNewDisciplersForGroup = (g: GroupBucket): number => {
+    const names = getGroupDisciplerNames(g);
+    if (names.size === 0) return 0;
+    return members.filter(m => names.has(normalizeStr(m.nome)) && !g.membersById[String(m.id)]).length;
+  };
+
+  const addDisciplersToGroup = (groupId: string) => {
+    setGroups(prev => prev.map(g => {
+      if (g.id !== groupId) return g;
+      const names = getGroupDisciplerNames(g);
+      if (names.size === 0) return g;
+      const membersById = { ...g.membersById };
+      members.forEach(m => {
+        if (names.has(normalizeStr(m.nome))) membersById[String(m.id)] = m;
+      });
+      return { ...g, membersById };
+    }));
+  };
+
   const addMemberToGroup = (groupId: string, member: any) => {
     setGroups(prev => prev.map(g => g.id === groupId
       ? { ...g, membersById: { ...g.membersById, [String(member.id)]: member } }
@@ -1020,6 +1052,29 @@ export const Reports: React.FC = () => {
           </div>
 
         </div>
+
+        {/* Quick group-assign bar: add the current filter result to a group without scrolling down */}
+        <div className="flex flex-wrap items-center gap-2 border-t border-gray-100 pt-4">
+          <span className="text-xs font-bold text-gray-500 flex items-center gap-1.5 shrink-0">
+            <Users className="h-3.5 w-3.5 text-primary-500" /> Adicionar {filteredMembers.length} filtrados ao grupo:
+          </span>
+          {groups.map(g => (
+            <button
+              key={g.id}
+              onClick={() => addFilteredToGroup(g.id)}
+              disabled={filteredMembers.length === 0}
+              className="flex items-center gap-1.5 bg-primary-50 hover:bg-primary-100 disabled:opacity-40 text-primary-700 px-3 py-1.5 rounded-full text-xs font-bold transition-colors"
+            >
+              <Plus className="h-3 w-3" /> {g.name} ({Object.keys(g.membersById).length})
+            </button>
+          ))}
+          <button
+            onClick={addGroup}
+            className="flex items-center gap-1.5 bg-white border border-dashed border-gray-300 hover:border-primary-300 text-gray-500 hover:text-primary-600 px-3 py-1.5 rounded-full text-xs font-bold transition-colors"
+          >
+            <Plus className="h-3 w-3" /> Novo Grupo
+          </button>
+        </div>
       </div>
 
       {/* Real-time Small Charts / Stats Grid */}
@@ -1132,7 +1187,7 @@ export const Reports: React.FC = () => {
               <Users className="h-4 w-4 text-primary-500" /> Montar Grupos
             </h3>
             <p className="text-[11px] text-gray-400 mt-0.5 max-w-xl">
-              Ajuste os filtros acima e clique em "Add filtrados" no grupo desejado. Repita quantas vezes precisar, inclusive com outros filtros, para complementar o mesmo grupo (ex.: solteiros 18+ e depois os discipuladores deles, mesmo que casados). Também dá para adicionar uma pessoa específica pelo nome.
+              Ajuste os filtros acima e adicione ao grupo desejado (atalho rápido logo abaixo do painel de filtros, ou os botões aqui embaixo). Repita quantas vezes precisar, inclusive com outros filtros, para complementar o mesmo grupo. Use "Discipuladores deste grupo" para puxar automaticamente quem disciple as pessoas já adicionadas — ex.: filtre só até 42 anos, adicione ao grupo, depois clique nesse botão: só entram os discipuladores de quem está no grupo. Também dá para adicionar uma pessoa específica pelo nome.
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -1191,6 +1246,15 @@ export const Reports: React.FC = () => {
                     Limpar
                   </button>
                 </div>
+
+                <button
+                  onClick={() => addDisciplersToGroup(g.id)}
+                  disabled={countNewDisciplersForGroup(g) === 0}
+                  className="flex items-center justify-center gap-1.5 bg-white border border-emerald-200 hover:bg-emerald-50 disabled:opacity-40 disabled:hover:bg-white text-emerald-700 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-colors"
+                  title="Busca e adiciona quem já disciple as pessoas deste grupo, mesmo que não passem pelos filtros atuais"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Discipuladores deste grupo ({countNewDisciplersForGroup(g)})
+                </button>
 
                 <div className="relative">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
