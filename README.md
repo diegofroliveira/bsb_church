@@ -2,6 +2,9 @@
 
 Sistema inteligente de BI e Gestão para Igrejas, integrado ao Sistema Prover e Supabase.
 
+> 👋 Novo no projeto? Veja o [guia de onboarding](./ONBOARDING.md) para uma
+> visão completa da arquitetura, setup local e convenções antes de começar.
+
 ## 🚀 Como começar no novo ambiente
 
 Se você acabou de clonar este repositório para uma nova pasta ou drive (ex: Google Drive), siga estes passos:

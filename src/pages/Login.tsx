@@ -48,7 +48,7 @@ export const Login: React.FC = () => {
     setLoading(true);
     
     try {
-      await login(email, password);
+      await login(email.trim(), password.trim());
       if (rememberAccess) {
         localStorage.setItem(savedAccessKey, JSON.stringify({
           email,
@@ -73,7 +73,7 @@ export const Login: React.FC = () => {
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
         redirectTo: window.location.origin + '/reset-password',
       });
       if (error) throw error;
@@ -160,7 +160,7 @@ export const Login: React.FC = () => {
               </div>
               <h3 className="text-lg font-bold text-gray-900">E-mail Enviado!</h3>
               <p className="text-sm text-gray-500">
-                Enviamos um link de redefinição de senha para <strong>{email}</strong>. Por favor, verifique sua caixa de entrada.
+                Enviamos um link de redefinição de senha para <strong>{email}</strong>. Verifique sua caixa de entrada e também a caixa de spam/lixo eletrônico — o link expira em pouco tempo.
               </p>
               <button 
                 onClick={() => { setIsReset(false); setResetSuccess(false); }}
