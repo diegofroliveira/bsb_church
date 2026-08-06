@@ -27,7 +27,7 @@ function getSupabaseUrl() {
   return process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL;
 }
 
-function getAdminClient() {
+export function getAdminClient() {
   const url = getSupabaseUrl();
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !serviceRoleKey) {
@@ -42,6 +42,13 @@ function getSessionClient(token) {
   const anonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY;
   return createClient(getSupabaseUrl(), anonKey, {
     global: { headers: { Authorization: `Bearer ${token}` } },
+    auth: { persistSession: false, autoRefreshToken: false }
+  });
+}
+
+export function getAnonClient() {
+  const anonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY;
+  return createClient(getSupabaseUrl(), anonKey, {
     auth: { persistSession: false, autoRefreshToken: false }
   });
 }
