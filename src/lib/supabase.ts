@@ -1,8 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Chaves diretas para ignorar problemas de ambiente da Vercel
-const SUPABASE_URL = 'https://vadufkgbluisdamgkbln.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZhZHVma2dibHVpc2RhbWdrYmxuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4NjE2NDksImV4cCI6MjA5MjQzNzY0OX0.40XwaADEKukkhuLqcQQnNpx-6a1ipKnz_4Fy8DJdrao';
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL?.trim();
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim();
+
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  throw new Error(
+    'VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY precisam estar configuradas.',
+  );
+}
 
 // Client principal — usado para autenticação (login/logout)
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {

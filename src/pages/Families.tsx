@@ -2,19 +2,18 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { rawGet, rawGetAll } from '../lib/supabase';
 import { useFamilyEngine, useFlattenedFamilies, invertParentesco } from '../hooks/useFamilyEngine';
-import type { Member, Cell, Family, FamilyRelation, EnrichedMember } from '../hooks/useFamilyEngine';
+import type { Member, Cell, FamilyRelation, EnrichedMember } from '../hooks/useFamilyEngine';
 import { 
-  getAdministrativeRegion, 
-  getGCRegion,
+  getAdministrativeRegion,
   getSectorByResidence
 } from '../lib/geoUtils';
 import { filterOperationalCells, filterOperationalMembers } from '../lib/operationalScope';
 import { matchesPopulationMode, type PopulationMode } from '../lib/populationScope';
 import { PopulationFlags } from '../components/PopulationFlags';
 import { 
-  Heart, Search, Users, MapPin, AlertCircle, Phone, 
-  TrendingUp, Map as MapIcon, Filter, CheckCircle2, AlertTriangle, 
-  ChevronRight, Calendar, User, Eye, Sparkles, Download, Database
+  Heart, Search, Users, AlertCircle, Phone,
+  TrendingUp, Filter, CheckCircle2, AlertTriangle,
+  Sparkles, Download, Database
 } from 'lucide-react';
 import clsx from 'clsx';
 import * as XLSX from 'xlsx';
@@ -120,7 +119,7 @@ export const Families: React.FC = () => {
         const membrosSelectCols = 'id,nome,grupos_caseiros,status,sexo,bairro,pai,mae,logradouro,celular_principal_sms,telefone_fixo,estado_civil,nascimento,latitude,longitude,cidade,estado,setor_eclesiastico,setor_residencial,tipo_de_pessoa';
         const [membrosRes, celulasRes, relsRes] = await Promise.all([
           rawGet('membros', `select=${membrosSelectCols}&status=eq.Ativo`),
-          rawGet('celulas', 'select=grupo_caseiro,lider,auxiliar,setor'),
+          rawGet('celulas', 'select=id,grupo_caseiro,lider,auxiliar,setor'),
           rawGetAll('pessoas_familiares', 'id_pessoa_a,pessoa_a,parentesco,id_pessoa_b,pessoa_b,mesmo_domicilio'),
         ]);
 
@@ -485,6 +484,8 @@ export const Families: React.FC = () => {
     [familyData.list, members]
   );
 
+  void legacyParentelas;
+
   const getMemberSector = (m: Member | undefined): string => {
     if (!m) return 'Sem Setor';
     
@@ -805,10 +806,7 @@ export const Families: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredFamilies.length > 0 ? (
               filteredFamilies.map((fam) => {
-                const headMember = fam.familyMembers.find((m: Member) => m.id.toString() === fam.headId);
                 const spouse = fam.familyMembers.find((m: Member) => m.id.toString() !== fam.headId && m.estado_civil === 'Casado');
-                const children = fam.familyMembers.filter((m: Member) => m.id.toString() !== fam.headId && m.id.toString() !== spouse?.id);
-
                 return (
                   <div 
                     key={fam.headId}
@@ -855,16 +853,16 @@ export const Families: React.FC = () => {
 
                       {/* Parallel Sectors Badges */}
                       {(() => {
-                        const residentSectors = Array.from(new Set(
-                          fam.familyMembers.map((member: Member) => getMemberSector(member)).filter(sector => sector !== 'Sem Setor')
+                        const residentSectors = Array.from(new Set<string>(
+                          fam.familyMembers.map((member: Member) => getMemberSector(member)).filter((sector: string) => sector !== 'Sem Setor')
                         ));
-                        const gcSectors = Array.from(new Set(
+                        const gcSectors = Array.from(new Set<string>(
                           fam.familyMembers.map((member: Member) => {
                             const rawSector = member.setor_eclesiastico || (member.grupos_caseiros
                               ? cells.find(c => c.grupo_caseiro === member.grupos_caseiros)?.setor
                               : '');
                             return getNormalizedSectorName(rawSector);
-                          }).filter(sector => sector !== 'Sem Setor')
+                          }).filter((sector: string) => sector !== 'Sem Setor')
                         ));
 
                         return (

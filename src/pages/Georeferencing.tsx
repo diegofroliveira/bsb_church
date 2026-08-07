@@ -92,6 +92,7 @@ interface LocationData {
     isLider?: boolean;
     isAuxiliar?: boolean;
     isDiscipulador?: boolean;
+    populationStatus?: string;
   };
 }
 
@@ -244,15 +245,6 @@ const Georeferencing: React.FC = () => {
 
       if (dError) console.warn('Discipulado não disponível:', dError.message);
 
-      // Fetch pessoas_funcoes.json
-      let funcoes: any[] = [];
-      try {
-        const res = await fetch('/data/pessoas_funcoes.json');
-        if (res.ok) funcoes = await res.json();
-      } catch (err) {
-        console.warn('Erro ao buscar pessoas_funcoes.json:', err);
-      }
-
       // Processamento de Mapas Auxiliares
       const setorPorGrupo: Record<string, string> = {};
       const coordsPorGrupo: Record<string, [number, number]> = {};
@@ -341,7 +333,6 @@ const Georeferencing: React.FC = () => {
           }
 
           const nameUpper = m.nome?.trim().toUpperCase();
-          const t = (m.tipo_de_pessoa || '').trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
           const isLider = lideresSet.has(nameUpper);
           const isAuxiliar = auxiliaresSet.has(nameUpper) && !isLider;
           const isDiscipulador = discipuladoresSet.has(nameUpper);

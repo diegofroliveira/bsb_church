@@ -1,8 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
 
-const DEFAULT_SUPABASE_URL = 'https://vadufkgbluisdamgkbln.supabase.co';
-const DEFAULT_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZhZHVma2dibHVpc2RhbWdrYmxuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4NjE2NDksImV4cCI6MjA5MjQzNzY0OX0.40XwaADEKukkhuLqcQQnNpx-6a1ipKnz_4Fy8DJdrao';
-
 export function sendJson(res, status, payload) {
   res.status(status).setHeader('Content-Type', 'application/json; charset=utf-8');
   return res.end(JSON.stringify(payload));
@@ -24,7 +21,11 @@ function getBearerToken(req) {
 }
 
 function getSupabaseUrl() {
-  return process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL;
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  if (!url) {
+    throw Object.assign(new Error('SUPABASE_URL precisa estar configurada no ambiente.'), { status: 503 });
+  }
+  return url;
 }
 
 function getAdminClient() {
@@ -39,7 +40,10 @@ function getAdminClient() {
 }
 
 function getSessionClient(token) {
-  const anonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY;
+  const anonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+  if (!anonKey) {
+    throw Object.assign(new Error('SUPABASE_ANON_KEY precisa estar configurada no ambiente.'), { status: 503 });
+  }
   return createClient(getSupabaseUrl(), anonKey, {
     global: { headers: { Authorization: `Bearer ${token}` } },
     auth: { persistSession: false, autoRefreshToken: false }
@@ -63,7 +67,7 @@ export async function requireAdmin(req) {
     .eq('id', authData.user.id)
     .maybeSingle();
 
-  const role = String(profile?.role || authData.user.user_metadata?.role || '').toLowerCase();
+  const role = String(profile?.role || '').toLowerCase();
   if (role !== 'admin' && role !== 'administrador') {
     throw Object.assign(new Error('Apenas administradores podem executar esta operação.'), { status: 403 });
   }

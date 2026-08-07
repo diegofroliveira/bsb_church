@@ -4,8 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { 
   Handshake, Users, MapPin, Search, Plus, Trash2, Heart, 
   Smile, Compass, BookOpen, AlertTriangle, Sparkles, 
-  CheckCircle2, Map, Filter, ArrowRight, Clock, PlusCircle, Check,
-  Sliders, Play, RefreshCw, XCircle, FileSpreadsheet
+  CheckCircle2, Map, Filter, ArrowRight, Clock, Check,
+  Sliders, Play, RefreshCw, XCircle
 } from 'lucide-react';
 import clsx from 'clsx';
 import { filterOperationalMembers } from '../lib/operationalScope';
@@ -74,7 +74,7 @@ export const Companionship: React.FC = () => {
   const { user: currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState<'active' | 'assistant' | 'theology'>('active');
   const [members, setMembers] = useState<Member[]>([]);
-  const [rawMembers, setRawMembers] = useState<any[]>([]);
+  const [, setRawMembers] = useState<any[]>([]);
   const [companionships, setCompanionships] = useState<CompanionshipData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);

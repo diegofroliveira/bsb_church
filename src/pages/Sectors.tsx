@@ -4,8 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { 
   Compass, Users, Home, MapPin, Search, Filter, 
-  Layers, CheckCircle2, ChevronRight, AlertCircle, 
-  Map, BarChart2, ShieldCheck, UserCheck, Flame, Baby
+  Layers, ChevronRight, AlertCircle,
+  UserCheck, Baby
 } from 'lucide-react';
 import clsx from 'clsx';
 import { filterOperationalCells, filterOperationalMembers } from '../lib/operationalScope';
@@ -251,8 +251,6 @@ export const Sectors: React.FC = () => {
     return sectorsMeta.map(meta => {
       // Find cells under this sector
       const sectorCells = cells.filter(c => getNormalizedSectorName(c.setor) === meta.name);
-      const cellNames = new Set(sectorCells.map(c => c.grupo_caseiro));
-
       // Find members under this sector based on viewMode
       const sectorMembers = activeMembers.filter(m => {
         if (viewMode === 'residencial') {

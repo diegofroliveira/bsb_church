@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { type User as SupabaseUser } from '@supabase/supabase-js';
 
-export type Role = 'admin' | 'pastor' | 'leader' | 'financeiro' | 'secretaria';
+export type Role = 'admin' | 'pastor' | 'leader' | 'financeiro' | 'secretaria' | 'member';
 
 export interface User {
   id: string;
@@ -18,7 +18,7 @@ export interface User {
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password?: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
 }
@@ -36,7 +36,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       id: sbUser.id,
       email: sbUser.email || '',
       name: sbUser.user_metadata?.name || sbUser.email?.split('@')[0] || 'Usuário',
-      role: (sbUser.user_metadata?.role as Role) || 'pastor', // Default role if not set
+      // Metadados ainda são usados apenas na camada legada de apresentação.
+      // A autorização v2 é calculada no banco; o fallback deve ser não privilegiado.
+      role: (sbUser.user_metadata?.role as Role) || 'member',
       avatar: sbUser.user_metadata?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${sbUser.id}`,
       groupId: sbUser.user_metadata?.groupId,
       assigned_gc: sbUser.user_metadata?.assigned_gc,
@@ -73,12 +75,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const login = async (email: string, password?: string) => {
+  const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
       const { error } = await supabase.auth.signInWithPassword({
         email,
-        password: password || '123456', // Default password if not provided for ease of testing
+        password,
       });
       
       if (error) throw error;

@@ -236,7 +236,7 @@ function formIdealCells(pool: Member[], targetSize = 12): IdealCell[] {
 
     const numCellsInRegion = Math.max(1, Math.round(totalPeople / targetSize));
     
-    const regionCells: IdealCell[] = Array.from({ length: numCellsInRegion }, (_, i) => ({
+    const regionCells: IdealCell[] = Array.from({ length: numCellsInRegion }, () => ({
       index: cellIndex++,
       score: 0,
       coverage: 0,
@@ -355,7 +355,7 @@ export const LabVision: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [expandedCell, setExpandedCell] = useState<number | null>(null);
   const [hoveredMin, setHoveredMin] = useState<MinistryKey | null>(null);
-  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
     supabaseReader
@@ -416,7 +416,6 @@ export const LabVision: React.FC = () => {
     bodyPool.filter(m => !presbyNames.some(key => key.split(' ').every(part => m.nome.toUpperCase().includes(part)))),
     [bodyPool]);
 
-  const pastors  = useMemo(() => nonPresb.filter(m => normalizeType(m.tipo_de_pessoa) === 'PASTOR'), [nonPresb]);
   const deacons  = useMemo(() => nonPresb.filter(m => normalizeType(m.tipo_de_pessoa) === 'DIÁCONO'), [nonPresb]);
   const leaders  = useMemo(() => nonPresb.filter(m => normalizeType(m.tipo_de_pessoa) === 'LÍDER'), [nonPresb]);
   const regular  = useMemo(() => nonPresb.filter(m => normalizeType(m.tipo_de_pessoa) === 'MEMBRO'), [nonPresb]);

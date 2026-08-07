@@ -3,8 +3,8 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { supabase, supabaseReader, rawGet } from '../lib/supabase';
 import { 
   ArrowLeft, User, Phone, MapPin, Mail, Calendar, Users, Heart, 
-  Wallet, BookOpen, Activity, Loader2, Award, FileText, Briefcase,
-  Key, ShieldCheck, Plus, Trash2, X, CheckCircle2, Shield, CalendarCheck, Map, HelpCircle, Eye, Edit3, Upload
+  Wallet, BookOpen, Loader2, Award, FileText, Briefcase,
+  Key, ShieldCheck, Plus, Trash2, X, Shield, Map, Eye, Edit3, Upload
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '../context/AuthContext';
@@ -38,6 +38,7 @@ interface MemberData {
   estado: string;
   cep?: string;
   cpf?: string;
+  identificacao?: string;
   status: string;
   tipo_cadastro: string;
   grupos_caseiros: string;
@@ -257,7 +258,7 @@ export const MemberProfile: React.FC = () => {
 
         // Finance mapping
         if (finRes.data) {
-          const myFin = finRes.data.filter(f => normalizeStr(f.pessoa_lancamento) === normName);
+          const myFin = finRes.data.filter((f: any) => normalizeStr(f.pessoa_lancamento) === normName);
           setFinance(myFin);
         } else {
           setFinance([]);

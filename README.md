@@ -29,7 +29,25 @@ Crie um arquivo `.env.local` na raiz do projeto com as suas chaves do Supabase:
 ```text
 VITE_SUPABASE_URL=https://vadufkgbluisdamgkbln.supabase.co
 VITE_SUPABASE_ANON_KEY=SUA_ANON_KEY_AQUI
+SUPABASE_URL=https://vadufkgbluisdamgkbln.supabase.co
+SUPABASE_ANON_KEY=SUA_ANON_KEY_AQUI
+SUPABASE_SERVICE_ROLE_KEY=SOMENTE_NO_BACKEND
 ```
+
+As variáveis `SUPABASE_*` sem o prefixo `VITE_` são exclusivas das funções de
+backend. Nunca exponha `SUPABASE_SERVICE_ROLE_KEY` ao navegador.
+
+Para executar a sincronização local sem gravar a senha no código, defina as
+credenciais apenas na sessão do terminal:
+
+```powershell
+$env:PROVER_EMAIL="seu-email"
+$env:PROVER_PASSWORD="sua-senha"
+.\venv\Scripts\python.exe run_sync.py
+```
+
+No GitHub Actions, cadastre `PROVER_EMAIL` e `PROVER_PASSWORD` como secrets do
+repositório. Nunca adicione essas credenciais a arquivos versionados.
 
 ---
 

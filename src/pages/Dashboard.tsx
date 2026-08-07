@@ -254,7 +254,6 @@ export const Dashboard: React.FC = () => {
         const matchSectorEcl = filterSectorEcl === 'Todos' || eclSector === filterSectorEcl;
 
         const nameUpper = m.nome?.trim().toUpperCase();
-        const t = (m.tipo_de_pessoa || '').trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
         const mIsLider = liderSet.has(nameUpper);
         const mIsAuxiliar = auxiliarSet.has(nameUpper) && !mIsLider;
         const mIsDiscipulador = discSet.has(nameUpper);
@@ -386,7 +385,7 @@ export const Dashboard: React.FC = () => {
     });
 
     const mestreCounts: any = {};
-    discNameMap.forEach((originalName, upperName) => {
+    discNameMap.forEach((originalName) => {
       mestreCounts[originalName] = 0;
     });
 

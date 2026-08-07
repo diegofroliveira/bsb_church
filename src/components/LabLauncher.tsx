@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Sparkles, Eye, UserPlus, X, FlaskConical, Database, Compass } from 'lucide-react';
+import { Sparkles, Eye, UserPlus, X, FlaskConical, Database } from 'lucide-react';
 
 interface LabLauncherProps {
   onClose: () => void;

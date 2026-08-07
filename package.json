@@ -1,12 +1,15 @@
 {
-  "name": "prover-dashboard",
+  "name": "igrejapro",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "typecheck": "tsc -b",
     "lint": "eslint .",
+    "check:sensitive": "node scripts/check-sensitive-files.mjs",
+    "check:rls": "node scripts/check-rls-coverage.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

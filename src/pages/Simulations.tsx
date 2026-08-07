@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, Circle, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import * as XLSX from 'xlsx';
@@ -14,50 +13,13 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-const cellIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
-
-const memberIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
-
-const disciplerIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
-
-const isolatedIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
-
-
 import { supabaseReader } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { 
   Users, Home, Play, RotateCcw, ArrowRight, ArrowLeft,
-  Search, ShieldAlert, CheckCircle2, Download, Filter,
+  Search, ShieldAlert, CheckCircle2, Download,
   Network, TrendingUp, AlertTriangle, Brain, MapPin,
-  ChevronDown, ChevronUp, UserCheck, Eye, EyeOff, Plus, X, PlusCircle, Zap, Lightbulb,
+  ChevronDown, ChevronUp, UserCheck, Eye, EyeOff, Plus, X, PlusCircle, Lightbulb,
   FileSpreadsheet, ClipboardCopy, Check, FileText
 } from 'lucide-react';
 import clsx from 'clsx';
@@ -129,7 +91,6 @@ export const Simulations: React.FC = () => {
   // Discipleship Audit collapsible states
   const [isDiscAuditIsolatedExpanded, setIsDiscAuditIsolatedExpanded] = useState(true);
   const [isDiscAuditOverloadedExpanded, setIsDiscAuditOverloadedExpanded] = useState(false);
-  const [isDiscAuditDisplacedExpanded, setIsDiscAuditDisplacedExpanded] = useState(false);
   
   // Selection State
   const [selectedSource, setSelectedSource] = useState<string>('');

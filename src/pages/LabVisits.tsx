@@ -81,7 +81,7 @@ export const LabVisits: React.FC = () => {
             .eq('status', 'Ativo'),
           supabaseReader
             .from('celulas')
-            .select('grupo_caseiro, lider, auxiliar, setor')
+            .select('id, grupo_caseiro, lider, auxiliar, setor')
         ]);
 
         if (membrosRes.error) throw membrosRes.error;

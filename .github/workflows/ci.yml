@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - 'feature/**'
+      - 'fix/**'
+      - 'chore/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Qualidade e segurança
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configurar pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          run_install: false
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Verificar arquivos sensíveis
+        run: pnpm run check:sensitive
+
+      - name: Verificar cobertura RLS das migrations
+        run: pnpm run check:rls
+
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile
+
+      - name: Análise estática
+        run: pnpm run lint
+
+      - name: Verificar tipos
+        run: pnpm run typecheck
+
+      - name: Verificar integridade do diff
+        run: git diff --check origin/main...HEAD
+
+      - name: Auditar dependências críticas
+        run: pnpm audit --audit-level critical --ignore-registry-errors
+
+      - name: Executar testes automatizados, quando configurados
+        shell: bash
+        run: |
+          if node -e "const p=require('./package.json'); process.exit(p.scripts?.test ? 0 : 1)"; then
+            pnpm run test
+          else
+            echo "Nenhum script 'test' está configurado; etapa ignorada de forma explícita."
+          fi
+
+      - name: Gerar build de produção
+        run: pnpm run build
+
+  database:
+    name: Banco e políticas RLS
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v4
+
+      - name: Configurar Supabase CLI
+        uses: supabase/setup-cli@v3
+        with:
+          version: 2.101.0
+
+      - name: Iniciar Supabase local
+        run: supabase start
+
+      - name: Recriar banco sintético
+        run: supabase db reset --local
+
+      - name: Analisar schema local
+        run: supabase db lint --local --level warning
+
+      - name: Executar testes do banco
+        run: supabase test db
+
+      - name: Encerrar Supabase local
+        if: always()
+        run: supabase stop --no-backup
