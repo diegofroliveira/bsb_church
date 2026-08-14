@@ -3,6 +3,7 @@ import { supabase, supabaseReader } from '../lib/supabase';
 import { filterOperationalMembers } from '../lib/operationalScope';
 import { matchesPopulationMode, type PopulationMode } from '../lib/populationScope';
 import { PopulationFlags } from '../components/PopulationFlags';
+import { ImageCropperModal } from '../components/ImageCropperModal';
 import { 
   Calendar, 
   Copy, 
@@ -105,6 +106,7 @@ export const Birthdays: React.FC = () => {
   }>>({});
   const [storageError, setStorageError] = useState<string | null>(null);
   const [excludedMemberIds, setExcludedMemberIds] = useState<Set<any>>(new Set());
+  const [cropState, setCropState] = useState<{ memberId: string | null; imageSrc: string | null }>({ memberId: null, imageSrc: null });
 
   const toggleExcludeMember = (memberId: any) => {
     setExcludedMemberIds(prev => {
@@ -639,6 +641,21 @@ export const Birthdays: React.FC = () => {
   const handleUploadPhoto = async (memberId: any, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setCropState({ memberId, imageSrc: reader.result });
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handleCropComplete = async (file: File) => {
+    const memberId = cropState.memberId;
+    if (!memberId) return;
+    setCropState({ memberId: null, imageSrc: null });
     handleUploadFile(memberId, file);
   };
 
@@ -832,7 +849,7 @@ export const Birthdays: React.FC = () => {
                           </label>
                           <input
                             type="range"
-                            min="1"
+                            min="0.1"
                             max="3"
                             step="0.1"
                             value={customNames[m.id]?.zoom ?? 1.0}
@@ -1237,6 +1254,14 @@ export const Birthdays: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {cropState.imageSrc && cropState.memberId && (
+        <ImageCropperModal
+          imageSrc={cropState.imageSrc}
+          onCropComplete={handleCropComplete}
+          onCancel={() => setCropState({ memberId: null, imageSrc: null })}
+        />
       )}
     </div>
   );

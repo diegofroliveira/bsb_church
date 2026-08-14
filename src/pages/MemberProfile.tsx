@@ -11,6 +11,7 @@ import { useAuth } from '../context/AuthContext';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import { ImageCropperModal } from '../components/ImageCropperModal';
 
 // Fix leaflet default icon path issues in React
 const DefaultIcon = L.icon({
@@ -147,6 +148,7 @@ export const MemberProfile: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isPhotoUploading, setIsPhotoUploading] = useState(false);
   const [isAvatarOpen, setIsAvatarOpen] = useState(false);
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
 
   // Expanded tabs list
   const [activeTab, setActiveTab] = useState<
@@ -454,6 +456,20 @@ export const MemberProfile: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file || !member) return;
 
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setCropImageSrc(reader.result);
+      }
+    };
+    reader.readAsDataURL(file);
+    // Reset file input so same file can be selected again
+    e.target.value = '';
+  };
+
+  const handleCropComplete = async (file: File) => {
+    if (!member) return;
+    setCropImageSrc(null);
     setIsPhotoUploading(true);
     try {
       const filePath = `avatars/${member.id}.jpg`;
@@ -2171,6 +2187,14 @@ export const MemberProfile: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {cropImageSrc && (
+        <ImageCropperModal
+          imageSrc={cropImageSrc}
+          onCropComplete={handleCropComplete}
+          onCancel={() => setCropImageSrc(null)}
+        />
       )}
     </div>
   );

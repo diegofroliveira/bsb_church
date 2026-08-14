@@ -19,13 +19,12 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-const cellIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
+const cellIcon = new L.DivIcon({
+  html: `<div style="background-color: #ef4444; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg></div>`,
+  className: '',
+  iconSize: [28, 28],
+  iconAnchor: [14, 14],
+  popupAnchor: [0, -14]
 });
 
 const memberIcon = new L.Icon({
@@ -642,6 +641,38 @@ const Georeferencing: React.FC = () => {
     );
   };
 
+  const activeNetworkIds = useMemo(() => {
+    if (!selectedLocation) return null;
+    const network = new Set<string>();
+    network.add(selectedLocation.id);
+
+    if (selectedLocation.tipo === 'grupo') {
+      filteredLocations.forEach(loc => {
+        if (loc.tipo === 'membro' && loc.metadata.grupo === selectedLocation.nome) {
+          network.add(loc.id);
+        }
+      });
+    } else {
+      filteredLocations.forEach(loc => {
+        if (loc.tipo === 'grupo' && loc.nome === selectedLocation.metadata.grupo) {
+          network.add(loc.id);
+        }
+        if (loc.tipo === 'membro') {
+          if (loc.nome === selectedLocation.metadata.discipuladorNome) {
+            network.add(loc.id);
+          }
+          if (loc.metadata.discipuladorNome === selectedLocation.nome) {
+            network.add(loc.id);
+          }
+          if (loc.metadata.grupo === selectedLocation.metadata.grupo) {
+            network.add(loc.id);
+          }
+        }
+      });
+    }
+    return network;
+  }, [selectedLocation, filteredLocations]);
+
   return (
     <div className="space-y-6 animate-in fade-in duration-700 max-w-7xl mx-auto pb-12 px-4 sm:px-6 lg:px-8 pt-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -982,6 +1013,8 @@ const Georeferencing: React.FC = () => {
 
           {locationsWithDensity.filter(loc => showGcPins || loc.tipo !== 'grupo').map((loc) => {
             const position: [number, number] = [loc.latitudeJittered!, loc.longitudeJittered!];
+            const isInActiveNetwork = activeNetworkIds ? activeNetworkIds.has(loc.id) : true;
+            const opacityMultiplier = isInActiveNetwork ? 1 : 0.15;
             
             if (mapMode === 'density') {
               let color = '#3b82f6';
@@ -1000,9 +1033,9 @@ const Georeferencing: React.FC = () => {
                   pathOptions={{
                     color: color,
                     fillColor: color,
-                    fillOpacity: 0.45,
+                    fillOpacity: 0.45 * opacityMultiplier,
                     weight: 1.5,
-                    opacity: 0.8
+                    opacity: 0.8 * opacityMultiplier
                   }}
                   eventHandlers={{
                     click: () => setSelectedLocation(loc),
@@ -1019,6 +1052,7 @@ const Georeferencing: React.FC = () => {
               <Marker 
                 key={loc.id} 
                 position={position}
+                opacity={isInActiveNetwork ? 1 : 0.25}
                 icon={
                   loc.tipo === 'grupo'
                     ? cellIcon
@@ -1045,30 +1079,30 @@ const Georeferencing: React.FC = () => {
 
           {/* Linhas de Conexão (Raiozinhos) */}
           {filteredLocations.filter(l => l.tipo === 'membro' && l.latitude !== null && l.longitude !== null).map(m => {
-            const isSelected = selectedLocation?.id === m.id;
+            const isInActiveNetwork = activeNetworkIds ? activeNetworkIds.has(m.id) : false;
             const isFilterActive = filters.discipulador !== 'Todos' && m.metadata.discipuladorNome === filters.discipulador;
             
             return (
               <React.Fragment key={`lines-${m.id}`}>
-                {/* Linha para o Grupo (Sempre que selecionado) */}
-                {showGcPins && isSelected && m.metadata.coordsGrupo && (
+                {/* Linha para o Grupo */}
+                {showGcPins && isInActiveNetwork && m.metadata.coordsGrupo && (
                   <Polyline 
                     positions={[[m.latitude!, m.longitude!], m.metadata.coordsGrupo]}
                     color="#2563eb"
                     dashArray="10, 10"
                     weight={2}
-                    opacity={0.6}
+                    opacity={selectedLocation?.id === m.id ? 0.8 : 0.3}
                   />
                 )}
                 
-                {/* Linha para o Discipulador (Selecionado OU Filtro Ativo) */}
-                {(isSelected || isFilterActive) && m.metadata.coordsDiscipulador && (
+                {/* Linha para o Discipulador */}
+                {(isInActiveNetwork || isFilterActive) && m.metadata.coordsDiscipulador && (
                   <Polyline 
                     positions={[[m.latitude!, m.longitude!], m.metadata.coordsDiscipulador]}
                     color="#059669"
                     dashArray="5, 5"
                     weight={isFilterActive ? 1.5 : 2}
-                    opacity={isFilterActive ? 0.4 : 0.6}
+                    opacity={isFilterActive ? 0.4 : (selectedLocation?.id === m.id ? 0.8 : 0.3)}
                   />
                 )}
               </React.Fragment>

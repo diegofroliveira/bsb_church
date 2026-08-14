@@ -1248,12 +1248,6 @@ export const Reports: React.FC = () => {
           </div>
         </div>
 
-        {groups.length === 0 && (
-          <p className="text-xs text-gray-400 italic text-center py-6">
-            Nenhum grupo criado ainda. Ajuste os filtros acima e clique em "Novo Grupo" — o nome já sai baseado no filtro atual.
-          </p>
-        )}
-
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {groups.map(g => {
             const memberList = Object.values(g.membersById).sort((a: any, b: any) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR'));
