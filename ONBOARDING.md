@@ -88,6 +88,25 @@ VITE_SUPABASE_ANON_KEY=<peça a chave anon para o Diego>
 > RLS no Postgres) — ainda assim, o ideal a médio prazo é centralizar tudo em
 > variáveis de ambiente e não deixar chaves hardcoded no código.
 
+#### E-mail de redefinição de senha (Resend)
+O fluxo de "Esqueceu a senha?" (`api/request-password-reset.js`) não depende
+mais do SMTP do Supabase. Se as variáveis abaixo estiverem configuradas na
+Vercel, o backend gera o link de recuperação via Admin API do Supabase e
+envia o e-mail ele mesmo através do [Resend](https://resend.com):
+```
+RESEND_API_KEY=<chave da API do Resend>
+RESEND_FROM_EMAIL=IgrejaPro <onboarding@resend.dev>   # opcional, veja nota abaixo
+```
+- Sem `RESEND_API_KEY`, o endpoint cai automaticamente no `resetPasswordForEmail`
+  nativo do Supabase (comportamento antigo, depende de SMTP configurado lá).
+- Para enviar para **qualquer** destinatário (não só o e-mail dono da conta
+  Resend), é preciso verificar um domínio próprio no Resend e usar um
+  remetente desse domínio em `RESEND_FROM_EMAIL` — sem domínio verificado,
+  o Resend só entrega pro e-mail cadastrado na conta (modo de teste).
+- Em ambos os casos, o **Redirect URL** (`/reset-password`) precisa estar
+  liberado em Supabase → Authentication → URL Configuration, senão o link
+  gerado não completa a sessão de recuperação.
+
 ### 4.3 Backend Python (opcional, só se for mexer na sincronização)
 ```bash
 python -m venv venv

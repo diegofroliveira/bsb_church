@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../lib/supabase';
 import { Lock, Mail, ArrowRight, ArrowLeft, CheckCircle } from 'lucide-react';
 
 export const Login: React.FC = () => {
@@ -73,10 +72,16 @@ export const Login: React.FC = () => {
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: window.location.origin + '/reset-password',
+      const response = await fetch('/api/request-password-reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim(),
+          redirectTo: window.location.origin + '/reset-password',
+        }),
       });
-      if (error) throw error;
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || 'Erro ao enviar link de recuperação.');
       setResetSuccess(true);
     } catch (err: any) {
       setError(err.message || 'Erro ao enviar link de recuperação.');
