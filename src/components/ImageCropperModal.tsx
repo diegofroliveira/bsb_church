@@ -49,6 +49,9 @@ export function ImageCropperModal({ imageSrc, onCropComplete, onCancel }: ImageC
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('No 2d context');
 
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, size, size);
+
       const containerRect = containerRef.current.getBoundingClientRect();
       const imageRect = imageRef.current.getBoundingClientRect();
       
@@ -116,12 +119,11 @@ export function ImageCropperModal({ imageSrc, onCropComplete, onCancel }: ImageC
                src={imageSrc} 
                alt="Crop preview" 
                draggable={false}
-               className="max-w-none origin-center"
+               className="origin-center"
                style={{
                  transform: `translate(${position.x}px, ${position.y}px) scale(${zoom})`,
-                 minWidth: '100%',
-                 minHeight: '100%',
-                 objectFit: 'cover'
+                 maxWidth: '100%',
+                 maxHeight: '100%'
                }}
              />
           </div>
@@ -134,7 +136,7 @@ export function ImageCropperModal({ imageSrc, onCropComplete, onCancel }: ImageC
               type="range"
               value={zoom}
               min={0.1}
-              max={3}
+              max={5}
               step={0.05}
               onChange={(e) => setZoom(Number(e.target.value))}
               className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-pink-600 focus:outline-none"
