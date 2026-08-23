@@ -7,6 +7,8 @@ import clsx from 'clsx';
 import { filterOperationalMembers } from '../lib/operationalScope';
 import { matchesPopulationMode, type PopulationMode } from '../lib/populationScope';
 import { PopulationFlags } from '../components/PopulationFlags';
+import { BatchPhotoUploadModal } from '../components/BatchPhotoUploadModal';
+import { Image as ImageIcon } from 'lucide-react';
 
 const getNormalizedSectorName = (dbSector: string | null | undefined): string => {
   if (!dbSector) return 'Sem Setor';
@@ -41,6 +43,7 @@ export const Members: React.FC = () => {
   const [showInactive, setShowInactive] = useState(false);
   const [populationMode, setPopulationMode] = useState<PopulationMode>('todos');
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
+  const [isBatchUploadOpen, setIsBatchUploadOpen] = useState(false);
 
   useEffect(() => {
     const fetchAllData = async () => {
@@ -171,14 +174,22 @@ export const Members: React.FC = () => {
              Gestão completa do cadastro de pessoas da igreja.
            </p>
         </div>
-        <a 
-          href="https://sis.sistemaprover.com.br/pt-BR/cadastro/0/dados" 
-          target="_blank" 
-          rel="noopener noreferrer"
-          className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm text-center flex items-center gap-2"
-        >
-            + Novo Cadastro no Prover
-        </a>
+        <div className="flex gap-2">
+           <button 
+             onClick={() => setIsBatchUploadOpen(true)}
+             className="bg-pink-600 hover:bg-pink-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm text-center flex items-center gap-2"
+           >
+             <ImageIcon className="w-4 h-4" /> Upload em Lote
+           </button>
+           <a 
+             href="https://sis.sistemaprover.com.br/pt-BR/cadastro/0/dados" 
+             target="_blank" 
+             rel="noopener noreferrer"
+             className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm text-center flex items-center gap-2"
+           >
+               + Novo Cadastro no Prover
+           </a>
+        </div>
       </header>
 
       {/* Advanced Filters Panel */}
@@ -533,6 +544,17 @@ export const Members: React.FC = () => {
              </div>
           </div>
       </div>
+
+      {isBatchUploadOpen && (
+        <BatchPhotoUploadModal 
+          members={members} 
+          onClose={() => setIsBatchUploadOpen(false)} 
+          onSuccess={() => {
+            setIsBatchUploadOpen(false);
+            window.location.reload();
+          }} 
+        />
+      )}
     </div>
   );
 };
