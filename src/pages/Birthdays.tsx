@@ -731,8 +731,21 @@ export const Birthdays: React.FC = () => {
         
         const finalMsg = `Bom dia,\n\n${greeting}\n${nameLine}\n\nParabéns!! Deus abençoe você!! 🥳 🎂 🎊 🥂 🎇\n\n_"Este é o dia com que nos presenteou o SENHOR: festejemos e regozijemo-nos nele!" (Salmos 118:24)_`;
         
+        let bDay = '00', bMonth = '00';
+        if (m.nascimento?.includes('/')) {
+           const p = m.nascimento.split('/');
+           bDay = String(p[0]).padStart(2, '0');
+           bMonth = String(p[1]).padStart(2, '0');
+        } else if (m.nascimento?.includes('-')) {
+           const p = m.nascimento.split('-');
+           bDay = String(p[2]).padStart(2, '0');
+           bMonth = String(p[1]).padStart(2, '0');
+        }
+        
+        const baseSafeName = m.nome.replace(/[^a-zA-Z0-9]/g, '_');
+        const safeName = `${bMonth}-${bDay}_${baseSafeName}`;
+
         // Add text to zip
-        const safeName = m.nome.replace(/[^a-zA-Z0-9]/g, '_');
         folder.file(`${safeName}.txt`, finalMsg);
 
         // Add Image to zip
