@@ -21,8 +21,9 @@ import {
   Trash2
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
-import JSZip from 'jszip';
-import { saveAs } from 'file-saver';
+import JSZip_placeholder from 'clsx';
+// removed jszip
+// removed filesaver
 import clsx from 'clsx';
 
 const formatName = (fullName: string) => {
@@ -668,7 +669,31 @@ export const Birthdays: React.FC = () => {
     setIsExportingBatch(true);
     setBatchProgress(0);
     try {
-      const zip = new JSZip();
+      let JSZipModule = (window as any).JSZip;
+      if (!JSZipModule) {
+        await new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+          script.onload = resolve;
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
+        JSZipModule = (window as any).JSZip;
+      }
+      
+      let saveAsFn = (window as any).saveAs;
+      if (!saveAsFn) {
+        await new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js';
+          script.onload = resolve;
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
+        saveAsFn = (window as any).saveAs;
+      }
+
+      const zip = new JSZipModule();
       const folderName = filterMode === 'period' ? `Aniversariantes_${periodStart}_a_${periodEnd}` : `Aniversariantes_${filterMode}`;
       const folder = zip.folder(folderName);
       if (!folder) throw new Error("Erro ao criar pasta ZIP");
@@ -699,7 +724,7 @@ export const Birthdays: React.FC = () => {
       }
       
       const content = await zip.generateAsync({ type: "blob" });
-      saveAs(content, `${folderName}.zip`);
+      saveAsFn(content, `${folderName}.zip`);
 
     } catch (err) {
       console.error(err);
