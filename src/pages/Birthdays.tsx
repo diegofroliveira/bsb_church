@@ -700,24 +700,47 @@ export const Birthdays: React.FC = () => {
       
       let processed = 0;
       for (const m of activeBirthdays) {
-        // Generates the personalized text
-        const baseMsg = generateMessage();
-        const firstNameMsg = customNames[m.id]?.msgName || getFirstName(m.nome);
-        const gcMsg = m.grupos_caseiros || '';
-        const ageMsg = String(calculateAge(m.nascimento));
-        let finalMsg = baseMsg.replace(/\[Nome\]/g, firstNameMsg)
-                              .replace(/\[GC\]/g, gcMsg)
-                              .replace(/\[Idade\]/g, ageMsg);
+        // Generates the personalized text for the individual
+        const age = calculateAge(m.nascimento);
+        const isExterno = (m.tipo_de_pessoa || '').trim().toUpperCase() === 'EXTERNO' || (m.tipo_cadastro || '').trim().toUpperCase() === 'EXTERNO';
+        const citySuffix = isExterno && m.cidade ? ` (${m.cidade})` : '';
+        const gcText = formatGCName(m.grupos_caseiros) + citySuffix;
+        
+        const customMsgName = customNames[m.id]?.msgName;
+        const firstName = (customMsgName !== undefined ? customMsgName : getFirstName(m.nome)).trim().toUpperCase();
+        const flower = m.sexo === 'Feminino' ? ' 🌷' : '';
+
+        let nameLine = '';
+        if (age >= 0 && age <= 15) {
+          const genderWord = m.sexo === 'Feminino' ? 'Filha' : m.sexo === 'Masculino' ? 'Filho' : 'Filho(a)';
+          let parentsText = '';
+          const father = m.pai?.trim();
+          const mother = m.mae?.trim();
+          if (father && mother) parentsText = ` - ${genderWord} de ${getFirstName(father).toUpperCase()} e ${getFirstName(mother).toUpperCase()}`;
+          else if (father) parentsText = ` - ${genderWord} de ${getFirstName(father).toUpperCase()}`;
+          else if (mother) parentsText = ` - ${genderWord} de ${getFirstName(mother).toUpperCase()}`;
+          nameLine = `*${firstName}* (${age} anos)${parentsText} - ${gcText}${flower}`;
+        } else {
+          const hasPhone = m.celular_principal_sms && m.celular_principal_sms.trim() !== '';
+          const mention = hasPhone ? ` (@${toTitleCase(firstName)})` : '';
+          nameLine = `*${firstName}*${mention} - ${gcText}${flower}`;
+        }
+
+        const isFemale = m.sexo === 'Feminino';
+        const greeting = isFemale ? `A aniversariante de hoje é:` : `O aniversariante de hoje é:`;
+        
+        const finalMsg = `Bom dia,\n\n${greeting}\n${nameLine}\n\nParabéns!! Deus abençoe você!! 🥳 🎂 🎊 🥂 🎇\n\n_"Este é o dia com que nos presenteou o SENHOR: festejemos e regozijemo-nos nele!" (Salmos 118:24)_`;
         
         // Add text to zip
-        folder.file(`${m.nome}.txt`, finalMsg);
+        const safeName = m.nome.replace(/[^a-zA-Z0-9]/g, '_');
+        folder.file(`${safeName}.txt`, finalMsg);
 
         // Add Image to zip
         const node = hiddenCollagesRefs.current[m.id];
         if (node) {
           const dataUrl = await toPng(node, { cacheBust: true, quality: 1, pixelRatio: 2, backgroundColor: '#f9fafb' });
           const base64Data = dataUrl.replace(/^data:image\/png;base64,/, "");
-          folder.file(`${m.nome}.png`, base64Data, { base64: true });
+          folder.file(`${safeName}.png`, base64Data, { base64: true });
         }
         processed++;
         setBatchProgress(Math.round((processed / activeBirthdays.length) * 100));
