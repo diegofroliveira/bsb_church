@@ -924,8 +924,8 @@ export const Birthdays: React.FC = () => {
         )}
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
-        {/* Left Column: Text Message */}
+      <div className="flex flex-col-reverse xl:grid xl:grid-cols-12 gap-8">
+        {/* Left Column: Text Message & Adjustments (Bottom on mobile) */}
         <div className="xl:col-span-4 space-y-6">
           {getBirthdays.length > 0 && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4">
@@ -1219,13 +1219,13 @@ export const Birthdays: React.FC = () => {
 
         {/* Right Column: Visual Collage */}
         <div className="xl:col-span-8">
-          <div className="bg-gray-100/50 rounded-3xl p-8 border border-gray-200">
-            <div className="max-w-3xl mx-auto">
+          <div className="bg-gray-100/50 rounded-3xl p-4 sm:p-8 border border-gray-200 overflow-x-auto">
+            <div className="max-w-3xl mx-auto min-w-[500px] sm:min-w-0">
               <div 
                 ref={collageRef}
-                className="bg-white rounded-2xl shadow-xl p-10 w-full"
+                className="bg-white rounded-2xl shadow-xl p-6 sm:p-10 w-full"
               >
-              <div className="text-center mb-10">
+              <div className="text-center mb-8 sm:mb-10">
                 <h2 className="text-4xl font-black text-gray-900 tracking-tight">
                   {birthdayRows.flat().length === 1 ? "Aniversariante" : "Aniversariantes"}
                 </h2>
