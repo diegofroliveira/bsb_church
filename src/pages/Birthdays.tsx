@@ -21,6 +21,8 @@ import {
   Trash2
 } from 'lucide-react';
 import { toPng } from 'html-to-image';
+import JSZip from 'jszip';
+import { saveAs } from 'file-saver';
 import clsx from 'clsx';
 
 const formatName = (fullName: string) => {
@@ -97,6 +99,9 @@ export const Birthdays: React.FC = () => {
   const [, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<{id: any, status: 'idle' | 'uploading' | 'success' | 'error'}>({id: null, status: 'idle'});
+  const [isExportingBatch, setIsExportingBatch] = useState(false);
+  const [batchProgress, setBatchProgress] = useState(0);
+  const hiddenCollagesRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const [customNames, setCustomNames] = useState<Record<any, { 
     msgName: string; 
     photoName: string; 
@@ -164,11 +169,17 @@ export const Birthdays: React.FC = () => {
     });
   };
   const collageRef = useRef<HTMLDivElement>(null);
-
-  const [filterMode, setFilterMode] = useState<'today' | 'tomorrow' | 'month' | 'specific'>('today');
+  
+  const [filterMode, setFilterMode] = useState<'today' | 'tomorrow' | 'month' | 'specific' | 'period'>('today');
   const [draggedOverMemberId, setDraggedOverMemberId] = useState<any>(null);
   const [avatarCacheBuster, setAvatarCacheBuster] = useState<number>(Date.now());
   const [specificDate, setSpecificDate] = useState(new Date().toISOString().split('T')[0]);
+  const [periodStart, setPeriodStart] = useState(new Date().toISOString().split('T')[0]);
+  const [periodEnd, setPeriodEnd] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    return d.toISOString().split('T')[0];
+  });
   
   const [filterGender, setFilterGender] = useState('Todos');
   const [filterGC, setFilterGC] = useState('Todos');
@@ -361,6 +372,31 @@ export const Birthdays: React.FC = () => {
         }
         
         matchDate = day === specDay && month === specMonth;
+      } else if (filterMode === 'period') {
+        const parseDate = (dStr: string) => {
+          if (!dStr) return null;
+          const cleanDate = dStr.trim();
+          if (cleanDate.includes('-')) {
+             const p = cleanDate.split('-');
+             if (p[0].length === 4) return { m: parseInt(p[1], 10), d: parseInt(p[2], 10) };
+             return { m: parseInt(p[0], 10), d: parseInt(p[1], 10) };
+          }
+          return null;
+        };
+        const start = parseDate(periodStart);
+        const end = parseDate(periodEnd);
+        if (start && end && !isNaN(start.m) && !isNaN(end.m)) {
+          const mDate = month * 100 + day;
+          const sDate = start.m * 100 + start.d;
+          const eDate = end.m * 100 + end.d;
+          if (sDate <= eDate) {
+             matchDate = mDate >= sDate && mDate <= eDate;
+          } else {
+             // Wraps around the year
+             matchDate = mDate >= sDate || mDate <= eDate;
+          }
+        }
+      }
 
         if (filterMode === 'specific' && (month === 5 || m.nome.includes('ARTHUR'))) {
           console.log('[DEBUG-SPECIFIC]', {
@@ -384,9 +420,33 @@ export const Birthdays: React.FC = () => {
           });
         }
       }
-      return matchDate;
-    }).sort((a, b) => a.nome.localeCompare(b.nome));
-  }, [members, populationMode, filterMode, specificDate, filterGender, filterGC, filterMinAge, filterMaxAge, filterMaritalStatus, excludedMemberIds]);
+    }).sort((a, b) => {
+      // For periods, sort by date (month then day) instead of just name
+      if (filterMode === 'period') {
+        let aDay = 0, aMonth = 0, bDay = 0, bMonth = 0;
+        if (a.nascimento?.includes('/')) {
+           const p = a.nascimento.split('/');
+           aDay = parseInt(p[0]); aMonth = parseInt(p[1]);
+        } else if (a.nascimento?.includes('-')) {
+           const p = a.nascimento.split('-');
+           if (p[0].length === 4) { aDay = parseInt(p[2]); aMonth = parseInt(p[1]); }
+           else { aMonth = parseInt(p[0]); aDay = parseInt(p[1]); }
+        }
+        if (b.nascimento?.includes('/')) {
+           const p = b.nascimento.split('/');
+           bDay = parseInt(p[0]); bMonth = parseInt(p[1]);
+        } else if (b.nascimento?.includes('-')) {
+           const p = b.nascimento.split('-');
+           if (p[0].length === 4) { bDay = parseInt(p[2]); bMonth = parseInt(p[1]); }
+           else { bMonth = parseInt(p[0]); bDay = parseInt(p[1]); }
+        }
+        const aDate = aMonth * 100 + aDay;
+        const bDate = bMonth * 100 + bDay;
+        if (aDate !== bDate) return aDate - bDate;
+      }
+      return a.nome.localeCompare(b.nome);
+    });
+  }, [members, populationMode, filterMode, specificDate, periodStart, periodEnd, filterGender, filterGC, filterMinAge, filterMaxAge, filterMaritalStatus, excludedMemberIds]);
 
   const birthdayRows = useMemo(() => {
     const activeBirthdays = getBirthdays.filter(m => !excludedMemberIds.has(m.id));
@@ -601,6 +661,54 @@ export const Birthdays: React.FC = () => {
     }
   };
 
+  const handleBatchDownload = async () => {
+    const activeBirthdays = getBirthdays.filter(m => !excludedMemberIds.has(m.id));
+    if (activeBirthdays.length === 0) return;
+    
+    setIsExportingBatch(true);
+    setBatchProgress(0);
+    try {
+      const zip = new JSZip();
+      const folderName = filterMode === 'period' ? `Aniversariantes_${periodStart}_a_${periodEnd}` : `Aniversariantes_${filterMode}`;
+      const folder = zip.folder(folderName);
+      if (!folder) throw new Error("Erro ao criar pasta ZIP");
+      
+      let processed = 0;
+      for (const m of activeBirthdays) {
+        // Generates the personalized text
+        const baseMsg = generateMessage();
+        const firstNameMsg = customNames[m.id]?.msgName || getFirstName(m.nome);
+        const gcMsg = m.grupos_caseiros || '';
+        const ageMsg = String(calculateAge(m.nascimento));
+        let finalMsg = baseMsg.replace(/\[Nome\]/g, firstNameMsg)
+                              .replace(/\[GC\]/g, gcMsg)
+                              .replace(/\[Idade\]/g, ageMsg);
+        
+        // Add text to zip
+        folder.file(`${m.nome}.txt`, finalMsg);
+
+        // Add Image to zip
+        const node = hiddenCollagesRefs.current[m.id];
+        if (node) {
+          const dataUrl = await toPng(node, { cacheBust: true, quality: 1, pixelRatio: 2, backgroundColor: '#f9fafb' });
+          const base64Data = dataUrl.replace(/^data:image\/png;base64,/, "");
+          folder.file(`${m.nome}.png`, base64Data, { base64: true });
+        }
+        processed++;
+        setBatchProgress(Math.round((processed / activeBirthdays.length) * 100));
+      }
+      
+      const content = await zip.generateAsync({ type: "blob" });
+      saveAs(content, `${folderName}.zip`);
+
+    } catch (err) {
+      console.error(err);
+      alert('Erro no download em lote.');
+    } finally {
+      setIsExportingBatch(false);
+    }
+  };
+
   const handleUploadFile = async (memberId: any, file: File) => {
     setUploadStatus({ id: memberId, status: 'uploading' });
     try {
@@ -688,6 +796,7 @@ export const Birthdays: React.FC = () => {
           { id: 'tomorrow', label: 'Amanhã' },
           { id: 'month', label: 'Todo o Mês' },
           { id: 'specific', label: 'Data Específica:' },
+          { id: 'period', label: 'Período Personalizado:' }
         ].map((tab) => (
           <button
             key={tab.id}
@@ -708,6 +817,23 @@ export const Birthdays: React.FC = () => {
             onChange={e => setSpecificDate(e.target.value)}
             className="text-xs border border-gray-200 rounded px-2 py-1 outline-none focus:ring-1 focus:ring-pink-500"
           />
+        )}
+        {filterMode === 'period' && (
+          <div className="flex items-center gap-2">
+            <input 
+              type="date" 
+              value={periodStart} 
+              onChange={e => setPeriodStart(e.target.value)}
+              className="text-xs border border-gray-200 rounded px-2 py-1 outline-none focus:ring-1 focus:ring-pink-500"
+            />
+            <span className="text-gray-400 text-xs font-bold">até</span>
+            <input 
+              type="date" 
+              value={periodEnd} 
+              onChange={e => setPeriodEnd(e.target.value)}
+              className="text-xs border border-gray-200 rounded px-2 py-1 outline-none focus:ring-1 focus:ring-pink-500"
+            />
+          </div>
         )}
       </div>
 
@@ -1007,7 +1133,25 @@ export const Birthdays: React.FC = () => {
                 className="w-full bg-pink-600 hover:bg-pink-700 disabled:opacity-50 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-pink-200 transition-all flex items-center justify-center gap-2"
              >
                 {isExporting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Download className="h-5 w-5" />}
-                Baixar Colagem Final
+                Baixar Colagem Final (Agrupada)
+             </button>
+
+             <button
+                onClick={handleBatchDownload}
+                disabled={isExportingBatch || getBirthdays.length === 0}
+                className="w-full mt-3 bg-pink-100 hover:bg-pink-200 disabled:opacity-50 text-pink-700 font-bold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2"
+             >
+                {isExportingBatch ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Gerando ZIP... {batchProgress}%
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-5 w-5" />
+                    Baixar Lote (Fotos Individuais + Textos ZIP)
+                  </>
+                )}
              </button>
           </div>
         </div>
@@ -1263,6 +1407,60 @@ export const Birthdays: React.FC = () => {
           onCancel={() => setCropState({ memberId: null, imageSrc: null })}
         />
       )}
+
+      {/* Hidden Single Collages for Batch Export */}
+      <div className="absolute top-[-9999px] left-[-9999px] opacity-0 pointer-events-none">
+        {getBirthdays.filter(m => !excludedMemberIds.has(m.id)).map(m => {
+          const avatarUrl = `${supabase.storage.from('avatars').getPublicUrl(`avatars/${m.id}.jpg`).data.publicUrl}?t=${avatarCacheBuster}`;
+          return (
+            <div 
+              key={m.id}
+              ref={(el) => { hiddenCollagesRefs.current[m.id] = el; }}
+              className="bg-white p-10 w-[400px] flex flex-col items-center justify-center text-center shadow-xl"
+            >
+              <div className="mb-10">
+                <h2 className="text-4xl font-black text-gray-900 tracking-tight">Aniversariante</h2>
+                <p className="text-pink-500 font-bold tracking-widest text-sm mt-2 uppercase">Parabéns!</p>
+              </div>
+              <div className="w-full flex flex-col items-center">
+                  <div className="aspect-square w-[240px] rounded-2xl bg-gray-50 flex items-center justify-center overflow-hidden relative">
+                     <img 
+                        src={avatarUrl} 
+                        alt={m.nome}
+                        className="w-full h-full object-cover animate-none"
+                        style={{ 
+                          transform: `scale(${customNames[m.id]?.zoom ?? 1.0}) translate(${(customNames[m.id]?.xOffset ?? 50) - 50}%, ${(customNames[m.id]?.yOffset ?? 50) - 50}%)`, 
+                          transformOrigin: 'center' 
+                        }}
+                     />
+                  </div>
+                  <div className="text-center mt-6 w-full">
+                      <h4 className="font-black text-gray-900 text-2xl uppercase truncate max-w-full">
+                        {customNames[m.id]?.photoName || getFirstName(m.nome)}
+                      </h4>
+                       <p className="text-sm font-bold text-gray-400 uppercase truncate mt-2">
+                         {(() => {
+                           const age = calculateAge(m.nascimento);
+                           const hasGC = m.grupos_caseiros && m.grupos_caseiros.trim() !== '' && m.grupos_caseiros.trim().toUpperCase() !== 'NENHUM';
+                           const isExterno = (m.tipo_de_pessoa || '').trim().toUpperCase() === 'EXTERNO' || (m.tipo_cadastro || '').trim().toUpperCase() === 'EXTERNO';
+                           const citySuffix = isExterno && m.cidade ? ` (${m.cidade})` : '';
+                           const gcText = hasGC 
+                             ? `${formatGCName(m.grupos_caseiros)}${citySuffix}` 
+                             : (isExterno && m.cidade ? m.cidade : '');
+                           
+                           if (age >= 0 && age <= 15) {
+                             return `${age} Anos${gcText ? ` • ${gcText}` : ''}`;
+                           } else {
+                             return gcText;
+                           }
+                         })()}
+                       </p>
+                  </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };
