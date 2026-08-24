@@ -419,7 +419,7 @@ export const Birthdays: React.FC = () => {
             filterMaritalStatus
           });
         }
-      }
+      return matchDate;
     }).sort((a, b) => {
       // For periods, sort by date (month then day) instead of just name
       if (filterMode === 'period') {
