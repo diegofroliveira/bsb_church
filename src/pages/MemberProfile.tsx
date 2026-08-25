@@ -189,6 +189,17 @@ export const MemberProfile: React.FC = () => {
   const [showAddRoleModal, setShowAddRoleModal] = useState(false);
   const [newRole, setNewRole] = useState({ funcao: '', data_inicio: new Date().toISOString().split('T')[0], situacao: 'Ativo' });
 
+  // Edit vinculo modal state
+  const [showVinculoModal, setShowVinculoModal] = useState(false);
+  const [vinculoForm, setVinculoForm] = useState({
+    grupos_caseiros: '',
+    setor_eclesiastico: '',
+    status: '',
+    data_de_vinculo: ''
+  });
+  const [isSavingVinculo, setIsSavingVinculo] = useState(false);
+  const [vinculoSaveSuccess, setVinculoSaveSuccess] = useState(false);
+
   useEffect(() => {
     if (!name) return;
 
@@ -673,6 +684,45 @@ export const MemberProfile: React.FC = () => {
   }, 0);
   const avgContribution = finance.length ? totalContributed / finance.length : 0;
 
+  const handleOpenVinculoModal = () => {
+    setVinculoForm({
+      grupos_caseiros: member.grupos_caseiros || '',
+      setor_eclesiastico: member.setor_eclesiastico || '',
+      status: member.status || '',
+      data_de_vinculo: member.data_de_vinculo ? member.data_de_vinculo.split('T')[0] : ''
+    });
+    setVinculoSaveSuccess(false);
+    setShowVinculoModal(true);
+  };
+
+  const handleSaveVinculo = async () => {
+    if (!member) return;
+    setIsSavingVinculo(true);
+    try {
+      const payload: Record<string, any> = {};
+      if (vinculoForm.grupos_caseiros !== (member.grupos_caseiros || '')) payload.grupos_caseiros = vinculoForm.grupos_caseiros || null;
+      if (vinculoForm.setor_eclesiastico !== (member.setor_eclesiastico || '')) payload.setor_eclesiastico = vinculoForm.setor_eclesiastico || null;
+      if (vinculoForm.status !== (member.status || '')) payload.status = vinculoForm.status;
+      if (vinculoForm.data_de_vinculo !== (member.data_de_vinculo?.split('T')[0] || '')) payload.data_de_vinculo = vinculoForm.data_de_vinculo || null;
+
+      if (Object.keys(payload).length === 0) {
+        setShowVinculoModal(false);
+        return;
+      }
+
+      const { error } = await supabase.from('membros').update(payload).eq('id', member.id);
+      if (error) throw error;
+
+      setMember(prev => prev ? { ...prev, ...payload } : null);
+      setVinculoSaveSuccess(true);
+      setTimeout(() => setShowVinculoModal(false), 1500);
+    } catch (err: any) {
+      alert('Erro ao salvar: ' + err.message);
+    } finally {
+      setIsSavingVinculo(false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-7xl mx-auto pb-20">
       <button 
@@ -780,6 +830,12 @@ export const MemberProfile: React.FC = () => {
               
               {/* Prover Action Buttons styling */}
               <div className="flex flex-wrap gap-2 text-xs">
+                <button
+                  onClick={handleOpenVinculoModal}
+                  className="border border-primary-500 text-primary-700 bg-primary-50 px-3 py-1.5 rounded-lg hover:bg-primary-100 font-bold tracking-wide transition-colors text-center shrink-0 flex items-center gap-1.5"
+                >
+                  <Edit3 className="w-3.5 h-3.5" /> Editar Vínculo
+                </button>
                 <a 
                   href={`https://sis.sistemaprover.com.br/pt-BR/cadastro/${member.id}/dados`}
                   target="_blank"
@@ -2152,6 +2208,100 @@ export const MemberProfile: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* Modal de Edição Rápida de Vínculo */}
+      {/* ============================================================== */}
+      {showVinculoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h2 className="text-base font-bold text-gray-900">Editar Vínculo</h2>
+                <p className="text-xs text-gray-500 mt-0.5">{member.nome}</p>
+              </div>
+              <button onClick={() => setShowVinculoModal(false)} className="p-2 hover:bg-gray-100 rounded-full text-gray-400 transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            {vinculoSaveSuccess ? (
+              <div className="flex flex-col items-center justify-center py-8 gap-3">
+                <CheckCircle2 className="w-12 h-12 text-green-500" />
+                <p className="font-bold text-green-700">Salvo com sucesso!</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">Grupo Caseiro</label>
+                  <select
+                    value={vinculoForm.grupos_caseiros}
+                    onChange={e => setVinculoForm(f => ({ ...f, grupos_caseiros: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent bg-gray-50"
+                  >
+                    <option value="">— Sem GC —</option>
+                    {['BSB AGUAS CLARAS - "A"','BSB AGUAS CLARAS - "B"','BSB AGUAS CLARAS - "C"','BSB ASA NORTE','BSB ASA SUL','BSB CEILÂNDIA','BSB GUARÁ I','BSB GUARÁ II - NB','BSB RECANTO DAS EMAS','BSB SAMAMBAIA','BSB SOBRADINHO','BSB TAGUA 1','BSB TAGUA 2','BSB VICENTE PIRES','COBERTURA - VIX'].map(gc => (
+                      <option key={gc} value={gc}>{gc}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">Setor Eclesiástico</label>
+                  <select
+                    value={vinculoForm.setor_eclesiastico}
+                    onChange={e => setVinculoForm(f => ({ ...f, setor_eclesiastico: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent bg-gray-50"
+                  >
+                    <option value="">— Não definido —</option>
+                    {['BSB ÁGUAS CLARAS','BSB_CENTRAL','BSB_NORTE','BSB_SUL','COBERTURA - VIX'].map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">Status</label>
+                    <select
+                      value={vinculoForm.status}
+                      onChange={e => setVinculoForm(f => ({ ...f, status: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent bg-gray-50"
+                    >
+                      <option value="Ativo">Ativo</option>
+                      <option value="Inativo">Inativo</option>
+                      <option value="Em Transferência">Em Transferência</option>
+                      <option value="Visitante">Visitante</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">Data de Vínculo</label>
+                    <input
+                      type="date"
+                      value={vinculoForm.data_de_vinculo}
+                      onChange={e => setVinculoForm(f => ({ ...f, data_de_vinculo: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent bg-gray-50"
+                    />
+                  </div>
+                </div>
+                <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
+                  <p className="text-xs text-amber-700 font-medium">⚠️ Esta edição salva diretamente no banco de dados. Lembre de atualizar também no <strong>Prover</strong> após o retiro.</p>
+                </div>
+                <div className="flex gap-3 justify-end pt-2">
+                  <button onClick={() => setShowVinculoModal(false)} className="px-4 py-2 rounded-xl text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors">
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleSaveVinculo}
+                    disabled={isSavingVinculo}
+                    className="inline-flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-semibold text-white bg-primary-600 hover:bg-primary-700 transition-colors shadow-md disabled:opacity-60"
+                  >
+                    {isSavingVinculo ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                    Salvar Vínculo
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Filter, Mail, Phone, MoreVertical, Loader2, Eye, SlidersHorizontal } from 'lucide-react';
+import { Search, Filter, Mail, Phone, MoreVertical, Loader2, Eye, SlidersHorizontal, CheckSquare, Square, ArrowRightLeft, X, CheckCircle2, Users as UsersIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { supabaseReader } from '../lib/supabase';
+import { supabaseReader, supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import clsx from 'clsx';
 import { filterOperationalMembers } from '../lib/operationalScope';
@@ -44,6 +44,15 @@ export const Members: React.FC = () => {
   const [populationMode, setPopulationMode] = useState<PopulationMode>('todos');
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const [isBatchUploadOpen, setIsBatchUploadOpen] = useState(false);
+
+  // Batch transfer state
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [isBatchModeActive, setIsBatchModeActive] = useState(false);
+  const [showBatchTransferModal, setShowBatchTransferModal] = useState(false);
+  const [batchTargetGC, setBatchTargetGC] = useState('');
+  const [batchTargetSetor, setBatchTargetSetor] = useState('');
+  const [isBatchSaving, setIsBatchSaving] = useState(false);
+  const [batchSaveResult, setBatchSaveResult] = useState<{success: number; errors: number} | null>(null);
 
   useEffect(() => {
     const fetchAllData = async () => {
@@ -165,6 +174,53 @@ export const Members: React.FC = () => {
   const totalCount = filteredMembers.length;
   const paginatedMembers = filteredMembers.slice((page - 1) * pageSize, page * pageSize);
 
+  const toggleSelectMember = (id: number) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === paginatedMembers.length && paginatedMembers.length > 0) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(paginatedMembers.map(m => m.id)));
+    }
+  };
+
+  const handleBatchTransfer = async () => {
+    if (!batchTargetGC && !batchTargetSetor) return;
+    setIsBatchSaving(true);
+    setBatchSaveResult(null);
+    let successCount = 0;
+    let errorCount = 0;
+
+    const ids = Array.from(selectedIds);
+    for (const id of ids) {
+      const payload: Record<string, any> = {};
+      if (batchTargetGC) payload.grupos_caseiros = batchTargetGC;
+      if (batchTargetSetor) payload.setor_eclesiastico = batchTargetSetor;
+      const { error } = await supabase.from('membros').update(payload).eq('id', id);
+      if (error) errorCount++; else successCount++;
+    }
+
+    setBatchSaveResult({ success: successCount, errors: errorCount });
+    setIsBatchSaving(false);
+
+    if (successCount > 0) {
+      setMembers(prev => prev.map(m => {
+        if (!selectedIds.has(m.id)) return m;
+        return {
+          ...m,
+          ...(batchTargetGC ? { grupos_caseiros: batchTargetGC } : {}),
+          ...(batchTargetSetor ? { setor_eclesiastico: batchTargetSetor } : {}),
+        };
+      }));
+    }
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <header className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -181,6 +237,15 @@ export const Members: React.FC = () => {
            >
              <ImageIcon className="w-4 h-4" /> Upload em Lote
            </button>
+           <button
+             onClick={() => { setIsBatchModeActive(b => !b); setSelectedIds(new Set()); }}
+             className={clsx(
+               "px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm flex items-center gap-2",
+               isBatchModeActive ? 'bg-amber-600 text-white hover:bg-amber-700' : 'bg-amber-50 border border-amber-300 text-amber-700 hover:bg-amber-100'
+             )}
+           >
+             <ArrowRightLeft className="w-4 h-4" /> {isBatchModeActive ? 'Cancelar Seleção' : 'Mover em Lote'}
+           </button>
            <a 
              href="https://sis.sistemaprover.com.br/pt-BR/cadastro/0/dados" 
              target="_blank" 
@@ -191,6 +256,30 @@ export const Members: React.FC = () => {
            </a>
         </div>
       </header>
+
+      {/* Floating batch action bar */}
+      {isBatchModeActive && selectedIds.size > 0 && (
+        <div className="sticky top-4 z-30 bg-amber-600 text-white rounded-2xl shadow-xl p-4 flex items-center justify-between gap-4 animate-in slide-in-from-top-2 duration-200">
+          <div className="flex items-center gap-3">
+            <UsersIcon className="w-5 h-5" />
+            <span className="font-bold">{selectedIds.size} membro(s) selecionado(s)</span>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              className="px-3 py-1.5 rounded-lg text-sm font-medium bg-amber-500 hover:bg-amber-400 transition-colors"
+            >
+              Limpar
+            </button>
+            <button
+              onClick={() => { setBatchTargetGC(''); setBatchTargetSetor(''); setBatchSaveResult(null); setShowBatchTransferModal(true); }}
+              className="px-4 py-1.5 rounded-lg text-sm font-bold bg-white text-amber-700 hover:bg-amber-50 transition-colors flex items-center gap-1.5"
+            >
+              <ArrowRightLeft className="w-4 h-4" /> Transferir Agora
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Advanced Filters Panel */}
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-6 mb-6">
@@ -422,6 +511,15 @@ export const Members: React.FC = () => {
              <table className="hidden sm:table min-w-full divide-y divide-gray-200">
                 <thead className="bg-white">
                    <tr>
+                      {isBatchModeActive && (
+                        <th scope="col" className="py-3.5 pl-4 pr-0 w-8">
+                          <button onClick={toggleSelectAll} className="text-gray-400 hover:text-amber-600 transition-colors">
+                            {selectedIds.size === paginatedMembers.length && paginatedMembers.length > 0
+                              ? <CheckSquare className="w-4 h-4 text-amber-600" />
+                              : <Square className="w-4 h-4" />}
+                          </button>
+                        </th>
+                      )}
                       <th scope="col" className="py-3.5 pl-6 pr-3 text-left text-sm font-semibold text-gray-900">Nome</th>
                       <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Tipo / Perfil</th>
                       <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Grupo Caseiro</th>
@@ -432,7 +530,16 @@ export const Members: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-gray-100 bg-white">
                    {paginatedMembers.map((person) => (
-                      <tr key={person.id} className="hover:bg-gray-50 transition-colors group">
+                      <tr key={person.id} className={clsx("hover:bg-gray-50 transition-colors group", selectedIds.has(person.id) && "bg-amber-50")}>
+                         {isBatchModeActive && (
+                           <td className="pl-4 pr-0 py-4">
+                             <button onClick={() => toggleSelectMember(person.id)} className="text-gray-300 hover:text-amber-600 transition-colors">
+                               {selectedIds.has(person.id)
+                                 ? <CheckSquare className="w-4 h-4 text-amber-600" />
+                                 : <Square className="w-4 h-4" />}
+                             </button>
+                           </td>
+                         )}
                          <td className="whitespace-nowrap py-4 pl-6 pr-3">
                             <div className="flex items-center gap-3">
                                <div className="h-10 w-10 flex-shrink-0 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-bold border border-primary-200 overflow-hidden text-sm uppercase">
@@ -544,6 +651,82 @@ export const Members: React.FC = () => {
              </div>
           </div>
       </div>
+
+      {showBatchTransferModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h2 className="text-base font-bold text-gray-900">Transferência em Lote</h2>
+                <p className="text-xs text-gray-500 mt-0.5">{selectedIds.size} membro(s) selecionado(s)</p>
+              </div>
+              <button onClick={() => setShowBatchTransferModal(false)} className="p-2 hover:bg-gray-100 rounded-full text-gray-400">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            {batchSaveResult ? (
+              <div className="flex flex-col items-center justify-center py-8 gap-3">
+                <CheckCircle2 className="w-12 h-12 text-green-500" />
+                <div className="text-center">
+                  <p className="font-bold text-green-700 text-lg">{batchSaveResult.success} membro(s) transferido(s)!</p>
+                  {batchSaveResult.errors > 0 && <p className="text-red-500 text-sm mt-1">{batchSaveResult.errors} erro(s)</p>}
+                </div>
+                <button
+                  onClick={() => { setShowBatchTransferModal(false); setSelectedIds(new Set()); setIsBatchModeActive(false); }}
+                  className="mt-2 px-6 py-2 rounded-xl text-sm font-bold bg-green-600 text-white hover:bg-green-700 transition-colors"
+                >
+                  Concluir
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">Novo Grupo Caseiro</label>
+                  <select
+                    value={batchTargetGC}
+                    onChange={e => setBatchTargetGC(e.target.value)}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-amber-400 bg-gray-50"
+                  >
+                    <option value="">— Manter atual / não alterar —</option>
+                    {['BSB AGUAS CLARAS - "A"','BSB AGUAS CLARAS - "B"','BSB AGUAS CLARAS - "C"','BSB ASA NORTE','BSB ASA SUL','BSB CEILÂNDIA','BSB GUARÁ I','BSB GUARÁ II - NB','BSB RECANTO DAS EMAS','BSB SAMAMBAIA','BSB SOBRADINHO','BSB TAGUA 1','BSB TAGUA 2','BSB VICENTE PIRES','COBERTURA - VIX'].map(gc => (
+                      <option key={gc} value={gc}>{gc}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">Novo Setor Eclesiástico</label>
+                  <select
+                    value={batchTargetSetor}
+                    onChange={e => setBatchTargetSetor(e.target.value)}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-amber-400 bg-gray-50"
+                  >
+                    <option value="">— Manter atual / não alterar —</option>
+                    {['BSB ÁGUAS CLARAS','BSB_CENTRAL','BSB_NORTE','BSB_SUL','COBERTURA - VIX'].map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
+                  <p className="text-xs text-amber-700 font-medium">⚠️ Esta ação altera <strong>{selectedIds.size} membros</strong> de uma vez no banco de dados. Lembre de atualizar o <strong>Prover</strong> após o retiro.</p>
+                </div>
+                <div className="flex gap-3 justify-end pt-1">
+                  <button onClick={() => setShowBatchTransferModal(false)} className="px-4 py-2 rounded-xl text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors">
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleBatchTransfer}
+                    disabled={isBatchSaving || (!batchTargetGC && !batchTargetSetor)}
+                    className="inline-flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold text-white bg-amber-600 hover:bg-amber-700 transition-colors shadow-md disabled:opacity-60"
+                  >
+                    {isBatchSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRightLeft className="w-4 h-4" />}
+                    Confirmar Transferência
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {isBatchUploadOpen && (
         <BatchPhotoUploadModal 
