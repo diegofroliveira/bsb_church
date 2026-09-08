@@ -188,6 +188,7 @@ export const Birthdays: React.FC = () => {
   const [filterMaxAge, setFilterMaxAge] = useState<number>(120);
   const [filterMaritalStatus, setFilterMaritalStatus] = useState('Todos');
   const [populationMode, setPopulationMode] = useState<PopulationMode>('todos');
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   const [editedMessage, setEditedMessage] = useState<string | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -851,76 +852,100 @@ export const Birthdays: React.FC = () => {
         </div>
       )}
 
-      <div className="flex flex-wrap gap-4 border-b border-gray-100 pb-1">
+      {/* ── Filter chips (horizontal scroll on mobile) ── */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
         {[
-          { id: 'today', label: 'Aniversariantes de Hoje' },
-          { id: 'tomorrow', label: 'Amanhã' },
-          { id: 'month', label: 'Todo o Mês' },
-          { id: 'specific', label: 'Data Específica:' },
-          { id: 'period', label: 'Período Personalizado:' }
+          { id: 'today', label: '🎂 Hoje' },
+          { id: 'tomorrow', label: '📅 Amanhã' },
+          { id: 'month', label: '📆 Este Mês' },
+          { id: 'specific', label: '🗓 Data...' },
+          { id: 'period', label: '📊 Período...' }
         ].map((tab) => (
           <button
             key={tab.id}
             onClick={() => setFilterMode(tab.id as any)}
             className={clsx(
-              "pb-3 text-sm font-medium transition-colors relative",
-              filterMode === tab.id ? "text-pink-600" : "text-gray-500 hover:text-gray-700"
+              "shrink-0 px-4 py-2 rounded-full text-sm font-bold transition-all whitespace-nowrap",
+              filterMode === tab.id
+                ? "bg-pink-600 text-white shadow-md shadow-pink-200"
+                : "bg-white border border-gray-200 text-gray-600 hover:border-pink-300 hover:text-pink-600"
             )}
           >
             {tab.label}
-            {filterMode === tab.id && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-pink-600" />}
           </button>
         ))}
         {filterMode === 'specific' && (
-          <input 
-            type="date" 
-            value={specificDate} 
+          <input
+            type="date"
+            value={specificDate}
             onChange={e => setSpecificDate(e.target.value)}
-            className="text-xs border border-gray-200 rounded px-2 py-1 outline-none focus:ring-1 focus:ring-pink-500"
+            className="shrink-0 text-sm border border-gray-200 rounded-full px-3 py-1.5 outline-none focus:ring-2 focus:ring-pink-400 bg-white"
           />
         )}
         {filterMode === 'period' && (
-          <div className="flex items-center gap-2">
-            <input 
-              type="date" 
-              value={periodStart} 
+          <div className="flex items-center gap-2 shrink-0">
+            <input
+              type="date"
+              value={periodStart}
               onChange={e => setPeriodStart(e.target.value)}
-              className="text-xs border border-gray-200 rounded px-2 py-1 outline-none focus:ring-1 focus:ring-pink-500"
+              className="text-sm border border-gray-200 rounded-full px-3 py-1.5 outline-none focus:ring-2 focus:ring-pink-400 bg-white"
             />
             <span className="text-gray-400 text-xs font-bold">até</span>
-            <input 
-              type="date" 
-              value={periodEnd} 
+            <input
+              type="date"
+              value={periodEnd}
               onChange={e => setPeriodEnd(e.target.value)}
-              className="text-xs border border-gray-200 rounded px-2 py-1 outline-none focus:ring-1 focus:ring-pink-500"
+              className="text-sm border border-gray-200 rounded-full px-3 py-1.5 outline-none focus:ring-2 focus:ring-pink-400 bg-white"
             />
           </div>
         )}
       </div>
 
-      <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex flex-wrap gap-3 items-center">
-        <PopulationFlags value={populationMode} onChange={setPopulationMode} className="mr-2" />
-        <select value={filterGender} onChange={e => setFilterGender(e.target.value)} className="text-xs border-gray-200 rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-pink-500 bg-gray-50/50">
-          <option value="Todos">Todos os Sexos</option>
-          <option value="Masculino">Masculino</option>
-          <option value="Feminino">Feminino</option>
-        </select>
-        <select value={filterGC} onChange={e => setFilterGC(e.target.value)} className="text-xs border-gray-200 rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-pink-500 bg-gray-50/50 max-w-[150px]">
-          <option value="Todos">Todos os GCs</option>
-          {uniqueGCs.map(gc => <option key={gc} value={gc}>{gc}</option>)}
-        </select>
-        <select value={filterMaritalStatus} onChange={e => setFilterMaritalStatus(e.target.value)} className="text-xs border-gray-200 rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-pink-500 bg-gray-50/50">
-          <option value="Todos">Estado Civil</option>
-          {uniqueMaritalStatuses.map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
-        <div className="flex items-center gap-2 bg-gray-50/50 border border-gray-200 rounded-lg px-2 py-1">
-           <span className="text-[10px] font-bold text-gray-400 uppercase">Idade:</span>
-           <input type="number" value={filterMinAge} onChange={e => setFilterMinAge(parseInt(e.target.value) || 0)} className="w-10 bg-transparent text-xs font-semibold outline-none" placeholder="Min" />
-           <span className="text-gray-300">/</span>
-           <input type="number" value={filterMaxAge} onChange={e => setFilterMaxAge(parseInt(e.target.value) || 120)} className="w-10 bg-transparent text-xs font-semibold outline-none" placeholder="Max" />
-        </div>
-        {(filterGender !== 'Todos' || filterGC !== 'Todos' || filterMinAge !== 0 || filterMaxAge !== 120 || filterMaritalStatus !== 'Todos') && (
-          <button onClick={() => { setFilterGender('Todos'); setFilterGC('Todos'); setFilterMinAge(0); setFilterMaxAge(120); setFilterMaritalStatus('Todos'); }} className="text-[10px] text-red-600 font-bold uppercase hover:underline">Limpar</button>
+      {/* ── Advanced Filters (collapsible on mobile) ── */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
+        <button
+          onClick={() => setShowAdvancedFilters(f => !f)}
+          className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-gray-700"
+        >
+          <span className="flex items-center gap-2">
+            🔍 Filtros Avançados
+            {(filterGender !== 'Todos' || filterGC !== 'Todos' || filterMinAge !== 0 || filterMaxAge !== 120 || filterMaritalStatus !== 'Todos') && (
+              <span className="bg-pink-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                Ativos
+              </span>
+            )}
+          </span>
+          <span className="text-gray-400 text-xs">{showAdvancedFilters ? '▲' : '▼'}</span>
+        </button>
+
+        {showAdvancedFilters && (
+          <div className="px-4 pb-4 flex flex-wrap gap-3 items-center border-t border-gray-50">
+            <PopulationFlags value={populationMode} onChange={setPopulationMode} className="mr-2" />
+            <select value={filterGender} onChange={e => setFilterGender(e.target.value)} className="text-sm border-gray-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-pink-400 bg-gray-50">
+              <option value="Todos">Todos os Sexos</option>
+              <option value="Masculino">Masculino</option>
+              <option value="Feminino">Feminino</option>
+            </select>
+            <select value={filterGC} onChange={e => setFilterGC(e.target.value)} className="text-sm border-gray-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-pink-400 bg-gray-50 max-w-[180px]">
+              <option value="Todos">Todos os GCs</option>
+              {uniqueGCs.map(gc => <option key={gc} value={gc}>{gc}</option>)}
+            </select>
+            <select value={filterMaritalStatus} onChange={e => setFilterMaritalStatus(e.target.value)} className="text-sm border-gray-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-pink-400 bg-gray-50">
+              <option value="Todos">Estado Civil</option>
+              {uniqueMaritalStatuses.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+            <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2">
+              <span className="text-xs font-bold text-gray-400 uppercase">Idade:</span>
+              <input type="number" value={filterMinAge} onChange={e => setFilterMinAge(parseInt(e.target.value) || 0)} className="w-12 bg-transparent text-sm font-semibold outline-none" placeholder="Min" />
+              <span className="text-gray-300">/</span>
+              <input type="number" value={filterMaxAge} onChange={e => setFilterMaxAge(parseInt(e.target.value) || 120)} className="w-12 bg-transparent text-sm font-semibold outline-none" placeholder="Max" />
+            </div>
+            {(filterGender !== 'Todos' || filterGC !== 'Todos' || filterMinAge !== 0 || filterMaxAge !== 120 || filterMaritalStatus !== 'Todos') && (
+              <button onClick={() => { setFilterGender('Todos'); setFilterGC('Todos'); setFilterMinAge(0); setFilterMaxAge(120); setFilterMaritalStatus('Todos'); }} className="text-xs text-red-600 font-bold uppercase hover:underline px-3 py-2 bg-red-50 rounded-xl">
+                Limpar Filtros
+              </button>
+            )}
+          </div>
         )}
       </div>
 
@@ -1028,9 +1053,9 @@ export const Birthdays: React.FC = () => {
                       </div>
 
                       {/* Photo Zoom and Crop Adjustments */}
-                      <div className="pt-1.5 space-y-1.5 border-t border-gray-100 mt-1">
+                      <div className="pt-1.5 space-y-2 border-t border-gray-100 mt-1">
                         <div>
-                          <label className="block text-[8px] font-bold text-gray-400 uppercase mb-0.5 tracking-wider flex justify-between">
+                          <label className="block text-[8px] font-bold text-gray-400 uppercase mb-1 tracking-wider flex justify-between">
                             <span>Zoom (Escala)</span>
                             <span className="text-pink-650 font-extrabold">{(customNames[m.id]?.zoom ?? 1.0).toFixed(1)}x</span>
                           </label>
@@ -1041,13 +1066,13 @@ export const Birthdays: React.FC = () => {
                             step="0.1"
                             value={customNames[m.id]?.zoom ?? 1.0}
                             onChange={(e) => handleUpdateCustomName(m.id, 'zoom', parseFloat(e.target.value))}
-                            className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-pink-600 focus:outline-none"
+                            className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-pink-600 focus:outline-none"
                           />
                         </div>
                         
                         <div className="grid grid-cols-2 gap-2">
                           <div>
-                            <label className="block text-[8px] font-bold text-gray-400 uppercase mb-0.5 tracking-wider flex justify-between">
+                            <label className="block text-[8px] font-bold text-gray-400 uppercase mb-1 tracking-wider flex justify-between">
                               <span>Horizontal (X)</span>
                               <span className="text-pink-650 font-extrabold">{customNames[m.id]?.xOffset ?? 50}%</span>
                             </label>
@@ -1057,11 +1082,11 @@ export const Birthdays: React.FC = () => {
                               max="100"
                               value={customNames[m.id]?.xOffset ?? 50}
                               onChange={(e) => handleUpdateCustomName(m.id, 'xOffset', parseInt(e.target.value))}
-                              className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-pink-600 focus:outline-none"
+                              className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-pink-600 focus:outline-none"
                             />
                           </div>
                           <div>
-                            <label className="block text-[8px] font-bold text-gray-400 uppercase mb-0.5 tracking-wider flex justify-between">
+                            <label className="block text-[8px] font-bold text-gray-400 uppercase mb-1 tracking-wider flex justify-between">
                               <span>Vertical (Y)</span>
                               <span className="text-pink-650 font-extrabold">{customNames[m.id]?.yOffset ?? 50}%</span>
                             </label>
@@ -1071,7 +1096,7 @@ export const Birthdays: React.FC = () => {
                               max="100"
                               value={customNames[m.id]?.yOffset ?? 50}
                               onChange={(e) => handleUpdateCustomName(m.id, 'yOffset', parseInt(e.target.value))}
-                              className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-pink-600 focus:outline-none"
+                              className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-pink-600 focus:outline-none"
                             />
                           </div>
                         </div>
@@ -1219,8 +1244,8 @@ export const Birthdays: React.FC = () => {
 
         {/* Right Column: Visual Collage */}
         <div className="xl:col-span-8">
-          <div className="bg-gray-100/50 rounded-3xl p-4 sm:p-8 border border-gray-200 overflow-x-auto">
-            <div className="max-w-3xl mx-auto min-w-[500px] sm:min-w-0">
+          <div className="bg-gray-100/50 rounded-3xl p-4 sm:p-8 border border-gray-200">
+            <div className="max-w-3xl mx-auto">
               <div 
                 ref={collageRef}
                 className="bg-white rounded-2xl shadow-xl p-6 sm:p-10 w-full"
@@ -1381,6 +1406,29 @@ export const Birthdays: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* ── Sticky Mobile Action Bar ── */}
+      {getBirthdays.length > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 xl:hidden bg-white border-t border-gray-100 shadow-2xl shadow-black/20 px-4 py-3 flex gap-3">
+          <button
+            onClick={handleCopyText}
+            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-sm transition-colors"
+          >
+            <Copy className="h-4 w-4" /> Copiar Mensagem
+          </button>
+          <button
+            onClick={handleDownloadCollage}
+            disabled={isExporting}
+            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl bg-pink-600 hover:bg-pink-700 disabled:opacity-50 text-white font-bold text-sm shadow-lg shadow-pink-200 transition-all"
+          >
+            {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            Baixar Colagem
+          </button>
+        </div>
+      )}
+
+      {/* Spacer so sticky footer doesn't cover content on mobile */}
+      {getBirthdays.length > 0 && <div className="xl:hidden h-20" />}
 
       {/* ── Modal: Confirmação de Edição ── */}
       {showConfirmModal && (
