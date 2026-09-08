@@ -834,8 +834,8 @@ export const Dashboard: React.FC = () => {
               <p className="mt-2 text-[10px] leading-4 text-gray-400">A carga inicial de implantação de 2019 foi desconsiderada desta evolução.</p>
             )}
           </div>
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-64 w-full min-h-[256px]">
+            <ResponsiveContainer width="100%" height="100%" minHeight={256}>
               <AreaChart data={dashboardData?.charts.growth} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs><linearGradient id="colorEntradas" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/><stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/></linearGradient><linearGradient id="colorSaidas" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/><stop offset="95%" stopColor="#ef4444" stopOpacity={0}/></linearGradient></defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
