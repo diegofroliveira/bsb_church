@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Filter, Mail, Phone, MoreVertical, Loader2, Eye, SlidersHorizontal, CheckSquare, Square, ArrowRightLeft, X, CheckCircle2, Users as UsersIcon } from 'lucide-react';
+import { Search, Filter, Mail, Phone, MoreVertical, Loader2, Eye, SlidersHorizontal, CheckSquare, Square, ArrowRightLeft, X, CheckCircle2, Users as UsersIcon, Camera } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabaseReader, supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -53,6 +53,9 @@ export const Members: React.FC = () => {
   const [batchTargetSetor, setBatchTargetSetor] = useState('');
   const [isBatchSaving, setIsBatchSaving] = useState(false);
   const [batchSaveResult, setBatchSaveResult] = useState<{success: number; errors: number} | null>(null);
+
+  // Mobile photo upload state
+  const [mobileUploadStatus, setMobileUploadStatus] = useState<{id: any; status: 'idle'|'uploading'|'success'|'error'}>({id: null, status: 'idle'});
 
   useEffect(() => {
     const fetchAllData = async () => {
@@ -180,6 +183,26 @@ export const Members: React.FC = () => {
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
+  };
+
+  const handleMobilePhotoUpload = async (memberId: any, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    setMobileUploadStatus({ id: memberId, status: 'uploading' });
+    try {
+      const filePath = `avatars/${memberId}.jpg`;
+      const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file, { upsert: true, contentType: file.type });
+      if (uploadError) throw uploadError;
+      const publicUrl = supabase.storage.from('avatars').getPublicUrl(filePath).data.publicUrl;
+      const { error: dbError } = await supabase.from('membros').update({ foto: publicUrl }).eq('id', memberId);
+      if (dbError) throw dbError;
+      setMobileUploadStatus({ id: memberId, status: 'success' });
+      setTimeout(() => setMobileUploadStatus({ id: null, status: 'idle' }), 3000);
+    } catch (err: any) {
+      setMobileUploadStatus({ id: memberId, status: 'error' });
+      alert(`Erro no upload: ${err.message}`);
+    }
   };
 
   const toggleSelectAll = () => {
@@ -498,10 +521,26 @@ export const Members: React.FC = () => {
                         </div>
                      </div>
                      
-                     <div className="flex justify-end pt-2 border-t border-gray-50/50 pl-13">
+                     <div className="flex justify-between items-center pt-2 border-t border-gray-50/50 pl-13">
                         <Link to={`/membro/${person.id}`} className="text-primary-600 hover:text-primary-800 text-xs font-extrabold flex items-center gap-1">
                            <Eye className="w-3.5 h-3.5"/> Ver Ficha
                         </Link>
+                        <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gray-50 border border-gray-200 text-gray-600 text-[11px] font-bold transition-colors active:bg-gray-100">
+                          {mobileUploadStatus.id === person.id && mobileUploadStatus.status === 'uploading' ? (
+                            <><Loader2 className="w-3 h-3 animate-spin" /> Enviando...</>
+                          ) : mobileUploadStatus.id === person.id && mobileUploadStatus.status === 'success' ? (
+                            <><CheckCircle2 className="w-3 h-3 text-green-600" /> <span className="text-green-600">Salvo!</span></>
+                          ) : (
+                            <><Camera className="w-3 h-3" /> Foto</>
+                          )}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            className="hidden"
+                            onChange={(e) => handleMobilePhotoUpload(person.id, e)}
+                          />
+                        </label>
                      </div>
                   </div>
                 ))}
