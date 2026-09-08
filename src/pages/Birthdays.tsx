@@ -1380,6 +1380,23 @@ export const Birthdays: React.FC = () => {
                                      }
                                    })()}
                                  </p>
+                                 {/* Mobile upload buttons — always visible on touch devices */}
+                                 <div className="xl:hidden mt-2 flex items-center justify-center gap-2">
+                                   <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-pink-50 border border-pink-200 text-pink-700 text-[11px] font-bold transition-colors active:bg-pink-100">
+                                     <Upload className="h-3 w-3" />
+                                     {isUploading ? 'Enviando...' : 'Foto'}
+                                     <input
+                                       type="file"
+                                       accept="image/*"
+                                       capture="environment"
+                                       className="hidden"
+                                       onChange={(e) => handleUploadPhoto(m.id, e)}
+                                     />
+                                   </label>
+                                   {uploadStatus.id === m.id && uploadStatus.status === 'success' && (
+                                     <span className="text-[11px] text-green-600 font-bold">✓ Salvo!</span>
+                                   )}
+                                 </div>
                            </div>
                         </div>
                       );
