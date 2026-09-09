@@ -82,6 +82,7 @@ export const AdminUsers: React.FC = () => {
   const [newRole, setNewRole] = useState<string>('secretaria');
   const [newAssignedGC, setNewAssignedGC] = useState('');
   const [newAssignedSector, setNewAssignedSector] = useState('');
+  const [newIsExternal, setNewIsExternal] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
 
@@ -142,6 +143,8 @@ export const AdminUsers: React.FC = () => {
     setNewPassword(pass);
   };
 
+  const [churchMembers, setChurchMembers] = useState<any[]>([]);
+
   const fetchGCs = async () => {
     try {
       const { data } = await supabase.from('celulas').select('grupo_caseiro');
@@ -153,6 +156,19 @@ export const AdminUsers: React.FC = () => {
       console.error('Error fetching GCs:', error);
     }
   };
+
+  const fetchChurchMembers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('membros')
+        .select('id, nome, email, grupos_caseiros, setor')
+        .order('nome');
+      if (data) setChurchMembers(data);
+    } catch (err) {
+      console.error('Erro ao buscar membros:', err);
+    }
+  };
+
 
   const fetchLastSyncTime = async () => {
     try {
@@ -261,6 +277,7 @@ export const AdminUsers: React.FC = () => {
     fetchUsers(); 
     fetchRolesConfig();
     fetchGCs();
+    fetchChurchMembers();
     fetchLastSyncTime();
   }, []);
 
@@ -547,11 +564,55 @@ export const AdminUsers: React.FC = () => {
                 <h3 className="font-bold text-gray-900 flex items-center gap-2"><UserCog className="w-5 h-5 text-primary-600" /> Novo Usuário</h3>
                 <button onClick={() => setShowNewForm(false)}><X className="w-5 h-5 text-gray-400" /></button>
               </div>
+
+              <div className="flex items-center gap-2 mb-4 bg-gray-50 p-3 rounded-lg border border-gray-100">
+                <input 
+                  type="checkbox" 
+                  id="newIsExternal"
+                  checked={newIsExternal}
+                  onChange={e => {
+                    setNewIsExternal(e.target.checked);
+                    setNewName('');
+                    setNewEmail('');
+                    setNewAssignedGC('');
+                    setNewAssignedSector('');
+                  }}
+                  className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 h-4.5 w-4.5 cursor-pointer"
+                />
+                <label htmlFor="newIsExternal" className="text-sm font-semibold text-gray-700 cursor-pointer select-none">
+                  Acesso Externo / Não Membro (Ex: Contabilidade, Terceiros)
+                </label>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Nome completo</label>
-                  <input value={newName} onChange={e => setNewName(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none" placeholder="Ex: Ana Silva" />
-                </div>
+                {!newIsExternal ? (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Membro Vinculado</label>
+                    <select 
+                      value={newName} 
+                      onChange={e => {
+                        const m = churchMembers.find(mem => mem.nome === e.target.value);
+                        setNewName(e.target.value);
+                        if (m) {
+                          if (m.email) setNewEmail(m.email);
+                          if (m.grupos_caseiros && m.grupos_caseiros.trim() !== '' && m.grupos_caseiros.toUpperCase() !== 'NENHUM' && m.grupos_caseiros !== 'Não participo') setNewAssignedGC(m.grupos_caseiros);
+                          if (m.setor && m.setor.trim() !== '' && m.setor !== 'Sem Setor') setNewAssignedSector(m.setor);
+                        }
+                      }} 
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white font-medium"
+                    >
+                      <option value="">Selecione o membro na base...</option>
+                      {churchMembers.map(m => (
+                        <option key={m.id} value={m.nome}>{m.nome}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Nome completo (Externo)</label>
+                    <input value={newName} onChange={e => setNewName(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none" placeholder="Ex: Contabilidade XPTO" />
+                  </div>
+                )}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">E-mail</label>
                   <input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none" placeholder="email@igreja.com" />
