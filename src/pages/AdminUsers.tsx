@@ -256,21 +256,16 @@ export const AdminUsers: React.FC = () => {
       }
 
       // Busca dados sincronizados na nuvem
-      const { data } = await supabase
-        .from('profiles')
-        .select('avatar')
-        .eq('role', 'admin');
-
-      if (data && data.length > 0) {
-        const rowWithConfig = data.find(r => r.avatar && r.avatar.startsWith('{"'));
-        if (rowWithConfig && rowWithConfig.avatar) {
-          const parsed = JSON.parse(rowWithConfig.avatar);
+      const response = await fetch('/api/get-roles');
+      if (response.ok) {
+        const parsed = await response.json();
+        if (parsed && Object.keys(parsed).length > 0) {
           setDynamicRoles(parsed);
-          localStorage.setItem('church_dynamic_roles', rowWithConfig.avatar);
+          localStorage.setItem('church_dynamic_roles', JSON.stringify(parsed));
         }
       }
     } catch (_) {
-      console.log('Usando perfis padrão.');
+      console.log('Usando perfis padrão ou locais.');
     }
   };
 

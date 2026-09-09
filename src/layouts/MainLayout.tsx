@@ -96,36 +96,43 @@ export const MainLayout: React.FC = () => {
         return;
       }
 
+      let foundLocally = false;
+      let roleModules: string[] | null = null;
+
       try {
         const stored = localStorage.getItem('church_dynamic_roles');
         if (stored) {
           const parsed = JSON.parse(stored);
           if (parsed[userRole]) {
-            setAllowedModules(parsed[userRole].modules);
+            roleModules = parsed[userRole].modules;
+            foundLocally = true;
           }
         }
+      } catch (_) {}
 
-        // Busca a configuração global do Supabase para sincronia em tempo real
-        const { data } = await supabase
-          .from('profiles')
-          .select('avatar')
-          .eq('role', 'admin');
+      if (foundLocally && roleModules) {
+        setAllowedModules(roleModules);
+      }
 
-        if (data && data.length > 0) {
-          const rowWithConfig = data.find(r => r.avatar && r.avatar.startsWith('{"'));
-          if (rowWithConfig && rowWithConfig.avatar) {
-            const parsed = JSON.parse(rowWithConfig.avatar);
+      try {
+        // Busca a configuração global do Supabase via API para ignorar RLS
+        const response = await fetch('/api/get-roles');
+        if (response.ok) {
+          const parsed = await response.json();
+          if (parsed && Object.keys(parsed).length > 0) {
+            localStorage.setItem('church_dynamic_roles', JSON.stringify(parsed));
             if (parsed[userRole]) {
               setAllowedModules(parsed[userRole].modules);
-              localStorage.setItem('church_dynamic_roles', rowWithConfig.avatar);
               return;
             }
           }
         }
       } catch (_) {}
 
-      // Fallback para os perfis padrão do sistema
-      setAllowedModules(DEFAULT_ROLES[userRole] || ['Dashboard']);
+      // Fallback para os perfis padrão apenas se não encontrou no cache nem na nuvem
+      if (!foundLocally) {
+        setAllowedModules(DEFAULT_ROLES[userRole] || ['Dashboard']);
+      }
     };
 
     if (user) {
