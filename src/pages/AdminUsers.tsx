@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, rawGetAll } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { UserCog, Plus, Save, X, Loader2, Check, Shield, Eye, EyeOff, Trash2, Lock, Cloud, CloudLightning, AlertCircle, CheckCircle2, Database, Copy } from 'lucide-react';
 import clsx from 'clsx';
@@ -159,11 +159,12 @@ export const AdminUsers: React.FC = () => {
 
   const fetchChurchMembers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('membros')
-        .select('id, nome, email, grupos_caseiros, setor')
-        .order('nome');
-      if (data) setChurchMembers(data);
+      const { data, error } = await rawGetAll('membros', 'id,nome,email,grupos_caseiros,setor');
+      if (data) {
+        // Ordenar alfabeticamente no client já que rawGetAll não ordena via URL facilmente
+        const sorted = data.sort((a: any, b: any) => (a.nome || '').localeCompare(b.nome || ''));
+        setChurchMembers(sorted);
+      }
     } catch (err) {
       console.error('Erro ao buscar membros:', err);
     }
@@ -588,7 +589,8 @@ export const AdminUsers: React.FC = () => {
                 {!newIsExternal ? (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Membro Vinculado</label>
-                    <select 
+                    <input 
+                      list="membros-list"
                       value={newName} 
                       onChange={e => {
                         const m = churchMembers.find(mem => mem.nome === e.target.value);
@@ -599,13 +601,14 @@ export const AdminUsers: React.FC = () => {
                           if (m.setor && m.setor.trim() !== '' && m.setor !== 'Sem Setor') setNewAssignedSector(m.setor);
                         }
                       }} 
+                      placeholder="Pesquise pelo nome..."
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white font-medium"
-                    >
-                      <option value="">Selecione o membro na base...</option>
+                    />
+                    <datalist id="membros-list">
                       {churchMembers.map(m => (
-                        <option key={m.id} value={m.nome}>{m.nome}</option>
+                        <option key={m.id} value={m.nome} />
                       ))}
-                    </select>
+                    </datalist>
                   </div>
                 ) : (
                   <div>
