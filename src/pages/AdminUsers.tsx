@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { UserCog, Plus, Save, X, Loader2, Check, Shield, Eye, EyeOff, Trash2, Lock, Cloud, CloudLightning, AlertCircle, CheckCircle2, Database } from 'lucide-react';
+import { UserCog, Plus, Save, X, Loader2, Check, Shield, Eye, EyeOff, Trash2, Lock, Cloud, CloudLightning, AlertCircle, CheckCircle2, Database, Copy } from 'lucide-react';
 import clsx from 'clsx';
 import { filterOperationalCells } from '../lib/operationalScope';
 
@@ -463,6 +463,31 @@ export const AdminUsers: React.FC = () => {
     setNewRoleName('');
   };
 
+  const handleCloneRole = (roleKey: string) => {
+    const roleToClone = dynamicRoles[roleKey];
+    if (!roleToClone) return;
+    
+    const newLabel = prompt(`Nome para a cópia de "${roleToClone.label}":`, `${roleToClone.label} (Cópia)`);
+    if (!newLabel || newLabel.trim() === '') return;
+    
+    const newKey = newLabel.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    
+    if (dynamicRoles[newKey] || newKey === '') {
+      alert("Já existe um perfil com este nome (ou o nome é inválido).");
+      return;
+    }
+    
+    setDynamicRoles(prev => ({
+      ...prev,
+      [newKey]: {
+        label: newLabel,
+        modules: [...roleToClone.modules]
+      }
+    }));
+    setSelectedRoleForEdit(newKey);
+  };
+
+
   const handleDeleteRole = (keyToDelete: string) => {
     if (['admin', 'pastor', 'secretaria', 'financeiro'].includes(keyToDelete)) {
       alert('Perfis padrão do sistema não podem ser excluídos.');
@@ -757,14 +782,23 @@ export const AdminUsers: React.FC = () => {
                 <h3 className="font-bold text-gray-900">Módulos permitidos para: <span className="text-primary-600">{dynamicRoles[selectedRoleForEdit]?.label}</span></h3>
                 <p className="text-xs text-gray-400">Ative ou desative os menus que este perfil poderá acessar.</p>
               </div>
-              {!['admin', 'pastor', 'secretaria', 'financeiro'].includes(selectedRoleForEdit) && (
+              <div className="flex gap-2">
                 <button 
-                  onClick={() => handleDeleteRole(selectedRoleForEdit)}
-                  className="text-red-500 hover:text-red-600 flex items-center gap-1 text-xs font-bold border border-red-100 px-3 py-1.5 rounded-lg bg-red-50/30"
+                  onClick={() => handleCloneRole(selectedRoleForEdit)}
+                  className="text-gray-600 hover:text-gray-900 flex items-center gap-1 text-xs font-bold border border-gray-200 px-3 py-1.5 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
+                  title="Criar um novo perfil com as mesmas visões deste"
                 >
-                  <Trash2 className="w-3 h-3" /> Excluir Perfil
+                  <Copy className="w-3 h-3" /> Clonar Perfil
                 </button>
-              )}
+                {!['admin', 'pastor', 'secretaria', 'financeiro'].includes(selectedRoleForEdit) && (
+                  <button 
+                    onClick={() => handleDeleteRole(selectedRoleForEdit)}
+                    className="text-red-500 hover:text-red-600 flex items-center gap-1 text-xs font-bold border border-red-100 px-3 py-1.5 rounded-lg bg-red-50/30"
+                  >
+                    <Trash2 className="w-3 h-3" /> Excluir Perfil
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
