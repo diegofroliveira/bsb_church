@@ -159,7 +159,7 @@ export const AdminUsers: React.FC = () => {
 
   const fetchChurchMembers = async () => {
     try {
-      const { data, error } = await rawGetAll('membros', 'id,nome,email,grupos_caseiros,setor');
+      const { data, error } = await rawGetAll('membros', 'id,nome,email,grupos_caseiros,setor_eclesiastico');
       if (data) {
         // Ordenar alfabeticamente no client já que rawGetAll não ordena via URL facilmente
         const sorted = data.sort((a: any, b: any) => (a.nome || '').localeCompare(b.nome || ''));
@@ -598,7 +598,7 @@ export const AdminUsers: React.FC = () => {
                         if (m) {
                           if (m.email) setNewEmail(m.email);
                           if (m.grupos_caseiros && m.grupos_caseiros.trim() !== '' && m.grupos_caseiros.toUpperCase() !== 'NENHUM' && m.grupos_caseiros !== 'Não participo') setNewAssignedGC(m.grupos_caseiros);
-                          if (m.setor && m.setor.trim() !== '' && m.setor !== 'Sem Setor') setNewAssignedSector(m.setor);
+                          if (m.setor_eclesiastico && m.setor_eclesiastico.trim() !== '' && m.setor_eclesiastico !== 'Sem Setor') setNewAssignedSector(m.setor_eclesiastico);
                         }
                       }} 
                       placeholder="Pesquise pelo nome..."
