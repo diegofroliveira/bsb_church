@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase, rawGetAll } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { UserCog, Plus, Save, X, Loader2, Check, Shield, Eye, EyeOff, Trash2, Lock, Cloud, CloudLightning, AlertCircle, CheckCircle2, Database, Copy } from 'lucide-react';
+import { UserCog, Plus, Save, X, Loader2, Check, Shield, Eye, EyeOff, Trash2, Lock, Cloud, CloudLightning, AlertCircle, CheckCircle2, Database, Copy, RefreshCw } from 'lucide-react';
 import clsx from 'clsx';
 import { filterOperationalCells } from '../lib/operationalScope';
 
@@ -24,7 +24,7 @@ const AVAILABLE_MODULES = [
   { id: 'Financeiro',      label: 'Financeiro',      path: '/finance' },
   { id: 'Consultor IA',    label: 'Consultor IA',    path: '/ai-consultant' },
   { id: 'Insights IA',     label: 'Insights IA',     path: '/ai-insights' },
-  { id: 'Configurações',   label: 'Configurações',   path: '/admin/users' },
+  { id: 'Configurações',   label: 'Configurações / Sincronização', path: '/admin/users' },
   { id: 'Companheirismo',   label: 'Companheirismo',   path: '/companionship' },
   { id: 'Lab: Visão da Plenitude', label: 'Lab: Visão da Plenitude', path: '/lab/vision' },
   { id: 'Lab: Gestão de Visitas', label: 'Lab: Gestão de Visitas', path: '/lab/visits' },
@@ -34,7 +34,7 @@ const AVAILABLE_MODULES = [
 const DEFAULT_ROLES: Record<string, { label: string; modules: string[] }> = {
   admin: { label: 'Administrador', modules: ['Dashboard', 'Mapa', 'Membros', 'Famílias', 'Aniversariantes', 'GCs/Localidades', 'Setores', 'Discipulado', 'Rede', 'Simulações', 'Relatórios', 'QA', 'Financeiro', 'Consultor IA', 'Insights IA', 'Configurações', 'Companheirismo', 'Lab: Visão da Plenitude', 'Lab: Gestão de Visitas', 'Lab: Consultas & Estudos'] },
   pastor: { label: 'Pastor', modules: ['Dashboard', 'Mapa', 'Membros', 'Famílias', 'Aniversariantes', 'GCs/Localidades', 'Setores', 'Discipulado', 'Rede', 'Simulações', 'Relatórios', 'QA', 'Financeiro', 'Consultor IA', 'Insights IA', 'Companheirismo', 'Lab: Visão da Plenitude', 'Lab: Gestão de Visitas', 'Lab: Consultas & Estudos'] },
-  secretaria: { label: 'Secretaria', modules: ['Dashboard', 'Membros', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Consultor IA'] },
+  secretaria: { label: 'Secretaria', modules: ['Dashboard', 'Membros', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Consultor IA', 'Configurações'] },
   financeiro: { label: 'Financeiro', modules: ['Dashboard', 'Financeiro'] }
 };
 
@@ -51,9 +51,36 @@ interface AppUser {
 
 export const AdminUsers: React.FC = () => {
   const { user: currentUser } = useAuth();
-  const [activeTab, setActiveTab] = useState<'users' | 'roles' | 'system'>('users');
+  const isSecretaria = currentUser?.role === 'secretaria';
+  const [activeTab, setActiveTab] = useState<'users' | 'roles' | 'system'>(currentUser?.role === 'secretaria' ? 'system' : 'users');
   const [users, setUsers] = useState<AppUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Quota State
+  const [quota, setQuota] = useState<{
+    isAdmin: boolean;
+    role: string;
+    usedToday: number;
+    usedThisWeek: number;
+    remainingToday: number;
+    remainingThisWeek: number;
+    maxPerDay: number;
+    maxPerWeek: number;
+    canSync: boolean;
+    blockedReason: string | null;
+  }>({
+    isAdmin: currentUser?.role === 'admin',
+    role: currentUser?.role || 'secretaria',
+    usedToday: 0,
+    usedThisWeek: 0,
+    remainingToday: 2,
+    remainingThisWeek: 5,
+    maxPerDay: 2,
+    maxPerWeek: 5,
+    canSync: true,
+    blockedReason: null
+  });
+  const [isResettingQuota, setIsResettingQuota] = useState(false);
   
   // Dynamic Roles State
   const [dynamicRoles, setDynamicRoles] = useState<Record<string, { label: string; modules: string[] }>>(DEFAULT_ROLES);
@@ -234,7 +261,65 @@ export const AdminUsers: React.FC = () => {
     return body;
   };
 
+  const fetchQuota = async () => {
+    try {
+      const apiUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? 'https://bsb-church.vercel.app/api/trigger-sync'
+        : '/api/trigger-sync';
+
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: await getAuthHeaders(),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.quota) {
+          setQuota(data.quota);
+        }
+      }
+    } catch (err) {
+      console.warn('Não foi possível buscar cota de sincronização:', err);
+    }
+  };
+
+  const handleResetSecretariaQuota = async () => {
+    if (!confirm('Deseja resetar o limite de atualizações do perfil Secretaria para hoje e esta semana?')) {
+      return;
+    }
+
+    setIsResettingQuota(true);
+    try {
+      const apiUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? 'https://bsb-church.vercel.app/api/trigger-sync'
+        : '/api/trigger-sync';
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: await getAuthHeaders(),
+        body: JSON.stringify({ action: 'reset_secretaria_quota' }),
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        alert('Cota da secretaria resetada com sucesso!');
+        if (data.quota) setQuota(data.quota);
+        else fetchQuota();
+      } else {
+        alert(data.error || 'Erro ao resetar cota da secretaria.');
+      }
+    } catch (err: any) {
+      alert('Erro de conexão ao resetar cota: ' + err.message);
+    } finally {
+      setIsResettingQuota(false);
+    }
+  };
+
   const fetchUsers = async () => {
+    if (isSecretaria) {
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     try {
       const res = await fetch('/api/list-users', { headers: await getAuthHeaders() });
@@ -270,12 +355,15 @@ export const AdminUsers: React.FC = () => {
   };
 
   useEffect(() => { 
-    fetchUsers(); 
-    fetchRolesConfig();
-    fetchGCs();
-    fetchChurchMembers();
+    if (!isSecretaria) {
+      fetchUsers(); 
+      fetchRolesConfig();
+      fetchGCs();
+      fetchChurchMembers();
+    }
     fetchLastSyncTime();
-  }, []);
+    fetchQuota();
+  }, [isSecretaria]);
 
   const handleDeleteUser = async (userId: string, userName: string) => {
     if (!confirm(`Tem certeza absoluta que deseja EXCLUIR permanentemente o perfil do usuário "${userName}"? Esta ação não pode ser desfeita.`)) {
@@ -410,6 +498,11 @@ export const AdminUsers: React.FC = () => {
   };
 
   const handleTriggerSync = async () => {
+    if (isSecretaria && !quota.canSync) {
+      alert(quota.blockedReason || 'Você já atingiu o limite de atualizações. Entre em contato com o administrador.');
+      return;
+    }
+
     setIsSyncingCloud(true);
     setSyncStatus('idle');
     setSyncMessage('');
@@ -429,9 +522,17 @@ export const AdminUsers: React.FC = () => {
       if (response.ok) {
         setSyncStatus('success');
         setSyncMessage('Sincronização iniciada com sucesso! O robô do Prover está executando no GitHub Actions e atualizará o Supabase em breve.');
+        if (data.quota) {
+          setQuota(data.quota);
+        } else {
+          fetchQuota();
+        }
       } else {
         setSyncStatus('error');
         setSyncMessage(data.error || 'Erro ao acionar a sincronização na nuvem.');
+        if (data.quota) {
+          setQuota(data.quota);
+        }
       }
     } catch (error) {
       setSyncStatus('error');
@@ -514,14 +615,26 @@ export const AdminUsers: React.FC = () => {
   return (
     <div className="space-y-6 animate-in fade-in duration-700 max-w-5xl mx-auto pb-12 px-4">
       <header className="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-        <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-50 text-purple-700 text-sm font-semibold mb-3 border border-purple-100">
-            <Shield className="w-4 h-4" /> Administração
+        {isSecretaria ? (
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-sm font-semibold mb-3 border border-blue-100">
+              <CloudLightning className="w-4 h-4" /> Sincronização de Dados
+            </div>
+            <h1 className="text-3xl font-bold tracking-tight text-gray-900">Atualização da Base de Dados</h1>
+            <p className="mt-2 text-sm text-gray-500">
+              Sincronização dos dados mais recentes do Sistema Prover com o Supabase.
+            </p>
           </div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Configurações de Acesso</h1>
-          <p className="mt-2 text-sm text-gray-500">Gerencie perfis de acesso e usuários do IgrejaPro.</p>
-        </div>
-        {activeTab === 'users' && (
+        ) : (
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-50 text-purple-700 text-sm font-semibold mb-3 border border-purple-100">
+              <Shield className="w-4 h-4" /> Administração
+            </div>
+            <h1 className="text-3xl font-bold tracking-tight text-gray-900">Configurações de Acesso</h1>
+            <p className="mt-2 text-sm text-gray-500">Gerencie perfis de acesso e usuários do IgrejaPro.</p>
+          </div>
+        )}
+        {!isSecretaria && activeTab === 'users' && (
           <button onClick={() => { setShowNewForm(true); generateRandomPassword(); }}
             className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
             <Plus className="w-4 h-4" /> Novo Usuário
@@ -529,27 +642,29 @@ export const AdminUsers: React.FC = () => {
         )}
       </header>
 
-      {/* Tabs */}
-      <div className="flex border-b border-gray-100 mb-6 gap-6">
-        <button 
-          onClick={() => setActiveTab('users')}
-          className={clsx("pb-4 font-bold text-sm border-b-2 transition-all", activeTab === 'users' ? "border-primary-600 text-primary-600" : "border-transparent text-gray-400 hover:text-gray-600")}
-        >
-          Usuários Cadastrados
-        </button>
-        <button 
-          onClick={() => setActiveTab('roles')}
-          className={clsx("pb-4 font-bold text-sm border-b-2 transition-all", activeTab === 'roles' ? "border-primary-600 text-primary-600" : "border-transparent text-gray-400 hover:text-gray-600")}
-        >
-          Gerenciamento de Perfis (RBAC)
-        </button>
-        <button 
-          onClick={() => setActiveTab('system')}
-          className={clsx("pb-4 font-bold text-sm border-b-2 transition-all", activeTab === 'system' ? "border-primary-600 text-primary-600" : "border-transparent text-gray-400 hover:text-gray-600")}
-        >
-          Sistema & Sincronização
-        </button>
-      </div>
+      {/* Tabs - exibidas apenas para administradores */}
+      {!isSecretaria && (
+        <div className="flex border-b border-gray-100 mb-6 gap-6">
+          <button 
+            onClick={() => setActiveTab('users')}
+            className={clsx("pb-4 font-bold text-sm border-b-2 transition-all", activeTab === 'users' ? "border-primary-600 text-primary-600" : "border-transparent text-gray-400 hover:text-gray-600")}
+          >
+            Usuários Cadastrados
+          </button>
+          <button 
+            onClick={() => setActiveTab('roles')}
+            className={clsx("pb-4 font-bold text-sm border-b-2 transition-all", activeTab === 'roles' ? "border-primary-600 text-primary-600" : "border-transparent text-gray-400 hover:text-gray-600")}
+          >
+            Gerenciamento de Perfis (RBAC)
+          </button>
+          <button 
+            onClick={() => setActiveTab('system')}
+            className={clsx("pb-4 font-bold text-sm border-b-2 transition-all", activeTab === 'system' ? "border-primary-600 text-primary-600" : "border-transparent text-gray-400 hover:text-gray-600")}
+          >
+            Sistema & Sincronização
+          </button>
+        </div>
+      )}
 
       {activeTab === 'users' ? (
         <>
@@ -908,18 +1023,99 @@ export const AdminUsers: React.FC = () => {
         <div className="space-y-6 animate-in fade-in duration-300">
            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
               <div className="flex flex-col md:flex-row justify-between items-start gap-8">
-                 <div className="flex gap-5">
+                 <div className="flex gap-5 flex-1">
                     <div className="p-4 bg-blue-50 text-blue-600 rounded-2xl h-max shadow-inner">
                        <CloudLightning className="w-8 h-8"/>
                     </div>
-                    <div>
-                       <h3 className="text-xl font-bold text-gray-900">Automação de Dados (Nuvem)</h3>
+                    <div className="flex-1">
+                       <div className="flex flex-wrap items-center gap-2">
+                         <h3 className="text-xl font-bold text-gray-900">Automação de Dados (Nuvem)</h3>
+                         {isSecretaria ? (
+                           <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                             Perfil Secretaria
+                           </span>
+                         ) : (
+                           <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
+                             Administrador (Ilimitado)
+                           </span>
+                         )}
+                       </div>
                        <p className="text-sm text-gray-500 max-w-2xl mt-2 leading-relaxed">
                           Este processo aciona os robôs de sincronização na nuvem (GitHub Actions) para buscar os dados mais recentes do Sistema Prover e atualizá-los no Supabase.
                           <br/><br/>
                           <span className="font-semibold text-gray-700">Atenção:</span> Use este recurso apenas quando houver mudanças urgentes que não podem esperar pela sincronização automática programada.
                        </p>
-                       
+
+                       {/* Painel de Políticas e Cotas da Secretaria */}
+                       {isSecretaria ? (
+                          <div className="mt-6 p-5 rounded-2xl bg-amber-50/70 border border-amber-200/80 space-y-3">
+                             <div className="flex items-start gap-3">
+                                <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+                                <div>
+                                   <h4 className="font-bold text-amber-900 text-sm">Regras de Atualização da Secretaria</h4>
+                                   <p className="text-xs text-amber-800 mt-0.5 leading-relaxed">
+                                      Para não sobrecarregar o fluxo, realize <strong>primeiro todas as alterações</strong> no sistema e, somente ao concluir tudo, acione a atualização. O perfil possui limite de até <strong>2 vezes por dia</strong> e no máximo <strong>5 vezes por semana</strong>.
+                                   </p>
+                                </div>
+                             </div>
+
+                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                                <div className="bg-white p-3.5 rounded-xl border border-amber-100 shadow-sm flex items-center justify-between">
+                                   <div>
+                                      <div className="text-xs text-gray-500 font-medium">Limite Diário</div>
+                                      <div className="text-base font-bold text-gray-900 mt-0.5">
+                                         {quota.usedToday} / {quota.maxPerDay} <span className="text-xs font-normal text-gray-500">utilizadas hoje</span>
+                                      </div>
+                                   </div>
+                                   <span className={clsx(
+                                      "text-xs px-2.5 py-1 rounded-full font-bold",
+                                      quota.remainingToday > 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                                   )}>
+                                      {quota.remainingToday > 0 ? `${quota.remainingToday} restante(s)` : 'Esgotado hoje'}
+                                   </span>
+                                </div>
+
+                                <div className="bg-white p-3.5 rounded-xl border border-amber-100 shadow-sm flex items-center justify-between">
+                                   <div>
+                                      <div className="text-xs text-gray-500 font-medium">Limite Semanal</div>
+                                      <div className="text-base font-bold text-gray-900 mt-0.5">
+                                         {quota.usedThisWeek} / {quota.maxPerWeek} <span className="text-xs font-normal text-gray-500">utilizadas na semana</span>
+                                      </div>
+                                   </div>
+                                   <span className={clsx(
+                                      "text-xs px-2.5 py-1 rounded-full font-bold",
+                                      quota.remainingThisWeek > 0 ? "bg-blue-100 text-blue-700" : "bg-red-100 text-red-700"
+                                   )}>
+                                      {quota.remainingThisWeek > 0 ? `${quota.remainingThisWeek} restante(s)` : 'Esgotado na semana'}
+                                   </span>
+                                </div>
+                             </div>
+
+                             {!quota.canSync && (
+                                <div className="p-3 bg-red-100/90 border border-red-200 rounded-xl text-xs font-semibold text-red-800 flex items-center gap-2">
+                                   <Lock className="w-4 h-4 shrink-0 text-red-600" />
+                                   <span>{quota.blockedReason} Se você precisar de algo além, por favor entre em contato com o administrador para solicitar uma liberação.</span>
+                                </div>
+                             )}
+                          </div>
+                       ) : (
+                          <div className="mt-6 p-4 rounded-2xl bg-purple-50/60 border border-purple-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                             <div>
+                                <div className="text-xs font-bold uppercase tracking-wider text-purple-700">Controle de Quota da Secretaria</div>
+                                <div className="text-sm text-gray-700 mt-0.5">
+                                   Uso registrado: <strong>{quota.usedToday}/{quota.maxPerDay}</strong> hoje • <strong>{quota.usedThisWeek}/{quota.maxPerWeek}</strong> nesta semana
+                                </div>
+                             </div>
+                             <button
+                                onClick={handleResetSecretariaQuota}
+                                disabled={isResettingQuota}
+                                className="text-xs font-bold text-purple-700 hover:text-purple-900 bg-white hover:bg-purple-100/50 border border-purple-200 px-3.5 py-2 rounded-xl transition-all shadow-sm shrink-0"
+                             >
+                                {isResettingQuota ? 'Resetando...' : 'Resetar Limite da Secretaria'}
+                             </button>
+                          </div>
+                       )}
+
                        {syncStatus !== 'idle' && (
                           <div className={clsx(
                              "mt-6 flex items-center gap-3 p-4 rounded-xl border animate-in zoom-in-95 duration-300",
@@ -953,11 +1149,30 @@ export const AdminUsers: React.FC = () => {
                  </div>
                  <button 
                     onClick={handleTriggerSync}
-                    disabled={isSyncingCloud}
-                    className="w-full md:w-auto flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed text-white px-8 py-4 rounded-2xl font-bold transition-all shadow-xl shadow-blue-100 group"
+                    disabled={isSyncingCloud || (isSecretaria && !quota.canSync)}
+                    className={clsx(
+                       "w-full md:w-auto flex items-center justify-center gap-2 text-white px-8 py-4 rounded-2xl font-bold transition-all shadow-xl",
+                       isSyncingCloud || (isSecretaria && !quota.canSync)
+                          ? "bg-gray-400 cursor-not-allowed shadow-none"
+                          : "bg-blue-600 hover:bg-blue-700 shadow-blue-100 group"
+                    )}
                  >
-                    {isSyncingCloud ? <Loader2 className="w-5 h-5 animate-spin"/> : <Cloud className="w-5 h-5 group-hover:scale-110 transition-transform"/>}
-                    {isSyncingCloud ? 'Processando...' : 'Forçar Atualização na Nuvem'}
+                    {isSyncingCloud ? (
+                       <>
+                          <Loader2 className="w-5 h-5 animate-spin"/>
+                          <span>Processando...</span>
+                       </>
+                    ) : isSecretaria && !quota.canSync ? (
+                       <>
+                          <Lock className="w-5 h-5"/>
+                          <span>Limite Atingido (Contate o Admin)</span>
+                       </>
+                    ) : (
+                       <>
+                          <Cloud className="w-5 h-5 group-hover:scale-110 transition-transform"/>
+                          <span>Forçar Atualização na Nuvem</span>
+                       </>
+                    )}
                  </button>
               </div>
            </div>
@@ -1000,9 +1215,11 @@ export const AdminUsers: React.FC = () => {
         </div>
       )}
 
-      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
-        <strong>Regra de Segurança:</strong> O perfil `Administrador` possui acesso irrevogável a todas as telas para evitar bloqueios acidentais no sistema.
-      </div>
+      {!isSecretaria && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
+          <strong>Regra de Segurança:</strong> O perfil `Administrador` possui acesso irrevogável a todas as telas para evitar bloqueios acidentais no sistema.
+        </div>
+      )}
     </div>
   );
 };

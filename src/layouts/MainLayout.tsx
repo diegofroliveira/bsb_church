@@ -14,7 +14,7 @@ import { LabLauncher } from '../components/LabLauncher';
 const DEFAULT_ROLES: Record<string, string[]> = {
   admin: ['Dashboard', 'Aniversariantes', 'Mapa', 'Membros', 'Famílias', 'GCs/Localidades', 'Setores', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Financeiro', 'Consultor IA', 'Insights IA', 'Configurações', 'Simulações', 'Companheirismo', 'Lab: Visão da Plenitude', 'Lab: Gestão de Visitas', 'Lab: Consultas & Estudos'],
   pastor: ['Dashboard', 'Aniversariantes', 'Mapa', 'Membros', 'Famílias', 'GCs/Localidades', 'Setores', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Financeiro', 'Consultor IA', 'Insights IA', 'Simulações', 'Companheirismo', 'Lab: Visão da Plenitude', 'Lab: Gestão de Visitas', 'Lab: Consultas & Estudos'],
-  secretaria: ['Dashboard', 'Aniversariantes', 'Membros', 'Famílias', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Consultor IA'],
+  secretaria: ['Dashboard', 'Aniversariantes', 'Membros', 'Famílias', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Consultor IA', 'Configurações'],
   financeiro: ['Dashboard', 'Financeiro']
 };
 
@@ -104,7 +104,11 @@ export const MainLayout: React.FC = () => {
         if (stored) {
           const parsed = JSON.parse(stored);
           if (parsed[userRole]) {
-            roleModules = parsed[userRole].modules;
+            const list = [...(parsed[userRole].modules || [])];
+            if (userRole === 'secretaria' && !list.includes('Configurações')) {
+              list.push('Configurações');
+            }
+            roleModules = list;
             foundLocally = true;
           }
         }
@@ -122,7 +126,11 @@ export const MainLayout: React.FC = () => {
           if (parsed && Object.keys(parsed).length > 0) {
             localStorage.setItem('church_dynamic_roles', JSON.stringify(parsed));
             if (parsed[userRole]) {
-              setAllowedModules(parsed[userRole].modules);
+              const list = [...(parsed[userRole].modules || [])];
+              if (userRole === 'secretaria' && !list.includes('Configurações')) {
+                list.push('Configurações');
+              }
+              setAllowedModules(list);
               return;
             }
           }
@@ -164,7 +172,7 @@ export const MainLayout: React.FC = () => {
     { id: 'Consultor IA',    name: 'IA',              path: '/ai-consultant', icon: Brain,           group: 'Gestão & Ferramentas' },
     { id: 'Insights IA',     name: 'Insights IA',     path: '/ai-insights',   icon: Sparkles,        group: 'Gestão & Ferramentas' },
     { id: 'QA',              name: 'QA',              path: '/qa',           icon: AlertTriangle,   group: 'Gestão & Ferramentas' },
-    { id: 'Configurações',   name: 'Configurações',   path: '/admin/users',  icon: Settings,        group: 'Gestão & Ferramentas' },
+    { id: 'Configurações',   name: user?.role === 'secretaria' ? 'Atualização da Base' : 'Configurações', path: '/admin/users', icon: user?.role === 'secretaria' ? RefreshCw : Settings, group: 'Gestão & Ferramentas' },
   ];
 
   const GROUPS = [

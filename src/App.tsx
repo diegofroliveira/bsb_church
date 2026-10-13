@@ -58,10 +58,11 @@ function App() {
               <Route element={<ProtectedRoute allowedRoles={['admin', 'pastor', 'financeiro']} />}>
                 <Route path="/finance" element={<Finance />} />
               </Route>
-              <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
+              <Route element={<ProtectedRoute allowedRoles={['admin', 'secretaria']} />}>
                 <Route path="/admin/users" element={<AdminUsers />} />
+                <Route path="/sync" element={<Navigate to="/admin/users" replace />} />
               </Route>
-              <Route path="/settings" element={<Settings />} />
+              <Route path="/settings" element={<Navigate to="/admin/users" replace />} />
               <Route element={<ProtectedRoute allowedRoles={['admin', 'pastor']} />}>
                 <Route path="/simulations" element={<Simulations />} />
                 <Route path="/lab/vision" element={<LabVision />} />

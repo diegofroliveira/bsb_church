@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabaseReader } from '../lib/supabase';
-import { Filter, Download, Loader2, Search, FileText, ArrowUpDown, ChevronUp, ChevronDown, Home, ShieldAlert, Users, Heart, Plus, X, Trash2 } from 'lucide-react';
+import { Filter, Download, Loader2, Search, FileText, ArrowUpDown, ChevronUp, ChevronDown, Home, ShieldAlert, Users, Heart, Plus, X, Trash2, Calendar } from 'lucide-react';
 import clsx from 'clsx';
 import * as XLSX from 'xlsx';
 import { filterOperationalMembers } from '../lib/operationalScope';
@@ -106,6 +106,7 @@ export const Reports: React.FC = () => {
   const [filterMaritalStatus, setFilterMaritalStatus] = useState<string[]>([]);
   const [filterMinAge, setFilterMinAge] = useState<number>(0);
   const [filterMaxAge, setFilterMaxAge] = useState<number>(120);
+  const [filterReferenceDate, setFilterReferenceDate] = useState<string>('');
   const [filterPersonType, setFilterPersonType] = useState<string[]>([]);
   const [filterStatusPessoa, setFilterStatusPessoa] = useState<string[]>([]);
   const [filterNoChildren, setFilterNoChildren] = useState(false);
@@ -474,15 +475,64 @@ export const Reports: React.FC = () => {
     return names;
   }, [members]);
 
-  const calculateAge = (dob: string) => {
+  const parseDateSafe = (dateStr: string) => {
+    if (!dateStr) return null;
+    const clean = dateStr.trim();
+    if (clean.includes('/')) {
+      const p = clean.split('/');
+      if (p.length >= 3) return new Date(Number(p[2]), Number(p[1]) - 1, Number(p[0]));
+    } else if (clean.includes('-')) {
+      const p = clean.split('T')[0].split('-');
+      if (p.length >= 3) return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+    }
+    const d = new Date(dateStr);
+    return isNaN(d.getTime()) ? null : d;
+  };
+
+  const calculateAge = (dob: string, customRefDate?: string) => {
     if (!dob) return -1;
-    let parts = dob.includes('/') ? dob.split('/') : dob.split('-');
-    const birth = dob.includes('/') ? new Date(Number(parts[2]), Number(parts[1])-1, Number(parts[0])) : new Date(dob);
-    if (isNaN(birth.getTime())) return -1;
-    const now = new Date();
-    let age = now.getFullYear() - birth.getFullYear();
-    if (now.getMonth() < birth.getMonth() || (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate())) age--;
+    const birth = parseDateSafe(dob);
+    if (!birth || isNaN(birth.getTime())) return -1;
+
+    let target: Date;
+    const refStr = customRefDate !== undefined ? customRefDate : filterReferenceDate;
+    if (refStr && refStr !== 'hoje') {
+      const refParsed = parseDateSafe(refStr);
+      target = refParsed ? new Date(refParsed.getFullYear(), refParsed.getMonth(), refParsed.getDate(), 23, 59, 59) : new Date();
+    } else {
+      target = new Date();
+    }
+
+    let age = target.getFullYear() - birth.getFullYear();
+    if (target.getMonth() < birth.getMonth() || (target.getMonth() === birth.getMonth() && target.getDate() < birth.getDate())) {
+      age--;
+    }
     return age;
+  };
+
+  const formatDisplayDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    const d = parseDateSafe(dateStr);
+    if (!d) return dateStr;
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+
+  const getNextSaturdayDate = () => {
+    const now = new Date();
+    const day = now.getDay();
+    const diff = (6 - day + 7) % 7 || 7;
+    const sat = new Date(now);
+    sat.setDate(now.getDate() + diff);
+    return sat.toISOString().split('T')[0];
+  };
+
+  const getNext30DaysDate = () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 30);
+    return d.toISOString().split('T')[0];
   };
 
   const getAgeCategory = (age: number) => {
@@ -562,7 +612,7 @@ export const Reports: React.FC = () => {
       if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [members, populationMode, filterQuery, filterType, filterGC, filterGender, filterAgeCategory, filterMinAge, filterMaxAge, filterMaritalStatus, filterState, filterSetor, filterSetorEcl, filterMestre, filterPersonType, filterStatusPessoa, filterNoChildren, filterCellRoles, filterIsDiscipulador, allParentsNames, sortField, sortDirection]);
+  }, [members, populationMode, filterQuery, filterType, filterGC, filterGender, filterAgeCategory, filterMinAge, filterMaxAge, filterReferenceDate, filterMaritalStatus, filterState, filterSetor, filterSetorEcl, filterMestre, filterPersonType, filterStatusPessoa, filterNoChildren, filterCellRoles, filterIsDiscipulador, allParentsNames, sortField, sortDirection]);
 
   // Real-time mini dashboard calculations
   const chartsData = useMemo(() => {
@@ -851,8 +901,10 @@ export const Reports: React.FC = () => {
     if (filterSetorEcl.length > 0) parts.push(`Setor GC: ${filterSetorEcl.join('/')}`);
     if (filterGC.length > 0) parts.push(filterGC.join('/'));
     if (filterMestre.length > 0) parts.push(`Disc: ${filterMestre.join('/')}`);
-    if (filterCellRoles.length > 0) parts.push(filterCellRoles.join('/'));
-    if (filterMinAge > 0 || filterMaxAge < 120) parts.push(`Idade ${filterMinAge}-${filterMaxAge}`);
+    if (filterMinAge > 0 || filterMaxAge < 120) {
+      const refSuffix = filterReferenceDate ? ` (no Evento ${formatDisplayDate(filterReferenceDate)})` : '';
+      parts.push(`Idade ${filterMinAge}-${filterMaxAge}${refSuffix}`);
+    }
     if (filterIsDiscipulador) parts.push('Discipuladores');
     
     if (parts.length === 0) {
@@ -884,15 +936,25 @@ export const Reports: React.FC = () => {
     nonEmptyGroups.forEach(g => {
       const rows = Object.values(g.membersById)
         .sort((a: any, b: any) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR'))
-        .map((m: any) => ({
-          'Nome': m.nome || '-',
-          'Idade': calculateAge(m.nascimento || m.data_nascimento || m.birth_date),
-          'Sexo': m.sexo || '-',
-          'Estado Civil': m.estado_civil || '-',
-          'Discipulador': m.discipulador || '-',
-          'Telefone': m.celular_principal_sms || m.celular || '-',
-          'GC': m.grupos_caseiros || '-',
-        }));
+        .map((m: any) => {
+          const ageOnEvent = calculateAge(m.nascimento || m.data_nascimento || m.birth_date);
+          const ageToday = calculateAge(m.nascimento || m.data_nascimento || m.birth_date, 'hoje');
+          return {
+            'Nome': m.nome || '-',
+            ...(filterReferenceDate ? {
+              [`Idade no Evento (${formatDisplayDate(filterReferenceDate)})`]: ageOnEvent >= 0 ? `${ageOnEvent} anos` : '-',
+              'Idade Atual (Hoje)': ageToday >= 0 ? `${ageToday} anos` : '-',
+            } : {
+              'Idade': ageOnEvent >= 0 ? `${ageOnEvent} anos` : '-',
+            }),
+            'Data Nascimento': m.nascimento || m.data_nascimento || m.birth_date || '-',
+            'Sexo': m.sexo || '-',
+            'Estado Civil': m.estado_civil || '-',
+            'Discipulador': m.discipulador || '-',
+            'Telefone': m.celular_principal_sms || m.celular || '-',
+            'GC': m.grupos_caseiros || '-',
+          };
+        });
       const worksheet = XLSX.utils.json_to_sheet(rows);
       
       let sheetName = (g.name || 'Grupo')
@@ -921,7 +983,15 @@ export const Reports: React.FC = () => {
       selectedColumns.forEach(key => {
         const label = columnOptions.find(o => o.key === key)?.label || key;
         let val = item[key];
-        if (key === 'idade') val = calculateAge(item.nascimento || item.data_nascimento || item.birth_date);
+        if (key === 'idade') {
+          const ageOnEvent = calculateAge(item.nascimento || item.data_nascimento || item.birth_date);
+          if (filterReferenceDate) {
+            const ageToday = calculateAge(item.nascimento || item.data_nascimento || item.birth_date, 'hoje');
+            val = `${ageOnEvent} anos (em ${formatDisplayDate(filterReferenceDate)})${ageToday !== ageOnEvent ? ` [Hoje: ${ageToday}]` : ''}`;
+          } else {
+            val = ageOnEvent >= 0 ? `${ageOnEvent} anos` : '-';
+          }
+        }
         row[label] = val || '-';
       });
       return row;
@@ -993,6 +1063,35 @@ export const Reports: React.FC = () => {
           <div className="text-sm font-semibold text-gray-700 flex items-center gap-2">
             <Filter className="h-4 w-4 text-primary-500" /> Painel de Filtros Avançados
           </div>
+          {(filterQuery || filterType.length > 0 || filterAgeCategory !== 'Todas' || filterGender.length > 0 || filterSetor.length > 0 || filterSetorEcl.length > 0 || filterGC.length > 0 || filterState.length > 0 || filterMestre.length > 0 || filterMaritalStatus.length > 0 || filterStatusPessoa.length > 0 || filterPersonType.length > 0 || filterCellRoles.length > 0 || filterMinAge > 0 || filterMaxAge < 120 || filterNoChildren || filterIsDiscipulador || filterReferenceDate || populationMode !== 'todos') && (
+            <button 
+              type="button"
+              onClick={() => {
+                setFilterQuery('');
+                setFilterType([]);
+                setFilterAgeCategory('Todas');
+                setFilterGender([]);
+                setFilterSetor([]);
+                setFilterSetorEcl([]);
+                setFilterGC([]);
+                setFilterState([]);
+                setFilterMestre([]);
+                setFilterMaritalStatus([]);
+                setFilterStatusPessoa([]);
+                setFilterPersonType([]);
+                setFilterCellRoles([]);
+                setFilterMinAge(0);
+                setFilterMaxAge(120);
+                setFilterReferenceDate('');
+                setFilterNoChildren(false);
+                setFilterIsDiscipulador(false);
+                setPopulationMode('todos');
+              }}
+              className="text-xs text-red-600 font-medium hover:underline flex items-center gap-1"
+            >
+              Limpar Filtros
+            </button>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -1069,6 +1168,60 @@ export const Reports: React.FC = () => {
              </div>
           </div>
 
+          <div className="xl:col-span-1">
+             <div className="flex items-center justify-between mb-1">
+               <label className="text-xs font-medium text-gray-700 flex items-center gap-1.5">
+                 <Calendar className="w-3.5 h-3.5 text-primary-600" />
+                 Data Base (Evento / Retiro)
+               </label>
+               {filterReferenceDate && (
+                 <button 
+                   type="button"
+                   onClick={() => setFilterReferenceDate('')}
+                   className="text-[10px] text-gray-400 hover:text-red-500 font-semibold"
+                   title="Voltar para data atual"
+                 >
+                   Limpar
+                 </button>
+               )}
+             </div>
+             <input
+               type="date"
+               value={filterReferenceDate}
+               onChange={e => setFilterReferenceDate(e.target.value)}
+               className={`w-full py-1.5 px-3 text-sm border rounded-lg focus:ring-2 focus:ring-primary-500 outline-none transition-colors ${
+                 filterReferenceDate ? 'border-primary-500 bg-primary-50/40 text-primary-900 font-semibold shadow-xs' : 'border-gray-200 bg-white text-gray-700'
+               }`}
+             />
+             <div className="flex items-center gap-1 mt-1 text-[10px]">
+               <button
+                 type="button"
+                 onClick={() => setFilterReferenceDate('')}
+                 className={`px-1.5 py-0.5 rounded transition-colors ${
+                   !filterReferenceDate ? 'bg-primary-100 text-primary-700 font-bold' : 'text-gray-500 hover:bg-gray-100'
+                 }`}
+               >
+                 Hoje
+               </button>
+               <button
+                 type="button"
+                 onClick={() => setFilterReferenceDate(getNextSaturdayDate())}
+                 className="px-1.5 py-0.5 rounded text-gray-500 hover:bg-gray-100 transition-colors"
+                 title="Próximo sábado"
+               >
+                 Próx. Sáb
+               </button>
+               <button
+                 type="button"
+                 onClick={() => setFilterReferenceDate(getNext30DaysDate())}
+                 className="px-1.5 py-0.5 rounded text-gray-500 hover:bg-gray-100 transition-colors"
+                 title="Daqui a 30 dias"
+               >
+                 +30 dias
+               </button>
+             </div>
+          </div>
+
           <div className="xl:col-span-1 flex items-end pb-1">
              <label className="flex items-center gap-2 cursor-pointer group p-2 rounded-lg hover:bg-gray-50 transition-colors border border-dashed border-gray-200 w-full h-[38px]">
                 <input 
@@ -1094,6 +1247,27 @@ export const Reports: React.FC = () => {
           </div>
 
         </div>
+
+        {filterReferenceDate && (
+          <div className="bg-primary-50 border border-primary-200 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-primary-950 animate-in fade-in duration-300">
+            <div className="flex items-start sm:items-center gap-2.5">
+              <Calendar className="h-4 w-4 text-primary-600 shrink-0 mt-0.5 sm:mt-0" />
+              <div>
+                <span className="font-bold text-primary-900">Simulação de Idade para Evento / Retiro Ativa:</span>
+                <span className="ml-1 text-primary-800">
+                  Todas as idades e faixas etárias estão calculadas considerando a data do evento <strong>{formatDisplayDate(filterReferenceDate)}</strong>. Membros que fizerem aniversário até essa data já aparecem com a nova idade.
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setFilterReferenceDate('')}
+              className="self-end sm:self-auto text-primary-700 hover:text-primary-900 font-semibold underline text-xs shrink-0 hover:bg-primary-100/60 px-2 py-1 rounded transition-colors"
+            >
+              Restaurar para hoje
+            </button>
+          </div>
+        )}
 
         {/* Quick group-assign bar: add the current filter result to a group without scrolling down */}
         <div className="flex flex-wrap items-center gap-2 border-t border-gray-100 pt-4">
@@ -1246,7 +1420,11 @@ export const Reports: React.FC = () => {
               <Download className="h-3.5 w-3.5" /> Exportar Grupos
             </button>
           </div>
-        </div>
+        {groups.length === 0 && (
+          <p className="text-xs text-gray-400 italic text-center py-6">
+            Nenhum grupo criado ainda. Ajuste os filtros acima e clique em "Novo Grupo" — o nome já sai baseado no filtro atual.
+          </p>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {groups.map(g => {
@@ -1410,7 +1588,7 @@ export const Reports: React.FC = () => {
                     <tr>
                       <th className="py-4 pl-6 pr-2 text-left text-xs font-bold text-gray-400 uppercase w-12">#</th>
                       <th className="py-4 pl-2 pr-3 text-left text-xs font-bold text-gray-600 uppercase cursor-pointer hover:bg-gray-100 transition-colors group" onClick={() => toggleSort('nome')}><div className="flex items-center gap-1">Nome {sortField === 'nome' ? (sortDirection === 'asc' ? <ChevronUp className="h-3 w-3 text-primary-500" /> : <ChevronDown className="h-3 w-3 text-primary-500" />) : <ArrowUpDown className="h-3 w-3 text-gray-300 opacity-0 group-hover:opacity-100" />}</div></th>
-                      <th className="px-3 py-4 text-left text-xs font-bold text-gray-600 uppercase cursor-pointer hover:bg-gray-100 transition-colors group" onClick={() => toggleSort('idade')}><div className="flex items-center gap-1">Perfil / Idade {sortField === 'idade' ? (sortDirection === 'asc' ? <ChevronUp className="h-3 w-3 text-primary-500" /> : <ChevronDown className="h-3 w-3 text-primary-500" />) : <ArrowUpDown className="h-3 w-3 text-gray-300 opacity-0 group-hover:opacity-100" />}</div></th>
+                      <th className="px-3 py-4 text-left text-xs font-bold text-gray-600 uppercase cursor-pointer hover:bg-gray-100 transition-colors group" onClick={() => toggleSort('idade')}><div className="flex items-center gap-1">Perfil / Idade {filterReferenceDate ? `(em ${formatDisplayDate(filterReferenceDate)})` : ''} {sortField === 'idade' ? (sortDirection === 'asc' ? <ChevronUp className="h-3 w-3 text-primary-500" /> : <ChevronDown className="h-3 w-3 text-primary-500" />) : <ArrowUpDown className="h-3 w-3 text-gray-300 opacity-0 group-hover:opacity-100" />}</div></th>
                       <th className="px-3 py-4 text-left text-xs font-bold text-gray-600 uppercase cursor-pointer hover:bg-gray-100 transition-colors group" onClick={() => toggleSort('grupos_caseiros')}><div className="flex items-center gap-1">GC / Setor {sortField === 'grupos_caseiros' ? (sortDirection === 'asc' ? <ChevronUp className="h-3 w-3 text-primary-500" /> : <ChevronDown className="h-3 w-3 text-primary-500" />) : <ArrowUpDown className="h-3 w-3 text-gray-300 opacity-0 group-hover:opacity-100" />}</div></th>
                       <th className="px-3 py-4 text-left text-xs font-bold text-gray-600 uppercase cursor-pointer hover:bg-gray-100 transition-colors group" onClick={() => toggleSort('discipulador')}><div className="flex items-center gap-1">Discipulador {sortField === 'discipulador' ? (sortDirection === 'asc' ? <ChevronUp className="h-3 w-3 text-primary-500" /> : <ChevronDown className="h-3 w-3 text-primary-500" />) : <ArrowUpDown className="h-3 w-3 text-gray-300 opacity-0 group-hover:opacity-100" />}</div></th>
                     </tr>
@@ -1418,6 +1596,8 @@ export const Reports: React.FC = () => {
                   <tbody className="divide-y divide-gray-100 bg-white">
                     {filteredMembers.slice(0, 100).map((m, idx) => {
                       const age = calculateAge(m.nascimento || m.data_nascimento || m.birth_date);
+                      const ageToday = filterReferenceDate ? calculateAge(m.nascimento || m.data_nascimento || m.birth_date, 'hoje') : age;
+                      const turnsAge = filterReferenceDate && ageToday >= 0 && age > ageToday;
                       
                       return (
                         <tr key={m.id || idx} className="hover:bg-gray-50/50">
@@ -1447,7 +1627,17 @@ export const Reports: React.FC = () => {
                                     </span>
                                   )}
                                 </div>
-                                <span className="text-xs text-gray-500 mt-1">{age > 0 ? `${age} anos` : '-'} - {m.sexo||''}</span>
+                                <div className="flex items-center gap-1.5 mt-1">
+                                  <span className="text-xs text-gray-700 font-medium">
+                                    {age >= 0 ? `${age} anos` : '-'}
+                                  </span>
+                                  <span className="text-xs text-gray-400">· {m.sexo || ''}</span>
+                                </div>
+                                {turnsAge && (
+                                  <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5 mt-1 inline-flex items-center gap-1 w-fit">
+                                    Hoje: {ageToday} anos (completa {age} até o evento)
+                                  </span>
+                                )}
                              </div>
                           </td>
                           <td className="whitespace-nowrap px-3 py-4">

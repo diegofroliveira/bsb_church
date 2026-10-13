@@ -46,9 +46,9 @@ function getSessionClient(token) {
   });
 }
 
-export async function requireAdmin(req) {
+export async function requireAuthUser(req) {
   const token = getBearerToken(req);
-  if (!token) throw Object.assign(new Error('Sessão administrativa não informada.'), { status: 401 });
+  if (!token) throw Object.assign(new Error('Sessão de usuário não informada.'), { status: 401 });
 
   const hasServiceRole = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
   const supabase = hasServiceRole ? getAdminClient() : getSessionClient(token);
@@ -64,11 +64,29 @@ export async function requireAdmin(req) {
     .maybeSingle();
 
   const role = String(profile?.role || authData.user.user_metadata?.role || '').toLowerCase();
-  if (role !== 'admin' && role !== 'administrador') {
+
+  return { supabase, user: authData.user, profile, role, hasServiceRole };
+}
+
+export async function requireAdmin(req) {
+  const auth = await requireAuthUser(req);
+  if (auth.role !== 'admin' && auth.role !== 'administrador') {
     throw Object.assign(new Error('Apenas administradores podem executar esta operação.'), { status: 403 });
   }
 
-  return { supabase, user: authData.user, profile, hasServiceRole };
+  return auth;
+}
+
+export async function requireSyncAccess(req) {
+  const auth = await requireAuthUser(req);
+  const isAdmin = auth.role === 'admin' || auth.role === 'administrador';
+  const isSecretaria = auth.role === 'secretaria';
+
+  if (!isAdmin && !isSecretaria) {
+    throw Object.assign(new Error('Apenas administradores e o perfil secretaria possuem permissão para atualizar a base.'), { status: 403 });
+  }
+
+  return { ...auth, isAdmin, isSecretaria };
 }
 
 export function requireServiceRole(hasServiceRole) {

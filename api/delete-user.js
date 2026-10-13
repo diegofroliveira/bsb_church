@@ -8,7 +8,7 @@ export default async function handler(req, res) {
     const { supabase, user: admin, hasServiceRole } = await requireAdmin(req);
     requireServiceRole(hasServiceRole);
     const { userId } = await readJson(req);
-    if (!userId || userId === SPECIAL_CONFIG_ID) throw Object.assign(new Error('Usuário inválido.'), { status: 400 });
+    if (!userId || userId === SPECIAL_CONFIG_ID || userId === '00000000-0000-0000-0000-000000000002') throw Object.assign(new Error('Usuário inválido.'), { status: 400 });
     if (userId === admin.id) throw Object.assign(new Error('Não é permitido excluir o próprio usuário.'), { status: 400 });
     const { error } = await supabase.auth.admin.deleteUser(userId);
     if (error) throw error;

@@ -118,11 +118,24 @@ export const Members: React.FC = () => {
     fetchAllData();
   }, [user]);
 
+  const parseDateSafe = (dateStr: string) => {
+    if (!dateStr) return null;
+    const clean = dateStr.trim();
+    if (clean.includes('/')) {
+      const p = clean.split('/');
+      if (p.length >= 3) return new Date(Number(p[2]), Number(p[1]) - 1, Number(p[0]));
+    } else if (clean.includes('-')) {
+      const p = clean.split('T')[0].split('-');
+      if (p.length >= 3) return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+    }
+    const d = new Date(dateStr);
+    return isNaN(d.getTime()) ? null : d;
+  };
+
   const calculateAge = (dob: string) => {
     if (!dob) return -1;
-    let parts = dob.includes('/') ? dob.split('/') : dob.split('-');
-    const birth = dob.includes('/') ? new Date(Number(parts[2]), Number(parts[1])-1, Number(parts[0])) : new Date(dob);
-    if (isNaN(birth.getTime())) return -1;
+    const birth = parseDateSafe(dob);
+    if (!birth || isNaN(birth.getTime())) return -1;
     const now = new Date();
     let age = now.getFullYear() - birth.getFullYear();
     if (now.getMonth() < birth.getMonth() || (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate())) age--;

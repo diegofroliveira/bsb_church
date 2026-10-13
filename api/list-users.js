@@ -9,7 +9,7 @@ export default async function handler(req, res) {
       if (error) throw error;
       return sendJson(res, 200, {
         users: (profiles || [])
-          .filter(profile => profile.id !== '00000000-0000-0000-0000-000000000000')
+          .filter(profile => profile.id !== '00000000-0000-0000-0000-000000000000' && profile.id !== '00000000-0000-0000-0000-000000000002' && profile.role !== 'system')
           .map(profile => ({
             id: profile.id,
             email: profile.email || '',
@@ -35,7 +35,7 @@ export default async function handler(req, res) {
     if (profilesError) throw profilesError;
     const byId = new Map((profiles || []).map(profile => [profile.id, profile]));
     const result = users
-      .filter(user => user.id !== '00000000-0000-0000-0000-000000000000')
+      .filter(user => user.id !== '00000000-0000-0000-0000-000000000000' && user.id !== '00000000-0000-0000-0000-000000000002')
       .map(user => {
         const profile = byId.get(user.id) || {};
         return {

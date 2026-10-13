@@ -9,7 +9,7 @@ export default async function handler(req, res) {
     requireServiceRole(hasServiceRole);
     const body = await readJson(req);
     const { userId, name, role, assigned_gc, assigned_sector } = body;
-    if (!userId || userId === SPECIAL_CONFIG_ID) throw Object.assign(new Error('Usuário inválido.'), { status: 400 });
+    if (!userId || userId === SPECIAL_CONFIG_ID || userId === '00000000-0000-0000-0000-000000000002') throw Object.assign(new Error('Usuário inválido.'), { status: 400 });
     if (!String(name || '').trim()) throw Object.assign(new Error('O nome é obrigatório.'), { status: 400 });
     if (userId === admin.id && role !== 'admin') {
       throw Object.assign(new Error('Não é possível remover o próprio acesso de administrador.'), { status: 400 });
