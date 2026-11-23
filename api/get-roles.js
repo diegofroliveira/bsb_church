@@ -21,9 +21,15 @@ export default async function handler(req, res) {
       .eq('role', 'admin');
 
     if (data && data.length > 0) {
-      const rowWithConfig = data.find(r => r.avatar && r.avatar.startsWith('{"'));
-      if (rowWithConfig && rowWithConfig.avatar) {
-        return sendJson(res, 200, JSON.parse(rowWithConfig.avatar));
+      for (const r of data) {
+        if (r.avatar && r.avatar.startsWith('{"')) {
+          try {
+            const parsed = JSON.parse(r.avatar);
+            if (parsed && parsed.admin && Array.isArray(parsed.admin.modules)) {
+              return sendJson(res, 200, parsed);
+            }
+          } catch (_) {}
+        }
       }
     }
     return sendJson(res, 200, {});

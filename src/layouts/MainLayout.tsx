@@ -103,10 +103,13 @@ export const MainLayout: React.FC = () => {
         const stored = localStorage.getItem('church_dynamic_roles');
         if (stored) {
           const parsed = JSON.parse(stored);
-          if (parsed[userRole]) {
-            const list = [...(parsed[userRole].modules || [])];
+          if (parsed && parsed[userRole] && Array.isArray(parsed[userRole].modules)) {
+            const list = [...parsed[userRole].modules];
             if (userRole === 'secretaria' && !list.includes('Configurações')) {
               list.push('Configurações');
+            }
+            if (userRole === 'secretaria' && !list.includes('Aniversariantes')) {
+              list.push('Aniversariantes');
             }
             roleModules = list;
             foundLocally = true;
@@ -123,12 +126,15 @@ export const MainLayout: React.FC = () => {
         const response = await fetch('/api/get-roles');
         if (response.ok) {
           const parsed = await response.json();
-          if (parsed && Object.keys(parsed).length > 0) {
+          if (parsed && parsed.admin && Array.isArray(parsed.admin.modules)) {
             localStorage.setItem('church_dynamic_roles', JSON.stringify(parsed));
-            if (parsed[userRole]) {
-              const list = [...(parsed[userRole].modules || [])];
+            if (parsed[userRole] && Array.isArray(parsed[userRole].modules)) {
+              const list = [...parsed[userRole].modules];
               if (userRole === 'secretaria' && !list.includes('Configurações')) {
                 list.push('Configurações');
+              }
+              if (userRole === 'secretaria' && !list.includes('Aniversariantes')) {
+                list.push('Aniversariantes');
               }
               setAllowedModules(list);
               return;

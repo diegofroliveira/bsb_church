@@ -46,17 +46,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
+    let isMounted = true;
+
+    // Fallback de segurança para redes móveis instáveis (4G/5G):
+    // garante que a tela nunca fique presa infinitamente em carregamento
+    const safetyTimeout = window.setTimeout(() => {
+      if (isMounted) {
+        setIsLoading(false);
+      }
+    }, 8000);
+
     // Get initial session
     const initAuth = async () => {
       try {
         console.log("Iniciando verificação de sessão...");
+        // Se houve migração de sessionStorage para localStorage, aproveita sessão antiga se existir
+        try {
+          for (let i = 0; i < window.sessionStorage.length; i++) {
+            const key = window.sessionStorage.key(i);
+            if (key && key.startsWith('sb-') && !window.localStorage.getItem(key)) {
+              const val = window.sessionStorage.getItem(key);
+              if (val) window.localStorage.setItem(key, val);
+            }
+          }
+        } catch (_) {}
+
         const { data: { session } } = await supabase.auth.getSession();
-        setUser(mapSupabaseUser(session?.user || null));
+        if (isMounted) {
+          setUser(mapSupabaseUser(session?.user || null));
+        }
         console.log("Sessão carregada com sucesso.");
       } catch (err) {
         console.error("Erro crítico na inicialização do Auth:", err);
       } finally {
-        setIsLoading(false);
+        window.clearTimeout(safetyTimeout);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
@@ -64,11 +90,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(mapSupabaseUser(session?.user || null));
-      setIsLoading(false);
+      window.clearTimeout(safetyTimeout);
+      if (isMounted) {
+        setUser(mapSupabaseUser(session?.user || null));
+        setIsLoading(false);
+      }
     });
 
     return () => {
+      isMounted = false;
+      window.clearTimeout(safetyTimeout);
       subscription.unsubscribe();
     };
   }, []);

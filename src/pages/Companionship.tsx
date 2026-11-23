@@ -289,6 +289,7 @@ export const Companionship: React.FC = () => {
 
       currentConfig.companionships = updatedList;
       localStorage.setItem('church_dynamic_roles', JSON.stringify(currentConfig));
+      localStorage.setItem('church_companionships', JSON.stringify(updatedList));
 
       if (currentUser?.id) {
         await supabase.from('profiles').upsert({

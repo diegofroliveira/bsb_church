@@ -34,7 +34,7 @@ const AVAILABLE_MODULES = [
 const DEFAULT_ROLES: Record<string, { label: string; modules: string[] }> = {
   admin: { label: 'Administrador', modules: ['Dashboard', 'Mapa', 'Membros', 'Famílias', 'Aniversariantes', 'GCs/Localidades', 'Setores', 'Discipulado', 'Rede', 'Simulações', 'Relatórios', 'QA', 'Financeiro', 'Consultor IA', 'Insights IA', 'Configurações', 'Companheirismo', 'Lab: Visão da Plenitude', 'Lab: Gestão de Visitas', 'Lab: Consultas & Estudos'] },
   pastor: { label: 'Pastor', modules: ['Dashboard', 'Mapa', 'Membros', 'Famílias', 'Aniversariantes', 'GCs/Localidades', 'Setores', 'Discipulado', 'Rede', 'Simulações', 'Relatórios', 'QA', 'Financeiro', 'Consultor IA', 'Insights IA', 'Companheirismo', 'Lab: Visão da Plenitude', 'Lab: Gestão de Visitas', 'Lab: Consultas & Estudos'] },
-  secretaria: { label: 'Secretaria', modules: ['Dashboard', 'Membros', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Consultor IA', 'Configurações'] },
+  secretaria: { label: 'Secretaria', modules: ['Dashboard', 'Aniversariantes', 'Membros', 'Famílias', 'GCs/Localidades', 'Discipulado', 'Rede', 'Relatórios', 'QA', 'Consultor IA', 'Configurações'] },
   financeiro: { label: 'Financeiro', modules: ['Dashboard', 'Financeiro'] }
 };
 
@@ -337,14 +337,16 @@ export const AdminUsers: React.FC = () => {
       const stored = localStorage.getItem('church_dynamic_roles');
       if (stored) {
         const parsed = JSON.parse(stored);
-        setDynamicRoles(parsed);
+        if (parsed && parsed.admin && Array.isArray(parsed.admin.modules)) {
+          setDynamicRoles(parsed);
+        }
       }
 
       // Busca dados sincronizados na nuvem
       const response = await fetch('/api/get-roles');
       if (response.ok) {
         const parsed = await response.json();
-        if (parsed && Object.keys(parsed).length > 0) {
+        if (parsed && parsed.admin && Array.isArray(parsed.admin.modules)) {
           setDynamicRoles(parsed);
           localStorage.setItem('church_dynamic_roles', JSON.stringify(parsed));
         }
@@ -390,11 +392,26 @@ export const AdminUsers: React.FC = () => {
   const saveRolesConfig = async (updatedRoles: typeof dynamicRoles) => {
     setIsSavingRoles(true);
     try {
-      localStorage.setItem('church_dynamic_roles', JSON.stringify(updatedRoles));
+      let existingCompanionships: any = undefined;
+      try {
+        const stored = localStorage.getItem('church_dynamic_roles');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed && parsed.companionships) {
+            existingCompanionships = parsed.companionships;
+          }
+        }
+      } catch (_) {}
+
+      const payloadToSave = existingCompanionships
+        ? { ...updatedRoles, companionships: existingCompanionships }
+        : updatedRoles;
+
+      localStorage.setItem('church_dynamic_roles', JSON.stringify(payloadToSave));
       
       const { error } = await supabase.from('profiles').upsert({
         id: currentUser?.id,
-        avatar: JSON.stringify(updatedRoles),
+        avatar: JSON.stringify(payloadToSave),
         email: currentUser?.email,
         name: currentUser?.name,
         role: currentUser?.role,
@@ -740,7 +757,7 @@ export const AdminUsers: React.FC = () => {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Perfil de acesso</label>
                   <select value={newRole} onChange={e => setNewRole(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white font-medium">
-                    {Object.entries(dynamicRoles).map(([key, r]) => <option key={key} value={key}>{r.label}</option>)}
+                    {Object.entries(dynamicRoles).filter(([_, r]) => r && Array.isArray((r as any).modules)).map(([key, r]) => <option key={key} value={key}>{r.label}</option>)}
                   </select>
                 </div>
                 <div>
@@ -845,7 +862,7 @@ export const AdminUsers: React.FC = () => {
                           {isEditing ? (
                             <select value={editRole} onChange={e => setEditRole(e.target.value)}
                               className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white shadow-sm font-medium">
-                              {Object.entries(dynamicRoles).map(([key, r]) => <option key={key} value={key}>{r.label}</option>)}
+                              {Object.entries(dynamicRoles).filter(([_, r]) => r && Array.isArray((r as any).modules)).map(([key, r]) => <option key={key} value={key}>{r.label}</option>)}
                             </select>
                           ) : (
                             <span className="text-sm text-gray-300">—</span>
@@ -907,7 +924,7 @@ export const AdminUsers: React.FC = () => {
               <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2"><Shield className="w-5 h-5 text-primary-600" /> Perfis Ativos</h3>
               
               <div className="space-y-2">
-                {Object.entries(dynamicRoles).map(([key, r]) => (
+                {Object.entries(dynamicRoles).filter(([_, r]) => r && Array.isArray((r as any).modules)).map(([key, r]) => (
                   <div 
                     key={key} 
                     onClick={() => setSelectedRoleForEdit(key)}
@@ -920,7 +937,7 @@ export const AdminUsers: React.FC = () => {
                   >
                     <div className="flex flex-col">
                       <span className="font-bold text-gray-900 text-sm">{r.label}</span>
-                      <span className="text-[10px] text-gray-400 font-semibold uppercase">{r.modules.length} módulos liberados</span>
+                      <span className="text-[10px] text-gray-400 font-semibold uppercase">{(r.modules || []).length} módulos liberados</span>
                     </div>
                     {selectedRoleForEdit === key && <Check className="w-4 h-4 text-primary-600" />}
                   </div>
