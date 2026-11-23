@@ -27,7 +27,8 @@ export const MainLayout: React.FC = () => {
   const [isLabOpen, setIsLabOpen] = useState(false);
   const [hasNewVersion, setHasNewVersion] = useState(false);
 
-  const hasAccessToAnyLab = allowedModules.some(m => m.startsWith('Lab:'));
+  const safeAllowedModules = Array.isArray(allowedModules) ? allowedModules : [];
+  const hasAccessToAnyLab = safeAllowedModules.some(m => typeof m === 'string' && m.startsWith('Lab:'));
 
   useEffect(() => {
     let initialVersion: string | null = null;
@@ -74,12 +75,12 @@ export const MainLayout: React.FC = () => {
     };
 
     const requiredModule = labRouteMap[currentPath];
-    if (requiredModule && user?.role !== 'admin' && allowedModules.length > 0) {
-      if (!allowedModules.includes(requiredModule)) {
+    if (requiredModule && user?.role !== 'admin' && safeAllowedModules.length > 0) {
+      if (!safeAllowedModules.includes(requiredModule)) {
         navigate('/');
       }
     }
-  }, [location.pathname, allowedModules, navigate, user]);
+  }, [location.pathname, safeAllowedModules, navigate, user]);
 
   useEffect(() => {
     if (user?.forcePasswordReset) {
@@ -190,7 +191,7 @@ export const MainLayout: React.FC = () => {
   ];
 
   const authorizedNavItems = navItems.filter(item =>
-    allowedModules.includes(item.id) ||
+    safeAllowedModules.includes(item.id) ||
     (item.id === 'Visões de Liderança' && ['admin', 'pastor', 'leader'].includes(user?.role || ''))
   );
 
@@ -332,7 +333,7 @@ export const MainLayout: React.FC = () => {
       </div>
 
       {/* Discreet watermark signature */}
-      <div className="fixed bottom-2 right-4 text-[10px] text-slate-300/80 select-none pointer-events-none tracking-widest z-50 font-serif">
+      <div translate="no" className="notranslate fixed bottom-2 right-4 text-[10px] text-slate-300/80 select-none pointer-events-none tracking-widest z-50 font-serif">
         רוּמָה
       </div>
     </div>

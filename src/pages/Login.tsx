@@ -193,7 +193,7 @@ export const Login: React.FC = () => {
                 disabled={loading}
                 className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-500 px-4 py-3.5 text-sm font-semibold text-white shadow-md hover:from-primary-500 hover:to-primary-400 disabled:opacity-70 transition-all"
               >
-                {loading ? 'Enviando...' : 'Enviar Link de Recuperação'}
+                <span>{loading ? 'Enviando...' : 'Enviar Link de Recuperação'}</span>
                 {!loading && <ArrowRight className="w-4 h-4" />}
               </button>
 
@@ -281,7 +281,7 @@ export const Login: React.FC = () => {
               disabled={loading}
               className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-500 px-4 py-3.5 text-sm font-semibold text-white shadow-md hover:from-primary-500 hover:to-primary-400 focus-visible:outline-primary-600 disabled:opacity-70 transition-all active:scale-[0.98]"
             >
-              {loading ? 'Entrando...' : 'Entrar'}
+              <span>{loading ? 'Entrando...' : 'Entrar'}</span>
               {!loading && <ArrowRight className="w-4 h-4" />}
             </button>
           </form>

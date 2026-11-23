@@ -32,11 +32,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const mapSupabaseUser = (sbUser: SupabaseUser | null): User | null => {
     if (!sbUser) return null;
     
+    const rawRole = String(sbUser.user_metadata?.role || 'pastor').trim().toLowerCase();
     return {
       id: sbUser.id,
       email: sbUser.email || '',
-      name: sbUser.user_metadata?.name || sbUser.email?.split('@')[0] || 'Usuário',
-      role: (sbUser.user_metadata?.role as Role) || 'pastor', // Default role if not set
+      name: String(sbUser.user_metadata?.name || sbUser.email?.split('@')[0] || 'Usuário'),
+      role: (rawRole as Role) || 'pastor', // Default role if not set
       avatar: sbUser.user_metadata?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${sbUser.id}`,
       groupId: sbUser.user_metadata?.groupId,
       assigned_gc: sbUser.user_metadata?.assigned_gc,
@@ -107,15 +108,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password?: string) => {
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password: password || '123456', // Default password if not provided for ease of testing
       });
       
       if (error) throw error;
+      if (data?.user) {
+        setUser(mapSupabaseUser(data.user));
+      }
     } catch (err: any) {
-      setIsLoading(false);
       throw new Error(err.message || 'Erro ao realizar login');
+    } finally {
+      setIsLoading(false);
     }
   };
 
